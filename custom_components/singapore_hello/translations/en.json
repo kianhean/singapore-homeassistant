@@ -1,0 +1,16 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Singapore Hello World",
+        "description": "Set up the Singapore Hello World integration.",
+        "data": {
+          "name": "Integration Name"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This integration is already configured."
+    }
+  }
+}
