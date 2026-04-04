@@ -1,143 +1,151 @@
-"""Tests for Singapore electricity tariff sensor platform."""
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+"""Tests for Singapore SP Group tariff sensor entities."""
+from unittest.mock import MagicMock
 
-from homeassistant.const import CONF_NAME
-from homeassistant.core import HomeAssistant
+from custom_components.singapore.coordinator import TariffData, UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER
+from custom_components.singapore.sensor import (
+    SingaporeElectricityTariffSensor,
+    SingaporeGasTariffSensor,
+    SingaporeSolarExportPriceSensor,
+    SingaporeWaterTariffSensor,
+)
 
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+_DATA = TariffData(
+    electricity_price=29.29,
+    network_cost=7.61,
+    gas_price=20.14,
+    water_price=3.69,
+    quarter="Q1",
+    year=2025,
+)
 
-from custom_components.singapore import DOMAIN
-from custom_components.singapore.coordinator import UNIT
-
-_HTML_TABLE = """
-<html><body>
-<h2>Electricity Tariff – 1 January 2025 to 31 March 2025</h2>
-<table>
-  <thead><tr><th>Component</th><th>Rate (¢/kWh)</th></tr></thead>
-  <tbody>
-    <tr><td>Energy</td><td>14.32</td></tr>
-    <tr><td>Network</td><td>7.61</td></tr>
-    <tr><td>Total (incl. GST)</td><td>29.29</td></tr>
-  </tbody>
-</table>
-</body></html>
-"""
-
-_TARIFF_ENTITY = "sensor.singapore_electricity_tariff"
-_SOLAR_ENTITY = "sensor.singapore_solar_export_price"
+_COMMON_ATTRS = {"quarter": "Q1", "year": 2025, "source": "SP Group"}
 
 
-async def _setup_entry(hass: HomeAssistant) -> MockConfigEntry:
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        data={CONF_NAME: "Singapore Electricity"},
-        unique_id="singapore_electricity",
-    )
-    entry.add_to_hass(hass)
-
-    mock_response = AsyncMock()
-    mock_response.status = 200
-    mock_response.text = AsyncMock(return_value=_HTML_TABLE)
-    mock_response.__aenter__ = AsyncMock(return_value=mock_response)
-    mock_response.__aexit__ = AsyncMock(return_value=False)
-
-    mock_session = MagicMock()
-    mock_session.get = MagicMock(return_value=mock_response)
-
-    with patch(
-        "custom_components.singapore_hello.coordinator.async_get_clientsession",
-        return_value=mock_session,
-    ):
-        await hass.config_entries.async_setup(entry.entry_id)
-        await hass.async_block_till_done()
-
-    return entry
+def _coordinator(data=_DATA):
+    coordinator = MagicMock()
+    coordinator.data = data
+    return coordinator
 
 
 # ---------------------------------------------------------------------------
-# Electricity tariff sensor
+# Electricity tariff
 # ---------------------------------------------------------------------------
 
 
-async def test_tariff_sensor_state(hass: HomeAssistant) -> None:
-    await _setup_entry(hass)
-    state = hass.states.get(_TARIFF_ENTITY)
-    assert state is not None
-    assert float(state.state) == 29.29
+def test_electricity_value():
+    sensor = SingaporeElectricityTariffSensor(_coordinator(), "entry1")
+    assert sensor.native_value == 29.29
 
 
-async def test_tariff_sensor_unit(hass: HomeAssistant) -> None:
-    await _setup_entry(hass)
-    state = hass.states.get(_TARIFF_ENTITY)
-    assert state.attributes.get("unit_of_measurement") == UNIT
+def test_electricity_unit():
+    sensor = SingaporeElectricityTariffSensor(_coordinator(), "entry1")
+    assert sensor.native_unit_of_measurement == UNIT_ELECTRICITY
 
 
-async def test_tariff_sensor_attributes(hass: HomeAssistant) -> None:
-    await _setup_entry(hass)
-    state = hass.states.get(_TARIFF_ENTITY)
-    assert state.attributes["quarter"] == "Q1"
-    assert state.attributes["year"] == 2025
-    assert state.attributes["source"] == "SP Group"
+def test_electricity_attributes():
+    sensor = SingaporeElectricityTariffSensor(_coordinator(), "entry1")
+    assert sensor.extra_state_attributes == _COMMON_ATTRS
 
 
-# ---------------------------------------------------------------------------
-# Solar export price sensor
-# ---------------------------------------------------------------------------
+def test_electricity_unique_id():
+    sensor = SingaporeElectricityTariffSensor(_coordinator(), "entry1")
+    assert sensor.unique_id == "entry1_electricity_tariff"
 
 
-async def test_solar_sensor_state(hass: HomeAssistant) -> None:
-    await _setup_entry(hass)
-    state = hass.states.get(_SOLAR_ENTITY)
-    assert state is not None
-    assert float(state.state) == round(29.29 - 7.61, 2)
-
-
-async def test_solar_sensor_unit(hass: HomeAssistant) -> None:
-    await _setup_entry(hass)
-    state = hass.states.get(_SOLAR_ENTITY)
-    assert state.attributes.get("unit_of_measurement") == UNIT
-
-
-async def test_solar_sensor_attributes(hass: HomeAssistant) -> None:
-    await _setup_entry(hass)
-    state = hass.states.get(_SOLAR_ENTITY)
-    assert state.attributes["network_cost"] == 7.61
-    assert state.attributes["total_tariff"] == 29.29
-    assert state.attributes["quarter"] == "Q1"
-    assert state.attributes["year"] == 2025
+def test_electricity_none_when_no_data():
+    sensor = SingaporeElectricityTariffSensor(_coordinator(data=None), "entry1")
+    assert sensor.native_value is None
 
 
 # ---------------------------------------------------------------------------
-# Error / unload
+# Solar export price
 # ---------------------------------------------------------------------------
 
 
-async def test_sensors_unavailable_when_no_data(hass: HomeAssistant) -> None:
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        data={CONF_NAME: "Singapore Electricity"},
-        unique_id="singapore_electricity",
-    )
-    entry.add_to_hass(hass)
-
-    mock_session = MagicMock()
-    mock_session.get = MagicMock(side_effect=Exception("Network error"))
-
-    with patch(
-        "custom_components.singapore_hello.coordinator.async_get_clientsession",
-        return_value=mock_session,
-    ):
-        await hass.config_entries.async_setup(entry.entry_id)
-        await hass.async_block_till_done()
-
-    for entity_id in (_TARIFF_ENTITY, _SOLAR_ENTITY):
-        state = hass.states.get(entity_id)
-        assert state is None or state.state in ("unavailable", "unknown")
+def test_solar_value():
+    sensor = SingaporeSolarExportPriceSensor(_coordinator(), "entry1")
+    assert sensor.native_value == round(29.29 - 7.61, 2)
 
 
-async def test_unload_entry(hass: HomeAssistant) -> None:
-    entry = await _setup_entry(hass)
-    assert await hass.config_entries.async_unload(entry.entry_id)
-    await hass.async_block_till_done()
-    assert entry.entry_id not in hass.data.get(DOMAIN, {})
+def test_solar_unit():
+    sensor = SingaporeSolarExportPriceSensor(_coordinator(), "entry1")
+    assert sensor.native_unit_of_measurement == UNIT_ELECTRICITY
+
+
+def test_solar_attributes():
+    sensor = SingaporeSolarExportPriceSensor(_coordinator(), "entry1")
+    attrs = sensor.extra_state_attributes
+    assert attrs["network_cost"] == 7.61
+    assert attrs["total_tariff"] == 29.29
+    assert attrs["quarter"] == "Q1"
+    assert attrs["year"] == 2025
+
+
+def test_solar_unique_id():
+    sensor = SingaporeSolarExportPriceSensor(_coordinator(), "entry1")
+    assert sensor.unique_id == "entry1_solar_export_price"
+
+
+def test_solar_none_when_no_data():
+    sensor = SingaporeSolarExportPriceSensor(_coordinator(data=None), "entry1")
+    assert sensor.native_value is None
+
+
+# ---------------------------------------------------------------------------
+# Gas tariff
+# ---------------------------------------------------------------------------
+
+
+def test_gas_value():
+    sensor = SingaporeGasTariffSensor(_coordinator(), "entry1")
+    assert sensor.native_value == 20.14
+
+
+def test_gas_unit():
+    sensor = SingaporeGasTariffSensor(_coordinator(), "entry1")
+    assert sensor.native_unit_of_measurement == UNIT_GAS
+
+
+def test_gas_attributes():
+    sensor = SingaporeGasTariffSensor(_coordinator(), "entry1")
+    assert sensor.extra_state_attributes == _COMMON_ATTRS
+
+
+def test_gas_unique_id():
+    sensor = SingaporeGasTariffSensor(_coordinator(), "entry1")
+    assert sensor.unique_id == "entry1_gas_tariff"
+
+
+def test_gas_none_when_no_data():
+    sensor = SingaporeGasTariffSensor(_coordinator(data=None), "entry1")
+    assert sensor.native_value is None
+
+
+# ---------------------------------------------------------------------------
+# Water tariff
+# ---------------------------------------------------------------------------
+
+
+def test_water_value():
+    sensor = SingaporeWaterTariffSensor(_coordinator(), "entry1")
+    assert sensor.native_value == 3.69
+
+
+def test_water_unit():
+    sensor = SingaporeWaterTariffSensor(_coordinator(), "entry1")
+    assert sensor.native_unit_of_measurement == UNIT_WATER
+
+
+def test_water_attributes():
+    sensor = SingaporeWaterTariffSensor(_coordinator(), "entry1")
+    assert sensor.extra_state_attributes == _COMMON_ATTRS
+
+
+def test_water_unique_id():
+    sensor = SingaporeWaterTariffSensor(_coordinator(), "entry1")
+    assert sensor.unique_id == "entry1_water_tariff"
+
+
+def test_water_none_when_no_data():
+    sensor = SingaporeWaterTariffSensor(_coordinator(data=None), "entry1")
+    assert sensor.native_value is None

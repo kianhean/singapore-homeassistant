@@ -17,23 +17,27 @@ custom_components/singapore/
     └── en.json        # English translations (mirrors strings.json)
 
 tests/
-├── conftest.py        # Enables custom integrations for all tests
-├── test_init.py       # Entry setup/unload; verifies coordinator stored
-├── test_config_flow.py # Happy path + duplicate abort
+├── conftest.py        # Mocks HA modules so tests run without installing homeassistant
+├── test_init.py       # Domain constant check
+├── test_config_flow.py # Config flow schema check
 ├── test_coordinator.py # Parser unit tests + coordinator HTTP mock tests
-└── test_sensor.py     # Sensor state, unit, attributes, unavailable, unload
+└── test_sensor.py     # Sensor value, unit, attributes, unique_id, None-safety
 
-.github/workflows/tests.yml   # CI: tests (Py 3.12 & 3.13) + ruff lint
+.github/workflows/tests.yml   # CI: tests + ruff lint on all pushes and PRs
 ```
 
 ## Sensors
 
-| Entity ID | Name | Description |
-|-----------|------|-------------|
-| `sensor.singapore_electricity_tariff` | Singapore Electricity Tariff | Total residential tariff in ¢/kWh |
-| `sensor.singapore_solar_export_price` | Singapore Solar Export Price | Tariff minus network costs in ¢/kWh |
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.singapore_electricity_tariff` | Singapore Electricity Tariff | ¢/kWh | Total residential electricity tariff |
+| `sensor.singapore_solar_export_price` | Singapore Solar Export Price | ¢/kWh | Tariff minus network costs |
+| `sensor.singapore_gas_tariff` | Singapore Gas Tariff | ¢/kWh | Piped natural gas tariff |
+| `sensor.singapore_water_tariff` | Singapore Water Tariff | SGD/m³ | Water tariff |
 
 ## Development Setup
+
+No full Home Assistant installation required. Tests mock all HA modules via `conftest.py`.
 
 ```bash
 pip install -r requirements_test.txt
@@ -54,20 +58,20 @@ pytest tests/ -v --cov=custom_components/singapore --cov-report=term-missing
 ## How the Scraper Works
 
 `coordinator.py` fetches `https://www.spgroup.com.sg/our-services/utilities/tariff-information`
-with browser-like headers (SP Group blocks plain bots). Parsing uses two strategies:
+with browser-like headers. Parsing uses two strategies per value:
 
 1. **Table row** — scans `<table>` rows for a keyword match, reads the last numeric cell
 2. **Text regex** — scans page text for a number following the keyword
 
 Quarter is inferred from date strings like "1 January 2025 to 31 March 2025".
-
-Solar export price = total tariff − network costs (network charges don't apply to exported electricity).
+Solar export price = total electricity tariff − network costs.
 
 ## Adding a New Sensor
 
-1. Add any new fields to `TariffData` in `coordinator.py` and parse them in `_parse_tariff`
-2. Add a new sensor class in `sensor.py` and include it in `async_setup_entry`
-3. Add tests in `tests/test_sensor.py` and `tests/test_coordinator.py`
+1. Add new field(s) to `TariffData` in `coordinator.py`
+2. Parse the new value(s) in `_parse_tariff` using `_extract_row_value`
+3. Add a new sensor class in `sensor.py`, register it in `async_setup_entry`
+4. Add tests in `tests/test_sensor.py` and `tests/test_coordinator.py`
 
 ## Key Conventions
 

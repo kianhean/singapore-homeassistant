@@ -1,4 +1,4 @@
-"""Data coordinator for Singapore electricity tariff."""
+"""Data coordinator for Singapore SP Group tariffs."""
 from __future__ import annotations
 
 import logging
@@ -17,8 +17,9 @@ _LOGGER = logging.getLogger(__name__)
 TARIFF_URL = "https://www.spgroup.com.sg/our-services/utilities/tariff-information"
 UPDATE_INTERVAL = timedelta(hours=24)
 
-# SP Group publishes prices in cents per kWh
-UNIT = "¢/kWh"
+UNIT_ELECTRICITY = "¢/kWh"
+UNIT_GAS = "¢/kWh"
+UNIT_WATER = "SGD/m³"
 
 _HEADERS = {
     "User-Agent": (
@@ -32,7 +33,6 @@ _HEADERS = {
     "Cache-Control": "no-cache",
 }
 
-# Quarter date ranges used by SP Group in page headings
 _QUARTER_RANGES = {
     "Q1": ("1 January", "31 March"),
     "Q2": ("1 April", "30 June"),
@@ -40,37 +40,40 @@ _QUARTER_RANGES = {
     "Q4": ("1 October", "31 December"),
 }
 
-# Row label keywords that identify the network cost component
 _NETWORK_KEYWORDS = ("network", "transmission", "distribution", "grid")
+_GAS_KEYWORDS = ("gas",)
+_WATER_KEYWORDS = ("water",)
 
 
 @dataclass
 class TariffData:
-    """Electricity tariff data parsed from SP Group."""
+    """SP Group tariff data for electricity, gas and water."""
 
-    price: float          # total tariff, cents/kWh
-    network_cost: float   # network component, cents/kWh
-    quarter: str          # e.g. "Q1"
+    electricity_price: float   # total residential tariff, ¢/kWh
+    network_cost: float        # electricity network component, ¢/kWh
+    gas_price: float           # piped natural gas tariff, ¢/kWh
+    water_price: float         # water tariff, SGD/m³
+    quarter: str               # e.g. "Q1"
     year: int
 
     @property
     def solar_export_price(self) -> float:
-        """Solar export price = total tariff minus network costs (cents/kWh).
+        """Solar export price = electricity tariff minus network costs (¢/kWh).
 
         Solar panel owners exporting to the grid receive the energy component
-        only; network charges are not paid on exported electricity.
+        only; network charges do not apply to exported electricity.
         """
-        return round(self.price - self.network_cost, 2)
+        return round(self.electricity_price - self.network_cost, 2)
 
 
 class SPGroupCoordinator(DataUpdateCoordinator[TariffData]):
-    """Fetches and caches SP Group electricity tariff data."""
+    """Fetches and caches SP Group tariff data (electricity, gas, water)."""
 
     def __init__(self, hass: HomeAssistant) -> None:
         super().__init__(
             hass,
             _LOGGER,
-            name="SP Group Electricity Tariff",
+            name="SP Group Tariffs",
             update_interval=UPDATE_INTERVAL,
         )
 
@@ -81,38 +84,51 @@ class SPGroupCoordinator(DataUpdateCoordinator[TariffData]):
                 TARIFF_URL, headers=_HEADERS, timeout=30
             ) as response:
                 if response.status != 200:
-                    raise UpdateFailed(
-                        f"SP Group returned HTTP {response.status}"
-                    )
+                    raise UpdateFailed(f"SP Group returned HTTP {response.status}")
                 html = await response.text()
         except Exception as err:
-            raise UpdateFailed(f"Error fetching SP Group tariff: {err}") from err
+            raise UpdateFailed(f"Error fetching SP Group tariffs: {err}") from err
 
         return _parse_tariff(html)
 
 
 def _parse_tariff(html: str) -> TariffData:
-    """Parse tariff price, network cost, quarter and year from SP Group HTML."""
+    """Parse electricity, gas and water tariffs from SP Group HTML."""
     soup = BeautifulSoup(html, "html.parser")
 
     quarter, year = _extract_quarter_year(soup)
 
-    price = _extract_row_value(soup, keywords=("total", "residential"))
-    if price is None:
+    electricity_price = _extract_row_value(soup, keywords=("total", "residential"))
+    if electricity_price is None:
         raise UpdateFailed("Could not find electricity price on SP Group page")
 
     network_cost = _extract_row_value(soup, keywords=_NETWORK_KEYWORDS)
     if network_cost is None:
-        _LOGGER.warning(
-            "Could not find network cost on SP Group page; solar export price unavailable"
-        )
+        _LOGGER.warning("Could not find network cost; solar export price will equal total tariff")
         network_cost = 0.0
 
-    return TariffData(price=price, network_cost=network_cost, quarter=quarter, year=year)
+    gas_price = _extract_row_value(soup, keywords=_GAS_KEYWORDS)
+    if gas_price is None:
+        _LOGGER.warning("Could not find gas tariff on SP Group page")
+        gas_price = 0.0
+
+    water_price = _extract_row_value(soup, keywords=_WATER_KEYWORDS)
+    if water_price is None:
+        _LOGGER.warning("Could not find water tariff on SP Group page")
+        water_price = 0.0
+
+    return TariffData(
+        electricity_price=electricity_price,
+        network_cost=network_cost,
+        gas_price=gas_price,
+        water_price=water_price,
+        quarter=quarter,
+        year=year,
+    )
 
 
 def _extract_quarter_year(soup: BeautifulSoup) -> tuple[str, int]:
-    """Return (quarter, year) by scanning headings for date ranges."""
+    """Return (quarter, year) by scanning page text for SP Group date ranges."""
     text = soup.get_text(" ", strip=True)
 
     year_match = re.search(r"\b(20\d{2})\b", text)
@@ -137,13 +153,10 @@ def _extract_quarter_year(soup: BeautifulSoup) -> tuple[str, int]:
 def _extract_row_value(
     soup: BeautifulSoup, keywords: tuple[str, ...]
 ) -> float | None:
-    """
-    Find a table row whose label matches any of `keywords` and return its
-    numeric value (the last numeric cell in the row).
+    """Find a table row matching any keyword and return its last numeric cell.
 
     Falls back to a regex scan of the full page text.
     """
-    # Strategy 1: table row keyword match
     for table in soup.find_all("table"):
         for row in table.find_all("tr"):
             cells = row.find_all(["td", "th"])
@@ -151,25 +164,23 @@ def _extract_row_value(
             if any(kw in row_text for kw in keywords):
                 for cell in reversed(cells):
                     val = _to_float(cell.get_text(strip=True))
-                    if val is not None and 0.5 < val < 100.0:
+                    if val is not None and 0.1 < val < 200.0:
                         return val
 
-    # Strategy 2: regex scan near the keyword
     text = soup.get_text(" ", strip=True)
     pattern = (
         r"(?:" + "|".join(re.escape(kw) for kw in keywords) + r")"
-        r"[^0-9]{0,60}?(\d{1,3}\.\d{1,2})\s*(?:cents?)?"
+        r"[^0-9]{0,60}?(\d{1,3}\.\d{1,2})"
     )
     for m in re.findall(pattern, text, re.IGNORECASE):
         val = _to_float(m)
-        if val is not None and 0.5 < val < 100.0:
+        if val is not None and 0.1 < val < 200.0:
             return val
 
     return None
 
 
 def _to_float(s: str) -> float | None:
-    """Convert string to float, return None if not possible."""
     try:
         return float(s.replace(",", "").strip())
     except (ValueError, AttributeError):
