@@ -40,6 +40,22 @@ _QUARTER_RANGES = {
     "Q4": ("1 October", "31 December"),
 }
 
+# Abbreviated month → quarter (for "wef 1 Apr - 30 Jun 26" style dates)
+_MONTH_ABBR_TO_Q = {
+    "jan": "Q1",
+    "feb": "Q1",
+    "mar": "Q1",
+    "apr": "Q2",
+    "may": "Q2",
+    "jun": "Q2",
+    "jul": "Q3",
+    "aug": "Q3",
+    "sep": "Q3",
+    "oct": "Q4",
+    "nov": "Q4",
+    "dec": "Q4",
+}
+
 _NETWORK_KEYWORDS = ("network", "transmission", "distribution", "grid")
 _GAS_KEYWORDS = ("gas",)
 _WATER_KEYWORDS = ("water",)
@@ -96,27 +112,47 @@ def _parse_tariff(html: str) -> TariffData:
     """Parse electricity, gas and water tariffs from SP Group HTML."""
     soup = BeautifulSoup(html, "html.parser")
 
-    quarter, year = _extract_quarter_year(soup)
-
-    electricity_price = _extract_row_value(
-        soup, keywords=("electricity", "total", "residential")
+    # Build a single text corpus: visible page text + all script tag content
+    # (covers both classic server-rendered HTML and Next.js __NEXT_DATA__ JSON)
+    page_text = soup.get_text(" ", strip=True)
+    script_text = " ".join(
+        (s.string or "") for s in soup.find_all("script") if s.string
     )
+    full_text = page_text + " " + script_text
+
+    quarter, year = _extract_quarter_year(full_text)
+
+    # Strategy 1: SP Group banner format (current layout as of 2026):
+    #   "29.72 cents/kWh 27.27 cents/kWh (w/o GST) ELECTRICITY TARIFF"
+    # The with-GST price always precedes the w/o-GST price before the label.
+    electricity_price = _extract_banner_cents_kwh(full_text, "ELECTRICITY")
+    if electricity_price is None:
+        # Strategy 2: generic keyword + float search (classic table layout)
+        electricity_price = _extract_by_keywords(
+            full_text, keywords=("total", "residential")
+        )
     if electricity_price is None:
         raise UpdateFailed("Could not find electricity price on SP Group page")
 
-    network_cost = _extract_row_value(soup, keywords=_NETWORK_KEYWORDS)
+    network_cost = _extract_by_keywords(full_text, keywords=_NETWORK_KEYWORDS)
     if network_cost is None:
         _LOGGER.warning(
             "Could not find network cost; solar export price will equal total tariff"
         )
         network_cost = 0.0
 
-    gas_price = _extract_row_value(soup, keywords=_GAS_KEYWORDS)
+    gas_price = _extract_banner_cents_kwh(full_text, "GAS")
+    if gas_price is None:
+        gas_price = _extract_by_keywords(full_text, keywords=_GAS_KEYWORDS)
     if gas_price is None:
         _LOGGER.warning("Could not find gas tariff on SP Group page")
         gas_price = 0.0
 
-    water_price = _extract_row_value(soup, keywords=_WATER_KEYWORDS)
+    # Water is shown as "$1.56 or $1.97/m³" (two residential tiers).
+    # Report the lower tier (≤40 m³) which covers most households.
+    water_price = _extract_water_tiered(full_text)
+    if water_price is None:
+        water_price = _extract_by_keywords(full_text, keywords=_WATER_KEYWORDS)
     if water_price is None:
         _LOGGER.warning("Could not find water tariff on SP Group page")
         water_price = 0.0
@@ -131,16 +167,42 @@ def _parse_tariff(html: str) -> TariffData:
     )
 
 
-def _extract_quarter_year(soup: BeautifulSoup) -> tuple[str, int]:
-    """Return (quarter, year) by scanning page text for SP Group date ranges."""
-    # Include __NEXT_DATA__ JSON in the search corpus
-    extra = ""
-    next_data_tag = soup.find("script", {"id": "__NEXT_DATA__"})
-    if next_data_tag and next_data_tag.string:
-        extra = next_data_tag.string
+def _extract_banner_cents_kwh(text: str, label: str) -> float | None:
+    """Parse SP Group's hero-banner format.
 
-    text = soup.get_text(" ", strip=True) + " " + extra
+    Matches: ``XX.XX cents/kWh YY.YY cents/kWh (w/o GST) <LABEL> TARIFF``
+    Returns the with-GST price (the first number).
+    """
+    pattern = (
+        r"(\d{1,3}\.\d{2})\s+cents/kWh\s+"
+        r"\d{1,3}\.\d{2}\s+cents/kWh\s+\(w/o\s+GST\)"
+        r".{0,40}" + re.escape(label)
+    )
+    m = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+    if m:
+        val = _to_float(m.group(1))
+        if val is not None and 0.1 < val < 200.0:
+            return val
+    return None
 
+
+def _extract_water_tiered(text: str) -> float | None:
+    """Parse SP Group's two-tier water tariff format.
+
+    Matches: ``$X.XX or $Y.YY/m`` (with or without spaces around the slash).
+    Returns the lower residential tier (≤40 m³, with GST).
+    """
+    m = re.search(r"\$(\d+\.\d+)\s+or\s+\$\d+\.\d+\s*/\s*m", text, re.IGNORECASE)
+    if m:
+        val = _to_float(m.group(1))
+        if val is not None and 0.1 < val < 20.0:
+            return val
+    return None
+
+
+def _extract_quarter_year(text: str) -> tuple[str, int]:
+    """Return (quarter, year) by scanning text for SP Group date ranges."""
+    # Full month name + 4-digit year: "1 January 2025 to 31 March 2025"
     year_match = re.search(r"\b(20\d{2})\b", text)
     year = int(year_match.group(1)) if year_match else 0
 
@@ -148,6 +210,23 @@ def _extract_quarter_year(soup: BeautifulSoup) -> tuple[str, int]:
         if start.lower() in text.lower():
             return quarter, year
 
+    # Abbreviated format: "wef 1 Apr - 30 Jun 26"
+    # Capture the START month (→ quarter) and the trailing 2-digit year.
+    abbr_match = re.search(
+        r"wef\s+\d{1,2}\s+([A-Za-z]{3})"  # start: day + month abbr
+        r"(?:\s*[-–]\s*\d{1,2}\s+[A-Za-z]{3})?"  # optional: "- 30 Jun"
+        r"\s+(\d{2})\b",  # trailing 2-digit year
+        text,
+        re.IGNORECASE,
+    )
+    if abbr_match:
+        month_abbr = abbr_match.group(1).lower()
+        year_2d = int(abbr_match.group(2))
+        year = 2000 + year_2d
+        quarter = _MONTH_ABBR_TO_Q.get(month_abbr, "Unknown")
+        return quarter, year
+
+    # Generic month match fallback
     month_match = re.search(
         r"\b(\d{1,2})\s+(?:January|February|March|April|May|June|"
         r"July|August|September|October|November|December)\s+(20\d{2})",
@@ -160,65 +239,21 @@ def _extract_quarter_year(soup: BeautifulSoup) -> tuple[str, int]:
     return "Unknown", year
 
 
-def _extract_row_value(soup: BeautifulSoup, keywords: tuple[str, ...]) -> float | None:
-    """Find a tariff value matching any keyword.
-
-    Tries four strategies in order:
-    1. HTML table rows (original SP Group layout)
-    2. __NEXT_DATA__ JSON embedded by Next.js SSR
-    3. Inline <script> text (JSON blobs, JS variables)
-    4. Full visible page text regex
-    """
-    # 1. Table rows
-    for table in soup.find_all("table"):
-        for row in table.find_all("tr"):
-            cells = row.find_all(["td", "th"])
-            row_text = " ".join(c.get_text(strip=True) for c in cells).lower()
-            if any(kw in row_text for kw in keywords):
-                for cell in reversed(cells):
-                    val = _to_float(cell.get_text(strip=True))
-                    if val is not None and 0.1 < val < 200.0:
-                        return val
-
-    # 2. __NEXT_DATA__ JSON (Next.js server-side renders page props here)
-    next_data_tag = soup.find("script", {"id": "__NEXT_DATA__"})
-    if next_data_tag and next_data_tag.string:
-        val = _search_text_for_keywords(next_data_tag.string, keywords)
-        if val is not None:
-            return val
-
-    # 3. Other inline <script> blocks that may contain JSON/JS data
-    for script in soup.find_all("script"):
-        if script.get("id") == "__NEXT_DATA__":
-            continue  # already handled above
-        src = script.string or ""
-        if not src:
-            continue
-        val = _search_text_for_keywords(src, keywords)
-        if val is not None:
-            return val
-
-    # 4. Visible page text
-    text = soup.get_text(" ", strip=True)
-    val = _search_text_for_keywords(text, keywords)
-    if val is not None:
-        return val
-
-    return None
-
-
-def _search_text_for_keywords(text: str, keywords: tuple[str, ...]) -> float | None:
+def _extract_by_keywords(text: str, keywords: tuple[str, ...]) -> float | None:
     """Regex-search text for a float near any keyword.
 
+    Designed for classic table/paragraph layouts where a keyword label sits
+    directly adjacent to its value with no intervening digits.
+
     Tries two passes:
-    - Forward:  keyword … number  (within 200 chars)
-    - Reverse:  number … keyword  (within 120 chars)
+    - Forward:  keyword … number  (up to 80 non-digit chars)
+    - Reverse:  number … keyword  (up to 60 non-digit chars)
     """
     kw_group = "(?:" + "|".join(re.escape(kw) for kw in keywords) + ")"
 
     # Forward pass
     for m in re.findall(
-        kw_group + r"[^0-9]{0,200}?(\d{1,3}\.\d{1,2})", text, re.IGNORECASE
+        kw_group + r"[^0-9]{0,80}?(\d{1,3}\.\d{1,2})", text, re.IGNORECASE
     ):
         val = _to_float(m)
         if val is not None and 0.1 < val < 200.0:
@@ -226,7 +261,7 @@ def _search_text_for_keywords(text: str, keywords: tuple[str, ...]) -> float | N
 
     # Reverse pass (number appears before its label)
     for m in re.findall(
-        r"(\d{1,3}\.\d{1,2})[^0-9]{0,120}?" + kw_group, text, re.IGNORECASE
+        r"(\d{1,3}\.\d{1,2})[^0-9]{0,60}?" + kw_group, text, re.IGNORECASE
     ):
         val = _to_float(m)
         if val is not None and 0.1 < val < 200.0:
