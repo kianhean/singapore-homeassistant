@@ -58,7 +58,7 @@ async def test_sensor_state(hass: HomeAssistant) -> None:
     """Sensor reports the correct tariff value."""
     await _setup_entry(hass)
 
-    state = hass.states.get("sensor.singapore_electricity_tariff_electricity_tariff")
+    state = hass.states.get("sensor.singapore_electricity_tariff")
     assert state is not None
     assert float(state.state) == 29.29
 
@@ -67,7 +67,7 @@ async def test_sensor_unit(hass: HomeAssistant) -> None:
     """Sensor uses cents/kWh as the unit."""
     await _setup_entry(hass)
 
-    state = hass.states.get("sensor.singapore_electricity_tariff_electricity_tariff")
+    state = hass.states.get("sensor.singapore_electricity_tariff")
     assert state.attributes.get("unit_of_measurement") == UNIT
 
 
@@ -75,7 +75,7 @@ async def test_sensor_attributes(hass: HomeAssistant) -> None:
     """Sensor exposes quarter, year, and source attributes."""
     await _setup_entry(hass)
 
-    state = hass.states.get("sensor.singapore_electricity_tariff_electricity_tariff")
+    state = hass.states.get("sensor.singapore_electricity_tariff")
     assert state.attributes["quarter"] == "Q1"
     assert state.attributes["year"] == 2025
     assert state.attributes["source"] == "SP Group"
@@ -100,7 +100,7 @@ async def test_sensor_unavailable_when_no_data(hass: HomeAssistant) -> None:
         await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-    state = hass.states.get("sensor.singapore_electricity_tariff_electricity_tariff")
+    state = hass.states.get("sensor.singapore_electricity_tariff")
     # Entry setup fails when first refresh fails, so state won't be loaded
     assert state is None or state.state in ("unavailable", "unknown")
 

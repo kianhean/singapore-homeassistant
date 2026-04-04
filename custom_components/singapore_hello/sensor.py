@@ -27,8 +27,8 @@ async def async_setup_entry(
 class SingaporeElectricityTariffSensor(CoordinatorEntity[SPGroupCoordinator], SensorEntity):
     """Sensor reporting the current Singapore residential electricity tariff."""
 
-    _attr_has_entity_name = True
-    _attr_name = "Electricity Tariff"
+    _attr_has_entity_name = False
+    _attr_name = "Singapore Electricity Tariff"
     _attr_icon = "mdi:lightning-bolt"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = UNIT
