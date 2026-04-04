@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -18,8 +17,6 @@ COE_API_URL = (
     "&limit=10"
     "&sort=month%20desc%2Cbidding_no%20desc"
 )
-
-UPDATE_INTERVAL = timedelta(hours=1)
 
 UNIT_COE = "SGD"
 
@@ -60,7 +57,7 @@ class CoeCoordinator(DataUpdateCoordinator[CoeData]):
             hass,
             _LOGGER,
             name="COE Bidding Results",
-            update_interval=UPDATE_INTERVAL,
+            update_interval=None,  # Refreshed daily at 19:30 via async_track_time_change
         )
 
     async def _async_update_data(self) -> CoeData:
