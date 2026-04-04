@@ -21,7 +21,7 @@ The solar export price sensor additionally exposes `network_cost` and `total_tar
 
 ### COE Bidding Results
 
-Updated every hour from the [LTA dataset on data.gov.sg](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view).
+Updated daily at **19:30** from the [LTA dataset on data.gov.sg](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view).
 Sensor value is the COE premium in SGD from the latest completed bidding exercise.
 
 | Entity ID | Name | Unit | Category |
@@ -112,7 +112,7 @@ sensor.singapore_coe_category_e:
   - Electricity and gas: Singapore cents per kilowatt-hour (¢/kWh)
   - Water: SGD per cubic metre (SGD/m³); lower residential tier (≤40 m³)
   - Solar export price = electricity tariff − network costs
-- **COE results** — fetched from the LTA dataset on [data.gov.sg](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view); updated after each bidding exercise (twice per month).
+- **COE results** — fetched from the LTA dataset on [data.gov.sg](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view); refreshed daily at 19:30 to pick up results after each bidding exercise.
 
 ## Development
 

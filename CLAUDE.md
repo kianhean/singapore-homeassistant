@@ -97,7 +97,11 @@ https://data.gov.sg/api/action/datastore_search
 The response contains records with fields `month`, `bidding_no`, `vehicle_class`, `quota`,
 `bids_success`, and `premium`. The coordinator picks the most recent bidding exercise
 (first record's `month` + `bidding_no`) and builds a `CoeData.premiums` dict keyed
-by category letter (`"A"`–`"E"`). Updated every hour.
+by category letter (`"A"`–`"E"`).
+
+The coordinator has `update_interval=None` (no automatic polling). Instead, `__init__.py`
+registers an `async_track_time_change` callback that triggers a refresh every day at
+**19:30** — after LTA typically publishes bidding results.
 
 ## How the SP Group Scraper Works
 
