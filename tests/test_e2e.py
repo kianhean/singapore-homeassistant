@@ -122,10 +122,15 @@ def test_e2e_raw_html_debug(capsys):
         else:
             print("\n[no __NEXT_DATA__ script tag found]")
 
-        # All floats found anywhere in page text
+        # All floats found anywhere in page text, with surrounding context
         page_text = soup.get_text(" ", strip=True)
         floats = re.findall(r"\b\d{1,3}\.\d{1,2}\b", page_text)
         print(f"\n--- floats in page text: {floats[:40]} ---")
+        for f in floats[:20]:
+            idx = page_text.find(f)
+            if idx >= 0:
+                ctx = page_text[max(0, idx - 120) : idx + 120]
+                print(f"  {f!r:>8}  context: ...{ctx}...")
 
         # Inline <script> tags that contain tariff-like numbers
         for i, script in enumerate(soup.find_all("script")):

@@ -98,7 +98,9 @@ def _parse_tariff(html: str) -> TariffData:
 
     quarter, year = _extract_quarter_year(soup)
 
-    electricity_price = _extract_row_value(soup, keywords=("total", "residential"))
+    electricity_price = _extract_row_value(
+        soup, keywords=("electricity", "total", "residential")
+    )
     if electricity_price is None:
         raise UpdateFailed("Could not find electricity price on SP Group page")
 
@@ -206,15 +208,30 @@ def _extract_row_value(soup: BeautifulSoup, keywords: tuple[str, ...]) -> float 
 
 
 def _search_text_for_keywords(text: str, keywords: tuple[str, ...]) -> float | None:
-    """Regex-search text for a float near any keyword."""
-    pattern = (
-        r"(?:" + "|".join(re.escape(kw) for kw in keywords) + r")"
-        r"[^0-9]{0,80}?(\d{1,3}\.\d{1,2})"
-    )
-    for m in re.findall(pattern, text, re.IGNORECASE):
+    """Regex-search text for a float near any keyword.
+
+    Tries two passes:
+    - Forward:  keyword … number  (within 200 chars)
+    - Reverse:  number … keyword  (within 120 chars)
+    """
+    kw_group = "(?:" + "|".join(re.escape(kw) for kw in keywords) + ")"
+
+    # Forward pass
+    for m in re.findall(
+        kw_group + r"[^0-9]{0,200}?(\d{1,3}\.\d{1,2})", text, re.IGNORECASE
+    ):
         val = _to_float(m)
         if val is not None and 0.1 < val < 200.0:
             return val
+
+    # Reverse pass (number appears before its label)
+    for m in re.findall(
+        r"(\d{1,3}\.\d{1,2})[^0-9]{0,120}?" + kw_group, text, re.IGNORECASE
+    ):
+        val = _to_float(m)
+        if val is not None and 0.1 < val < 200.0:
+            return val
+
     return None
 
 
