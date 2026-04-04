@@ -7,27 +7,36 @@ The integration domain is `singapore`.
 
 ```
 custom_components/singapore/
-├── __init__.py        # Entry setup/teardown; creates and stores coordinator
-├── coordinator.py     # DataUpdateCoordinator: fetches + parses SP Group page
-├── config_flow.py     # UI config flow (name input)
-├── sensor.py          # Sensor entities
-├── manifest.json      # Integration metadata; declares beautifulsoup4 dep
-├── strings.json       # Config flow UI strings
+├── __init__.py           # Entry setup/teardown; creates and stores both coordinators
+├── coordinator.py        # SPGroupCoordinator: fetches + parses SP Group tariff page
+├── coe_coordinator.py    # CoeCoordinator: fetches COE results from data.gov.sg API
+├── config_flow.py        # UI config flow (name input)
+├── sensor.py             # Sensor entities (tariff + COE)
+├── manifest.json         # Integration metadata; declares beautifulsoup4 dep
+├── strings.json          # Config flow UI strings
 └── translations/
-    └── en.json        # English translations (mirrors strings.json)
+    └── en.json           # English translations (mirrors strings.json)
 
 tests/
-├── conftest.py        # Mocks HA modules so tests run without installing homeassistant
-├── test_init.py       # Domain constant check
-├── test_config_flow.py # Config flow schema check
-├── test_coordinator.py # Parser unit tests + coordinator HTTP mock tests
-├── test_sensor.py     # Sensor value, unit, attributes, unique_id, None-safety
-└── test_e2e.py        # Live scrape tests (run with -m e2e, skipped in CI by default)
+├── conftest.py              # Mocks HA modules so tests run without installing homeassistant
+├── test_init.py             # Domain constant check
+├── test_config_flow.py      # Config flow schema check
+├── test_coordinator.py      # SP Group parser unit tests + coordinator HTTP mock tests
+├── test_coe_coordinator.py  # COE parser unit tests + coordinator HTTP mock tests
+├── test_sensor.py           # Sensor value, unit, attributes, unique_id, None-safety
+└── test_e2e.py              # Live scrape tests (run with -m e2e, skipped in CI by default)
 
 .github/workflows/tests.yml   # CI: three jobs — unit tests, e2e scrape, ruff lint
 ```
 
+Entry data is stored as a dict per `entry_id`:
+```python
+hass.data[DOMAIN][entry_id] = {"tariff": SPGroupCoordinator, "coe": CoeCoordinator}
+```
+
 ## Sensors
+
+### SP Group Utility Tariffs
 
 | Entity ID | Name | Unit | Description |
 |-----------|------|------|-------------|
@@ -35,6 +44,16 @@ tests/
 | `sensor.singapore_solar_export_price` | Singapore Solar Export Price | ¢/kWh | Tariff minus network costs |
 | `sensor.singapore_gas_tariff` | Singapore Gas Tariff | ¢/kWh | Piped natural gas tariff (with GST) |
 | `sensor.singapore_water_tariff` | Singapore Water Tariff | SGD/m³ | Water tariff, lower residential tier (≤40 m³, with GST) |
+
+### COE Bidding Results
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.singapore_coe_category_a` | Singapore COE Category A | SGD | Cars ≤1600cc / ≤97kW electric |
+| `sensor.singapore_coe_category_b` | Singapore COE Category B | SGD | Cars >1600cc / >97kW electric |
+| `sensor.singapore_coe_category_c` | Singapore COE Category C | SGD | Goods vehicles and buses |
+| `sensor.singapore_coe_category_d` | Singapore COE Category D | SGD | Motorcycles |
+| `sensor.singapore_coe_category_e` | Singapore COE Category E (Open) | SGD | All except motorcycles |
 
 ## Development Setup
 
@@ -64,7 +83,27 @@ With coverage:
 pytest tests/ -v -m "not e2e" --cov=custom_components/singapore --cov-report=term-missing
 ```
 
-## How the Scraper Works
+## How the COE Fetcher Works
+
+`coe_coordinator.py` calls the data.gov.sg CKAN API:
+
+```
+https://data.gov.sg/api/action/datastore_search
+  ?resource_id=d_69b3380ad7e51aff3a7dcc84eba52b8a
+  &limit=10
+  &sort=month%20desc%2Cbidding_no%20desc
+```
+
+The response contains records with fields `month`, `bidding_no`, `vehicle_class`, `quota`,
+`bids_success`, and `premium`. The coordinator picks the most recent bidding exercise
+(first record's `month` + `bidding_no`) and builds a `CoeData.premiums` dict keyed
+by category letter (`"A"`–`"E"`).
+
+The coordinator has `update_interval=None` (no automatic polling). Instead, `__init__.py`
+registers an `async_track_time_change` callback that triggers a refresh every day at
+**19:30** — after LTA typically publishes bidding results.
+
+## How the SP Group Scraper Works
 
 `coordinator.py` fetches `https://www.spgroup.com.sg/our-services/utilities/tariff-information`
 with browser-like headers. The full corpus searched includes visible page text and all
@@ -90,11 +129,17 @@ Solar export price = total electricity tariff − network costs.
 
 ## Adding a New Sensor
 
+### SP Group tariff sensor
 1. Add new field(s) to `TariffData` in `coordinator.py`
 2. Parse the new value(s) in `_parse_tariff` — use `_extract_banner_cents_kwh` for
    ¢/kWh values or `_extract_by_keywords` as a fallback
 3. Add a new sensor class in `sensor.py`, register it in `async_setup_entry`
 4. Add tests in `tests/test_sensor.py` and `tests/test_coordinator.py`
+
+### COE sensor
+COE sensors are generated automatically for every category in `COE_CATEGORIES` in
+`coe_coordinator.py`. To add a new COE-based sensor with different logic, subclass
+`CoordinatorEntity[CoeCoordinator]` in `sensor.py` and register it in `async_setup_entry`.
 
 ## Linting and Formatting
 

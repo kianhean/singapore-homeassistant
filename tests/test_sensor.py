@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock
 
+from custom_components.singapore.coe_coordinator import UNIT_COE, CoeData
 from custom_components.singapore.coordinator import (
     UNIT_ELECTRICITY,
     UNIT_GAS,
@@ -9,6 +10,7 @@ from custom_components.singapore.coordinator import (
     TariffData,
 )
 from custom_components.singapore.sensor import (
+    SingaporeCoeResultSensor,
     SingaporeElectricityTariffSensor,
     SingaporeGasTariffSensor,
     SingaporeSolarExportPriceSensor,
@@ -178,4 +180,65 @@ def test_water_none_when_no_data():
 def test_water_no_device_class():
     """SGD/m³ is not a valid HA water unit; device_class must be None."""
     sensor = SingaporeWaterTariffSensor(_coordinator(), "entry1")
+    assert sensor.device_class is None
+
+
+# ---------------------------------------------------------------------------
+# COE result sensors
+# ---------------------------------------------------------------------------
+
+_COE_DATA = CoeData(
+    premiums={"A": 95501, "B": 112001, "C": 73001, "D": 9801, "E": 118001},
+    month="2026-03",
+    bidding_no=1,
+)
+
+
+def _coe_coordinator(data=_COE_DATA):
+    coordinator = MagicMock()
+    coordinator.data = data
+    return coordinator
+
+
+def test_coe_cat_a_value():
+    sensor = SingaporeCoeResultSensor(_coe_coordinator(), "entry1", "A")
+    assert sensor.native_value == 95501
+
+
+def test_coe_cat_e_value():
+    sensor = SingaporeCoeResultSensor(_coe_coordinator(), "entry1", "E")
+    assert sensor.native_value == 118001
+
+
+def test_coe_unit():
+    sensor = SingaporeCoeResultSensor(_coe_coordinator(), "entry1", "A")
+    assert sensor.native_unit_of_measurement == UNIT_COE
+
+
+def test_coe_unique_id():
+    sensor = SingaporeCoeResultSensor(_coe_coordinator(), "entry1", "A")
+    assert sensor.unique_id == "entry1_coe_cat_a"
+
+
+def test_coe_name():
+    sensor = SingaporeCoeResultSensor(_coe_coordinator(), "entry1", "A")
+    assert sensor.name == "Singapore COE Category A"
+
+
+def test_coe_attributes():
+    sensor = SingaporeCoeResultSensor(_coe_coordinator(), "entry1", "B")
+    attrs = sensor.extra_state_attributes
+    assert attrs["category"] == "Category B"
+    assert attrs["month"] == "2026-03"
+    assert attrs["bidding_no"] == 1
+    assert attrs["source"] == "data.gov.sg / LTA"
+
+
+def test_coe_none_when_no_data():
+    sensor = SingaporeCoeResultSensor(_coe_coordinator(data=None), "entry1", "A")
+    assert sensor.native_value is None
+
+
+def test_coe_no_device_class():
+    sensor = SingaporeCoeResultSensor(_coe_coordinator(), "entry1", "A")
     assert sensor.device_class is None

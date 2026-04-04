@@ -61,9 +61,9 @@ def test_e2e_fetch_and_parse():
     from custom_components.singapore.coordinator import _parse_tariff
 
     html = _fetch_html()
-    assert (
-        len(html) > 1000
-    ), f"Page suspiciously short ({len(html)} bytes) — likely a bot-block page"
+    assert len(html) > 1000, (
+        f"Page suspiciously short ({len(html)} bytes) — likely a bot-block page"
+    )
 
     data = _parse_tariff(html)
 

@@ -1,9 +1,13 @@
 # Singapore Home Assistant Integration
 
 A [HACS](https://hacs.xyz) custom integration for Home Assistant that tracks Singapore
-utility tariffs published by [SP Group](https://www.spgroup.com.sg), updated every 24 hours.
+utility tariffs and COE (Certificate of Entitlement) bidding results.
 
 ## Sensors
+
+### SP Group Utility Tariffs
+
+Updated every 24 hours from the [SP Group tariff page](https://www.spgroup.com.sg/our-services/utilities/tariff-information).
 
 | Entity ID | Name | Unit | Description |
 |-----------|------|------|-------------|
@@ -12,45 +16,80 @@ utility tariffs published by [SP Group](https://www.spgroup.com.sg), updated eve
 | `sensor.singapore_gas_tariff` | Singapore Gas Tariff | ¢/kWh | Piped natural gas tariff |
 | `sensor.singapore_water_tariff` | Singapore Water Tariff | SGD/m³ | Water tariff, lower residential tier (≤40 m³, with GST) |
 
-All sensors expose `quarter` (e.g. `Q1`), `year`, and `source` as state attributes.
+Tariff sensors expose `quarter` (e.g. `Q1`), `year`, and `source` as state attributes.
 The solar export price sensor additionally exposes `network_cost` and `total_tariff`.
+
+### COE Bidding Results
+
+Updated daily at **19:30** from the [LTA dataset on data.gov.sg](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view).
+Sensor value is the COE premium in SGD from the latest completed bidding exercise.
+
+| Entity ID | Name | Unit | Category |
+|-----------|------|------|----------|
+| `sensor.singapore_coe_category_a` | Singapore COE Category A | SGD | Cars ≤1600cc / ≤97kW (electric) |
+| `sensor.singapore_coe_category_b` | Singapore COE Category B | SGD | Cars >1600cc / >97kW (electric) |
+| `sensor.singapore_coe_category_c` | Singapore COE Category C | SGD | Goods vehicles and buses |
+| `sensor.singapore_coe_category_d` | Singapore COE Category D | SGD | Motorcycles |
+| `sensor.singapore_coe_category_e` | Singapore COE Category E (Open) | SGD | Open — all except motorcycles |
+
+COE sensors expose `category`, `description`, `month`, `bidding_no`, and `source` as state attributes.
 
 ## Example sensor states
 
 ```yaml
 sensor.singapore_electricity_tariff:
-  state: 29.29
+  state: 29.72
   unit_of_measurement: ¢/kWh
   attributes:
-    quarter: Q1
-    year: 2025
+    quarter: Q2
+    year: 2026
     source: SP Group
 
 sensor.singapore_solar_export_price:
-  state: 21.68
+  state: 23.47
   unit_of_measurement: ¢/kWh
   attributes:
-    quarter: Q1
-    year: 2025
+    quarter: Q2
+    year: 2026
     source: SP Group
-    network_cost: 7.61
-    total_tariff: 29.29
+    network_cost: 6.25
+    total_tariff: 29.72
 
 sensor.singapore_gas_tariff:
-  state: 20.14
+  state: 23.89
   unit_of_measurement: ¢/kWh
   attributes:
-    quarter: Q1
-    year: 2025
+    quarter: Q2
+    year: 2026
     source: SP Group
 
 sensor.singapore_water_tariff:
-  state: 1.56      # lower residential tier (≤40 m³); upper tier is ~$1.97/m³
+  state: 1.56
   unit_of_measurement: SGD/m³
   attributes:
     quarter: Q2
     year: 2026
     source: SP Group
+
+sensor.singapore_coe_category_a:
+  state: 95501
+  unit_of_measurement: SGD
+  attributes:
+    category: Category A
+    description: Cars up to 1600cc / 97kW (electric)
+    month: "2026-03"
+    bidding_no: 1
+    source: data.gov.sg / LTA
+
+sensor.singapore_coe_category_e:
+  state: 118001
+  unit_of_measurement: SGD
+  attributes:
+    category: Category E
+    description: Open (all except motorcycles)
+    month: "2026-03"
+    bidding_no: 1
+    source: data.gov.sg / LTA
 ```
 
 ## Installation via HACS
@@ -67,15 +106,13 @@ sensor.singapore_water_tariff:
 2. Search for **Singapore**.
 3. Enter a name and click **Submit**.
 
-## Data source
+## Data sources
 
-Tariff data is scraped from the [SP Group tariff information page](https://www.spgroup.com.sg/our-services/utilities/tariff-information).
-Prices are published quarterly.
-
-- Electricity and gas prices are in Singapore cents per kilowatt-hour (¢/kWh)
-- Water price is in Singapore dollars per cubic metre (SGD/m³); SP Group publishes
-  two residential tiers (≤40 m³ and >40 m³) — the sensor reports the lower tier
-- Solar export price = electricity tariff − network costs (network charges don't apply to exported electricity)
+- **Utility tariffs** — scraped from the SP Group tariff information page; published quarterly.
+  - Electricity and gas: Singapore cents per kilowatt-hour (¢/kWh)
+  - Water: SGD per cubic metre (SGD/m³); lower residential tier (≤40 m³)
+  - Solar export price = electricity tariff − network costs
+- **COE results** — fetched from the LTA dataset on [data.gov.sg](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view); refreshed daily at 19:30 to pick up results after each bidding exercise.
 
 ## Development
 

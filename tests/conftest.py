@@ -134,6 +134,10 @@ _HA_MODULES: dict[str, ModuleType] = {
         "homeassistant.helpers.entity_platform",
         AddEntitiesCallback=AddEntitiesCallback,
     ),
+    "homeassistant.helpers.event": _mod(
+        "homeassistant.helpers.event",
+        async_track_time_change=MagicMock(return_value=MagicMock()),
+    ),
     "homeassistant.components": _mod("homeassistant.components"),
     "homeassistant.components.sensor": _mod(
         "homeassistant.components.sensor",
