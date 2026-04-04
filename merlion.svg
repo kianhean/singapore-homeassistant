@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Background circle -->
+  <circle cx="128" cy="128" r="124" fill="#C8102E"/>
+  <circle cx="128" cy="128" r="118" fill="#EF3340"/>
+
+  <!-- Water base -->
+  <ellipse cx="128" cy="210" rx="70" ry="18" fill="#0057A8" opacity="0.7"/>
+
+  <!-- Fish body (lower half of Merlion) -->
+  <!-- Main fish body -->
+  <ellipse cx="128" cy="185" rx="42" ry="52" fill="#F5A623"/>
+  <!-- Fish scales pattern -->
+  <ellipse cx="108" cy="168" rx="14" ry="10" fill="#E8940D" opacity="0.6"/>
+  <ellipse cx="128" cy="163" rx="14" ry="10" fill="#E8940D" opacity="0.6"/>
+  <ellipse cx="148" cy="168" rx="14" ry="10" fill="#E8940D" opacity="0.6"/>
+  <ellipse cx="110" cy="185" rx="14" ry="10" fill="#E8940D" opacity="0.6"/>
+  <ellipse cx="130" cy="181" rx="14" ry="10" fill="#E8940D" opacity="0.6"/>
+  <ellipse cx="148" cy="186" rx="14" ry="10" fill="#E8940D" opacity="0.6"/>
+  <ellipse cx="115" cy="201" rx="14" ry="10" fill="#E8940D" opacity="0.6"/>
+  <ellipse cx="138" cy="200" rx="14" ry="10" fill="#E8940D" opacity="0.6"/>
+
+  <!-- Tail fins -->
+  <path d="M 90 215 Q 70 230 65 215 Q 80 205 90 215 Z" fill="#F5A623"/>
+  <path d="M 166 215 Q 186 230 191 215 Q 176 205 166 215 Z" fill="#F5A623"/>
+  <path d="M 100 225 Q 88 245 80 238 Q 90 222 100 225 Z" fill="#F5A623"/>
+  <path d="M 156 225 Q 168 245 176 238 Q 166 222 156 225 Z" fill="#F5A623"/>
+
+  <!-- Lion body (torso area) -->
+  <rect x="100" y="120" width="56" height="50" rx="8" fill="#D4A017"/>
+
+  <!-- Lion chest mane detail -->
+  <ellipse cx="128" cy="138" rx="28" ry="22" fill="#B8860B"/>
+
+  <!-- Lion head -->
+  <ellipse cx="128" cy="102" rx="38" ry="36" fill="#D4A017"/>
+
+  <!-- Mane -->
+  <!-- Outer mane points -->
+  <ellipse cx="93" cy="88" rx="14" ry="18" fill="#8B6508" transform="rotate(-20 93 88)"/>
+  <ellipse cx="96" cy="70" rx="12" ry="16" fill="#8B6508" transform="rotate(-10 96 70)"/>
+  <ellipse cx="112" cy="62" rx="11" ry="15" fill="#8B6508" transform="rotate(5 112 62)"/>
+  <ellipse cx="128" cy="60" rx="11" ry="14" fill="#8B6508"/>
+  <ellipse cx="144" cy="62" rx="11" ry="15" fill="#8B6508" transform="rotate(-5 144 62)"/>
+  <ellipse cx="160" cy="70" rx="12" ry="16" fill="#8B6508" transform="rotate(10 160 70)"/>
+  <ellipse cx="163" cy="88" rx="14" ry="18" fill="#8B6508" transform="rotate(20 163 88)"/>
+  <!-- Inner mane -->
+  <ellipse cx="97" cy="93" rx="11" ry="15" fill="#A07010" transform="rotate(-15 97 93)"/>
+  <ellipse cx="105" cy="74" rx="10" ry="13" fill="#A07010" transform="rotate(-5 105 74)"/>
+  <ellipse cx="128" cy="68" rx="10" ry="12" fill="#A07010"/>
+  <ellipse cx="151" cy="74" rx="10" ry="13" fill="#A07010" transform="rotate(5 151 74)"/>
+  <ellipse cx="159" cy="93" rx="11" ry="15" fill="#A07010" transform="rotate(15 159 93)"/>
+
+  <!-- Lion face (re-draw over mane) -->
+  <ellipse cx="128" cy="104" rx="30" ry="28" fill="#D4A017"/>
+
+  <!-- Ears -->
+  <ellipse cx="100" cy="82" rx="11" ry="13" fill="#C49010"/>
+  <ellipse cx="156" cy="82" rx="11" ry="13" fill="#C49010"/>
+  <ellipse cx="100" cy="81" rx="7" ry="9" fill="#D4A017"/>
+  <ellipse cx="156" cy="81" rx="7" ry="9" fill="#D4A017"/>
+
+  <!-- Eyes -->
+  <ellipse cx="116" cy="100" rx="7" ry="6" fill="#1A1A1A"/>
+  <ellipse cx="140" cy="100" rx="7" ry="6" fill="#1A1A1A"/>
+  <ellipse cx="115" cy="99" rx="3" ry="3" fill="#FFFFFF"/>
+  <ellipse cx="139" cy="99" rx="3" ry="3" fill="#FFFFFF"/>
+  <circle cx="116" cy="100" r="2" fill="#000000"/>
+  <circle cx="140" cy="100" r="2" fill="#000000"/>
+
+  <!-- Nose -->
+  <ellipse cx="128" cy="112" rx="6" ry="4" fill="#8B4513"/>
+
+  <!-- Mouth -->
+  <path d="M 118 116 Q 128 122 138 116" stroke="#5C2A00" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- Whisker dots -->
+  <circle cx="110" cy="113" r="1.5" fill="#8B6508"/>
+  <circle cx="107" cy="116" r="1.5" fill="#8B6508"/>
+  <circle cx="110" cy="119" r="1.5" fill="#8B6508"/>
+  <circle cx="146" cy="113" r="1.5" fill="#8B6508"/>
+  <circle cx="149" cy="116" r="1.5" fill="#8B6508"/>
+  <circle cx="146" cy="119" r="1.5" fill="#8B6508"/>
+
+  <!-- Water spout from mouth -->
+  <path d="M 128 118 Q 122 90 118 72 Q 124 68 128 65 Q 132 68 138 72 Q 134 90 128 118 Z" fill="#4FC3F7" opacity="0.85"/>
+  <path d="M 124 90 Q 110 75 100 58 Q 106 53 112 56 Q 118 70 124 85 Z" fill="#4FC3F7" opacity="0.7"/>
+  <path d="M 132 90 Q 146 75 156 58 Q 150 53 144 56 Q 138 70 132 85 Z" fill="#4FC3F7" opacity="0.7"/>
+  <!-- Water droplets -->
+  <ellipse cx="108" cy="50" rx="5" ry="7" fill="#4FC3F7" opacity="0.8"/>
+  <ellipse cx="128" cy="54" rx="5" ry="8" fill="#4FC3F7" opacity="0.9"/>
+  <ellipse cx="148" cy="50" rx="5" ry="7" fill="#4FC3F7" opacity="0.8"/>
+  <ellipse cx="100" cy="42" rx="3" ry="5" fill="#4FC3F7" opacity="0.6"/>
+  <ellipse cx="156" cy="42" rx="3" ry="5" fill="#4FC3F7" opacity="0.6"/>
+
+  <!-- Water waves at base -->
+  <path d="M 60 210 Q 75 200 90 210 Q 105 220 120 210 Q 135 200 150 210 Q 165 220 180 210 Q 195 200 196 205" stroke="#4FC3F7" stroke-width="3" fill="none" opacity="0.8"/>
+  <path d="M 65 218 Q 80 208 95 218 Q 110 228 125 218 Q 140 208 155 218 Q 170 228 185 218" stroke="#4FC3F7" stroke-width="2.5" fill="none" opacity="0.6"/>
+</svg>
