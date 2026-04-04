@@ -2,8 +2,8 @@
   "config": {
     "step": {
       "user": {
-        "title": "Singapore Hello World",
-        "description": "Set up the Singapore Hello World integration.",
+        "title": "Singapore",
+        "description": "Set up the Singapore integration.",
         "data": {
           "name": "Integration Name"
         }

@@ -1,0 +1,14 @@
+{
+  "domain": "singapore",
+  "name": "Singapore",
+  "version": "0.2.0",
+  "description": "Singapore Home Assistant integration — electricity tariff, solar export price, and more",
+  "documentation": "https://github.com/kianhean/singapore-homeassistant",
+  "issue_tracker": "https://github.com/kianhean/singapore-homeassistant/issues",
+  "dependencies": [],
+  "codeowners": ["@kianhean"],
+  "requirements": ["beautifulsoup4==4.12.3"],
+  "iot_class": "cloud_polling",
+  "config_flow": true,
+  "hacs": "1.0.0"
+}
