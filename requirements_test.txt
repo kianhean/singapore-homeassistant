@@ -5,3 +5,4 @@ beautifulsoup4==4.12.3
 voluptuous>=0.13
 aiohttp>=3.9
 requests>=2.31
+ruff==0.8.6

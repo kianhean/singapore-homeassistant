@@ -61,9 +61,9 @@ def test_e2e_fetch_and_parse():
     from custom_components.singapore.coordinator import _parse_tariff
 
     html = _fetch_html()
-    assert len(html) > 1000, (
-        f"Page suspiciously short ({len(html)} bytes) — likely a bot-block page"
-    )
+    assert (
+        len(html) > 1000
+    ), f"Page suspiciously short ({len(html)} bytes) — likely a bot-block page"
 
     data = _parse_tariff(html)
 
@@ -84,9 +84,12 @@ def test_e2e_fetch_and_parse():
         f"[{_WATER_MIN}, {_WATER_MAX}] SGD/m³"
     )
     assert data.solar_export_price > 0, "solar_export_price must be positive"
-    assert data.quarter in ("Q1", "Q2", "Q3", "Q4"), (
-        f"quarter={data.quarter!r} not recognised — date parsing may be broken"
-    )
+    assert data.quarter in (
+        "Q1",
+        "Q2",
+        "Q3",
+        "Q4",
+    ), f"quarter={data.quarter!r} not recognised — date parsing may be broken"
     assert data.year >= 2024, f"year={data.year} looks wrong"
 
 
