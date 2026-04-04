@@ -131,7 +131,13 @@ def _parse_tariff(html: str) -> TariffData:
 
 def _extract_quarter_year(soup: BeautifulSoup) -> tuple[str, int]:
     """Return (quarter, year) by scanning page text for SP Group date ranges."""
-    text = soup.get_text(" ", strip=True)
+    # Include __NEXT_DATA__ JSON in the search corpus
+    extra = ""
+    next_data_tag = soup.find("script", {"id": "__NEXT_DATA__"})
+    if next_data_tag and next_data_tag.string:
+        extra = next_data_tag.string
+
+    text = soup.get_text(" ", strip=True) + " " + extra
 
     year_match = re.search(r"\b(20\d{2})\b", text)
     year = int(year_match.group(1)) if year_match else 0
@@ -153,10 +159,15 @@ def _extract_quarter_year(soup: BeautifulSoup) -> tuple[str, int]:
 
 
 def _extract_row_value(soup: BeautifulSoup, keywords: tuple[str, ...]) -> float | None:
-    """Find a table row matching any keyword and return its last numeric cell.
+    """Find a tariff value matching any keyword.
 
-    Falls back to a regex scan of the full page text.
+    Tries four strategies in order:
+    1. HTML table rows (original SP Group layout)
+    2. __NEXT_DATA__ JSON embedded by Next.js SSR
+    3. Inline <script> text (JSON blobs, JS variables)
+    4. Full visible page text regex
     """
+    # 1. Table rows
     for table in soup.find_all("table"):
         for row in table.find_all("tr"):
             cells = row.find_all(["td", "th"])
@@ -167,16 +178,43 @@ def _extract_row_value(soup: BeautifulSoup, keywords: tuple[str, ...]) -> float 
                     if val is not None and 0.1 < val < 200.0:
                         return val
 
+    # 2. __NEXT_DATA__ JSON (Next.js server-side renders page props here)
+    next_data_tag = soup.find("script", {"id": "__NEXT_DATA__"})
+    if next_data_tag and next_data_tag.string:
+        val = _search_text_for_keywords(next_data_tag.string, keywords)
+        if val is not None:
+            return val
+
+    # 3. Other inline <script> blocks that may contain JSON/JS data
+    for script in soup.find_all("script"):
+        if script.get("id") == "__NEXT_DATA__":
+            continue  # already handled above
+        src = script.string or ""
+        if not src:
+            continue
+        val = _search_text_for_keywords(src, keywords)
+        if val is not None:
+            return val
+
+    # 4. Visible page text
     text = soup.get_text(" ", strip=True)
+    val = _search_text_for_keywords(text, keywords)
+    if val is not None:
+        return val
+
+    return None
+
+
+def _search_text_for_keywords(text: str, keywords: tuple[str, ...]) -> float | None:
+    """Regex-search text for a float near any keyword."""
     pattern = (
         r"(?:" + "|".join(re.escape(kw) for kw in keywords) + r")"
-        r"[^0-9]{0,60}?(\d{1,3}\.\d{1,2})"
+        r"[^0-9]{0,80}?(\d{1,3}\.\d{1,2})"
     )
     for m in re.findall(pattern, text, re.IGNORECASE):
         val = _to_float(m)
         if val is not None and 0.1 < val < 200.0:
             return val
-
     return None
 
 

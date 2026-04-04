@@ -94,13 +94,44 @@ def test_e2e_fetch_and_parse():
 
 
 def test_e2e_raw_html_debug(capsys):
-    """Fetch and print the first 3 000 chars of HTML to aid parser debugging.
+    """Fetch and print diagnostic info to aid parser debugging.
 
-    This test always passes; its job is to give you a quick snapshot of what
-    the page looks like when running ``pytest tests/test_e2e.py -v -s -m e2e``.
+    Always passes. Run with ``pytest tests/test_e2e.py -v -s -m e2e`` to see output.
     """
+    import json
+    import re
+
+    from bs4 import BeautifulSoup
+
     html = _fetch_html()
+    soup = BeautifulSoup(html, "html.parser")
+
     with capsys.disabled():
-        print(f"\n=== SP Group page ({len(html)} bytes) — first 3000 chars ===")
-        print(html[:3000])
-        print("=== end of snippet ===\n")
+        print(f"\n=== SP Group page ({len(html)} bytes) ===")
+
+        # __NEXT_DATA__ — the motherlode for Next.js SSR pages
+        next_data_tag = soup.find("script", {"id": "__NEXT_DATA__"})
+        if next_data_tag and next_data_tag.string:
+            try:
+                nd = json.loads(next_data_tag.string)
+                print("\n--- __NEXT_DATA__ (pretty, first 3000 chars) ---")
+                print(json.dumps(nd, indent=2)[:3000])
+            except json.JSONDecodeError:
+                print("\n--- __NEXT_DATA__ raw (first 3000 chars) ---")
+                print(next_data_tag.string[:3000])
+        else:
+            print("\n[no __NEXT_DATA__ script tag found]")
+
+        # All floats found anywhere in page text
+        page_text = soup.get_text(" ", strip=True)
+        floats = re.findall(r"\b\d{1,3}\.\d{1,2}\b", page_text)
+        print(f"\n--- floats in page text: {floats[:40]} ---")
+
+        # Inline <script> tags that contain tariff-like numbers
+        for i, script in enumerate(soup.find_all("script")):
+            src = script.string or ""
+            if re.search(r"\b(2[0-9]\.\d{2}|3[0-9]\.\d{2})\b", src):
+                print(f"\n--- inline script {i} snippet (first 500 chars) ---")
+                print(src[:500])
+
+        print("\n=== end of debug ===\n")
