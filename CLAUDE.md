@@ -73,6 +73,17 @@ Solar export price = total electricity tariff − network costs.
 3. Add a new sensor class in `sensor.py`, register it in `async_setup_entry`
 4. Add tests in `tests/test_sensor.py` and `tests/test_coordinator.py`
 
+## Linting and Formatting
+
+After every code change, always run and fix before committing:
+
+```bash
+ruff check custom_components/ tests/ --fix
+ruff format custom_components/ tests/
+```
+
+Both commands must exit cleanly — CI will fail otherwise.
+
 ## Key Conventions
 
 - All HA I/O must be `async`; use `async_`-prefixed HA helpers

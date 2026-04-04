@@ -36,10 +36,10 @@ _URL = "https://www.spgroup.com.sg/our-services/utilities/tariff-information"
 
 # Sanity-check bounds: tariffs that fall outside these ranges almost certainly
 # indicate a parse error rather than a real rate.
-_ELECTRICITY_MIN, _ELECTRICITY_MAX = 10.0, 60.0   # ¢/kWh
-_GAS_MIN, _GAS_MAX = 5.0, 50.0                    # ¢/kWh
-_WATER_MIN, _WATER_MAX = 1.0, 10.0                # SGD/m³
-_NETWORK_MIN, _NETWORK_MAX = 1.0, 20.0            # ¢/kWh
+_ELECTRICITY_MIN, _ELECTRICITY_MAX = 10.0, 60.0  # ¢/kWh
+_GAS_MIN, _GAS_MAX = 5.0, 50.0  # ¢/kWh
+_WATER_MIN, _WATER_MAX = 1.0, 10.0  # SGD/m³
+_NETWORK_MIN, _NETWORK_MAX = 1.0, 20.0  # ¢/kWh
 
 
 def _fetch_html() -> str:
@@ -61,7 +61,9 @@ def test_e2e_fetch_and_parse():
     from custom_components.singapore.coordinator import _parse_tariff
 
     html = _fetch_html()
-    assert len(html) > 1000, f"Page suspiciously short ({len(html)} bytes) — likely a bot-block page"
+    assert len(html) > 1000, (
+        f"Page suspiciously short ({len(html)} bytes) — likely a bot-block page"
+    )
 
     data = _parse_tariff(html)
 
