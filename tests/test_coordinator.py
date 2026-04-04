@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
-from custom_components.singapore_hello.coordinator import (
+from custom_components.singapore.coordinator import (
     SPGroupCoordinator,
     TariffData,
     _parse_tariff,
@@ -36,12 +36,24 @@ _HTML_NO_TABLE = """
 <html><body>
 <p>Current Residential Electricity Tariff</p>
 <p>Effective 1 April 2025 to 30 June 2025</p>
+<p>Network: 7.50 cents/kWh</p>
 <p>Total: 28.54 cents/kWh</p>
 </body></html>
 """
 
 _HTML_UNPARSEABLE = """
 <html><body><p>Service unavailable. Please try again.</p></body></html>
+"""
+
+_HTML_NO_NETWORK = """
+<html><body>
+<h2>1 January 2025 to 31 March 2025</h2>
+<table>
+  <tbody>
+    <tr><td>Total (incl. GST)</td><td>29.29</td></tr>
+  </tbody>
+</table>
+</body></html>
 """
 
 
@@ -53,6 +65,7 @@ _HTML_UNPARSEABLE = """
 def test_parse_tariff_from_table():
     data = _parse_tariff(_HTML_TABLE)
     assert data.price == 29.29
+    assert data.network_cost == 7.61
     assert data.quarter == "Q1"
     assert data.year == 2025
 
@@ -60,8 +73,14 @@ def test_parse_tariff_from_table():
 def test_parse_tariff_from_text():
     data = _parse_tariff(_HTML_NO_TABLE)
     assert data.price == 28.54
+    assert data.network_cost == 7.50
     assert data.quarter == "Q2"
     assert data.year == 2025
+
+
+def test_solar_export_price_calculation():
+    data = _parse_tariff(_HTML_TABLE)
+    assert data.solar_export_price == round(29.29 - 7.61, 2)
 
 
 def test_parse_tariff_raises_on_no_price():
@@ -70,12 +89,17 @@ def test_parse_tariff_raises_on_no_price():
 
 
 def test_parse_tariff_unknown_quarter():
-    html = """<html><body>
-    <p>Total: 27.00 cents/kWh</p>
-    </body></html>"""
+    html = "<html><body><p>Total: 27.00 cents/kWh</p></body></html>"
     data = _parse_tariff(html)
     assert data.quarter == "Unknown"
     assert data.price == 27.00
+
+
+def test_parse_tariff_missing_network_defaults_zero():
+    """Network cost defaults to 0 when not found; solar export price = total."""
+    data = _parse_tariff(_HTML_NO_NETWORK)
+    assert data.network_cost == 0.0
+    assert data.solar_export_price == data.price
 
 
 # ---------------------------------------------------------------------------
@@ -84,7 +108,6 @@ def test_parse_tariff_unknown_quarter():
 
 
 async def test_coordinator_fetches_and_parses(hass: HomeAssistant) -> None:
-    """Coordinator returns parsed TariffData on successful fetch."""
     coordinator = SPGroupCoordinator(hass)
 
     mock_response = AsyncMock()
@@ -104,12 +127,12 @@ async def test_coordinator_fetches_and_parses(hass: HomeAssistant) -> None:
 
     assert coordinator.data is not None
     assert coordinator.data.price == 29.29
+    assert coordinator.data.network_cost == 7.61
     assert coordinator.data.quarter == "Q1"
     assert coordinator.data.year == 2025
 
 
 async def test_coordinator_raises_on_http_error(hass: HomeAssistant) -> None:
-    """Coordinator raises UpdateFailed on non-200 response."""
     coordinator = SPGroupCoordinator(hass)
 
     mock_response = AsyncMock()
@@ -130,7 +153,6 @@ async def test_coordinator_raises_on_http_error(hass: HomeAssistant) -> None:
 
 
 async def test_coordinator_raises_on_network_error(hass: HomeAssistant) -> None:
-    """Coordinator raises UpdateFailed on connection error."""
     coordinator = SPGroupCoordinator(hass)
 
     mock_session = MagicMock()

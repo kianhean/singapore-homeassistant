@@ -1,16 +1,16 @@
-# Singapore Home Assistant HACS Integration
+# Singapore Home Assistant Integration
 
-A HACS custom integration that tracks Singapore's residential electricity tariff
-from SP Group, updated every 24 hours.
+A general-purpose HACS integration for Singapore-specific Home Assistant sensors.
+The integration domain is `singapore`.
 
 ## Structure
 
 ```
-custom_components/singapore_hello/
+custom_components/singapore/
 ├── __init__.py        # Entry setup/teardown; creates and stores coordinator
 ├── coordinator.py     # DataUpdateCoordinator: fetches + parses SP Group page
 ├── config_flow.py     # UI config flow (name input)
-├── sensor.py          # CoordinatorEntity sensor (¢/kWh, quarter, year attrs)
+├── sensor.py          # Sensor entities
 ├── manifest.json      # Integration metadata; declares beautifulsoup4 dep
 ├── strings.json       # Config flow UI strings
 └── translations/
@@ -25,6 +25,13 @@ tests/
 
 .github/workflows/tests.yml   # CI: tests (Py 3.12 & 3.13) + ruff lint
 ```
+
+## Sensors
+
+| Entity ID | Name | Description |
+|-----------|------|-------------|
+| `sensor.singapore_electricity_tariff` | Singapore Electricity Tariff | Total residential tariff in ¢/kWh |
+| `sensor.singapore_solar_export_price` | Singapore Solar Export Price | Tariff minus network costs in ¢/kWh |
 
 ## Development Setup
 
@@ -41,25 +48,26 @@ pytest tests/ -v
 With coverage:
 
 ```bash
-pytest tests/ -v --cov=custom_components/singapore_hello --cov-report=term-missing
+pytest tests/ -v --cov=custom_components/singapore --cov-report=term-missing
 ```
 
 ## How the Scraper Works
 
 `coordinator.py` fetches `https://www.spgroup.com.sg/our-services/utilities/tariff-information`
-with browser-like headers (SP Group blocks plain bots). Parsing uses three fallback strategies:
+with browser-like headers (SP Group blocks plain bots). Parsing uses two strategies:
 
-1. **Table row** — scans `<table>` rows for one containing "total" or "residential", reads last numeric cell
-2. **Text regex** — scans page text for a number following "total" or "residential"
-3. **Number scan** — picks the first plausible standalone number in range 5–100
+1. **Table row** — scans `<table>` rows for a keyword match, reads the last numeric cell
+2. **Text regex** — scans page text for a number following the keyword
 
 Quarter is inferred from date strings like "1 January 2025 to 31 March 2025".
 
-## Adding a New Platform
+Solar export price = total tariff − network costs (network charges don't apply to exported electricity).
 
-1. Create `custom_components/singapore_hello/<platform>.py`
-2. Add the platform to `PLATFORMS` in `__init__.py`
-3. Add tests in `tests/test_<platform>.py`
+## Adding a New Sensor
+
+1. Add any new fields to `TariffData` in `coordinator.py` and parse them in `_parse_tariff`
+2. Add a new sensor class in `sensor.py` and include it in `async_setup_entry`
+3. Add tests in `tests/test_sensor.py` and `tests/test_coordinator.py`
 
 ## Key Conventions
 

@@ -5,7 +5,7 @@ from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
-from custom_components.singapore_hello import DOMAIN
+from custom_components.singapore import DOMAIN
 
 
 async def test_user_flow_creates_entry(hass: HomeAssistant) -> None:

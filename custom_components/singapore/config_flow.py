@@ -1,4 +1,4 @@
-"""Config flow for Singapore Hello World integration."""
+"""Config flow for Singapore Electricity Tariff integration."""
 from __future__ import annotations
 
 from typing import Any
@@ -12,13 +12,13 @@ from . import DOMAIN
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_NAME, default="Singapore Hello World"): str,
+        vol.Required(CONF_NAME, default="Singapore Electricity"): str,
     }
 )
 
 
-class SingaporeHelloConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Singapore Hello World."""
+class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for Singapore Electricity Tariff."""
 
     VERSION = 1
 

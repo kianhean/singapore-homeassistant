@@ -6,8 +6,8 @@ from homeassistant.core import HomeAssistant
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.singapore_hello import DOMAIN
-from custom_components.singapore_hello.coordinator import SPGroupCoordinator
+from custom_components.singapore import DOMAIN
+from custom_components.singapore.coordinator import SPGroupCoordinator
 
 _HTML_TABLE = """
 <html><body>

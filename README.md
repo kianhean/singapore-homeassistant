@@ -3,12 +3,37 @@
 A [HACS](https://hacs.xyz) custom integration for Home Assistant that tracks Singapore's
 residential electricity tariff published by [SP Group](https://www.spgroup.com.sg).
 
-## Features
+## Sensors
 
-- **Electricity tariff sensor** — reports the current residential rate in **¢/kWh**
-- **Quarterly attributes** — `quarter` (e.g. `Q1`) and `year` on the sensor state
-- **24-hour polling** — automatically refreshes once per day
-- Robust HTML parser with three fallback strategies to handle SP Group page changes
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.singapore_electricity_tariff` | Singapore Electricity Tariff | ¢/kWh | Total residential electricity tariff |
+| `sensor.singapore_solar_export_price` | Singapore Solar Export Price | ¢/kWh | Tariff minus network costs — the rate paid for excess solar exported to the grid |
+
+Both sensors refresh every **24 hours** and expose `quarter` (e.g. `Q1`), `year`, and `source` as state attributes.
+The solar export price sensor additionally exposes `network_cost` and `total_tariff` as attributes.
+
+## Example sensor states
+
+```yaml
+sensor.singapore_electricity_tariff:
+  state: 29.29
+  unit_of_measurement: ¢/kWh
+  attributes:
+    quarter: Q1
+    year: 2025
+    source: SP Group
+
+sensor.singapore_solar_export_price:
+  state: 21.68
+  unit_of_measurement: ¢/kWh
+  attributes:
+    quarter: Q1
+    year: 2025
+    source: SP Group
+    network_cost: 7.61
+    total_tariff: 29.29
+```
 
 ## Installation via HACS
 
@@ -24,27 +49,14 @@ residential electricity tariff published by [SP Group](https://www.spgroup.com.s
 2. Search for **Singapore Electricity Tariff**.
 3. Enter a name and click **Submit**.
 
-The integration creates one sensor entity:
-
-| Entity | Unit | Attributes |
-|--------|------|------------|
-| `sensor.<name>_electricity_tariff` | `¢/kWh` | `quarter`, `year`, `source` |
-
-## Example sensor state
-
-```yaml
-state: 29.29
-unit_of_measurement: ¢/kWh
-attributes:
-  quarter: Q1
-  year: 2025
-  source: SP Group
-```
-
 ## Data source
 
 Tariff data is scraped from the [SP Group tariff information page](https://www.spgroup.com.sg/our-services/utilities/tariff-information).
-Prices are published quarterly and denominated in Singapore cents per kilowatt-hour.
+Prices are published quarterly in Singapore cents per kilowatt-hour.
+
+The solar export price is calculated as `total tariff − network costs`.
+Network costs (transmission and distribution charges) are not applicable
+to electricity exported back to the grid.
 
 ## Development
 

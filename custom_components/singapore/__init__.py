@@ -11,7 +11,7 @@ from .coordinator import SPGroupCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-DOMAIN = "singapore_hello"
+DOMAIN = "singapore"
 PLATFORMS = [Platform.SENSOR]
 
 

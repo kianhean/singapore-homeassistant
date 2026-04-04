@@ -7,10 +7,8 @@ from homeassistant.core import HomeAssistant
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.singapore_hello import DOMAIN
-from custom_components.singapore_hello.coordinator import TariffData, UNIT
-
-_MOCK_TARIFF = TariffData(price=29.29, quarter="Q1", year=2025)
+from custom_components.singapore import DOMAIN
+from custom_components.singapore.coordinator import UNIT
 
 _HTML_TABLE = """
 <html><body>
@@ -19,15 +17,18 @@ _HTML_TABLE = """
   <thead><tr><th>Component</th><th>Rate (¢/kWh)</th></tr></thead>
   <tbody>
     <tr><td>Energy</td><td>14.32</td></tr>
+    <tr><td>Network</td><td>7.61</td></tr>
     <tr><td>Total (incl. GST)</td><td>29.29</td></tr>
   </tbody>
 </table>
 </body></html>
 """
 
+_TARIFF_ENTITY = "sensor.singapore_electricity_tariff"
+_SOLAR_ENTITY = "sensor.singapore_solar_export_price"
+
 
 async def _setup_entry(hass: HomeAssistant) -> MockConfigEntry:
-    """Set up a config entry with mocked HTTP fetching."""
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={CONF_NAME: "Singapore Electricity"},
@@ -54,35 +55,65 @@ async def _setup_entry(hass: HomeAssistant) -> MockConfigEntry:
     return entry
 
 
-async def test_sensor_state(hass: HomeAssistant) -> None:
-    """Sensor reports the correct tariff value."""
-    await _setup_entry(hass)
+# ---------------------------------------------------------------------------
+# Electricity tariff sensor
+# ---------------------------------------------------------------------------
 
-    state = hass.states.get("sensor.singapore_electricity_tariff")
+
+async def test_tariff_sensor_state(hass: HomeAssistant) -> None:
+    await _setup_entry(hass)
+    state = hass.states.get(_TARIFF_ENTITY)
     assert state is not None
     assert float(state.state) == 29.29
 
 
-async def test_sensor_unit(hass: HomeAssistant) -> None:
-    """Sensor uses cents/kWh as the unit."""
+async def test_tariff_sensor_unit(hass: HomeAssistant) -> None:
     await _setup_entry(hass)
-
-    state = hass.states.get("sensor.singapore_electricity_tariff")
+    state = hass.states.get(_TARIFF_ENTITY)
     assert state.attributes.get("unit_of_measurement") == UNIT
 
 
-async def test_sensor_attributes(hass: HomeAssistant) -> None:
-    """Sensor exposes quarter, year, and source attributes."""
+async def test_tariff_sensor_attributes(hass: HomeAssistant) -> None:
     await _setup_entry(hass)
-
-    state = hass.states.get("sensor.singapore_electricity_tariff")
+    state = hass.states.get(_TARIFF_ENTITY)
     assert state.attributes["quarter"] == "Q1"
     assert state.attributes["year"] == 2025
     assert state.attributes["source"] == "SP Group"
 
 
-async def test_sensor_unavailable_when_no_data(hass: HomeAssistant) -> None:
-    """Sensor is unavailable when coordinator has no data."""
+# ---------------------------------------------------------------------------
+# Solar export price sensor
+# ---------------------------------------------------------------------------
+
+
+async def test_solar_sensor_state(hass: HomeAssistant) -> None:
+    await _setup_entry(hass)
+    state = hass.states.get(_SOLAR_ENTITY)
+    assert state is not None
+    assert float(state.state) == round(29.29 - 7.61, 2)
+
+
+async def test_solar_sensor_unit(hass: HomeAssistant) -> None:
+    await _setup_entry(hass)
+    state = hass.states.get(_SOLAR_ENTITY)
+    assert state.attributes.get("unit_of_measurement") == UNIT
+
+
+async def test_solar_sensor_attributes(hass: HomeAssistant) -> None:
+    await _setup_entry(hass)
+    state = hass.states.get(_SOLAR_ENTITY)
+    assert state.attributes["network_cost"] == 7.61
+    assert state.attributes["total_tariff"] == 29.29
+    assert state.attributes["quarter"] == "Q1"
+    assert state.attributes["year"] == 2025
+
+
+# ---------------------------------------------------------------------------
+# Error / unload
+# ---------------------------------------------------------------------------
+
+
+async def test_sensors_unavailable_when_no_data(hass: HomeAssistant) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={CONF_NAME: "Singapore Electricity"},
@@ -100,16 +131,13 @@ async def test_sensor_unavailable_when_no_data(hass: HomeAssistant) -> None:
         await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-    state = hass.states.get("sensor.singapore_electricity_tariff")
-    # Entry setup fails when first refresh fails, so state won't be loaded
-    assert state is None or state.state in ("unavailable", "unknown")
+    for entity_id in (_TARIFF_ENTITY, _SOLAR_ENTITY):
+        state = hass.states.get(entity_id)
+        assert state is None or state.state in ("unavailable", "unknown")
 
 
 async def test_unload_entry(hass: HomeAssistant) -> None:
-    """Config entry unloads cleanly."""
     entry = await _setup_entry(hass)
-
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
-
     assert entry.entry_id not in hass.data.get(DOMAIN, {})

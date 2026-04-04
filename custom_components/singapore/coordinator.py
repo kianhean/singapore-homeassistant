@@ -40,14 +40,27 @@ _QUARTER_RANGES = {
     "Q4": ("1 October", "31 December"),
 }
 
+# Row label keywords that identify the network cost component
+_NETWORK_KEYWORDS = ("network", "transmission", "distribution", "grid")
+
 
 @dataclass
 class TariffData:
     """Electricity tariff data parsed from SP Group."""
 
-    price: float  # cents/kWh
-    quarter: str  # e.g. "Q1"
+    price: float          # total tariff, cents/kWh
+    network_cost: float   # network component, cents/kWh
+    quarter: str          # e.g. "Q1"
     year: int
+
+    @property
+    def solar_export_price(self) -> float:
+        """Solar export price = total tariff minus network costs (cents/kWh).
+
+        Solar panel owners exporting to the grid receive the energy component
+        only; network charges are not paid on exported electricity.
+        """
+        return round(self.price - self.network_cost, 2)
 
 
 class SPGroupCoordinator(DataUpdateCoordinator[TariffData]):
@@ -79,26 +92,29 @@ class SPGroupCoordinator(DataUpdateCoordinator[TariffData]):
 
 
 def _parse_tariff(html: str) -> TariffData:
-    """Parse tariff price, quarter and year from SP Group HTML."""
+    """Parse tariff price, network cost, quarter and year from SP Group HTML."""
     soup = BeautifulSoup(html, "html.parser")
 
-    # --- Detect quarter and year from page headings / captions ---
     quarter, year = _extract_quarter_year(soup)
 
-    # --- Extract total residential electricity price (cents/kWh) ---
-    price = _extract_price(soup)
-
+    price = _extract_row_value(soup, keywords=("total", "residential"))
     if price is None:
         raise UpdateFailed("Could not find electricity price on SP Group page")
 
-    return TariffData(price=price, quarter=quarter, year=year)
+    network_cost = _extract_row_value(soup, keywords=_NETWORK_KEYWORDS)
+    if network_cost is None:
+        _LOGGER.warning(
+            "Could not find network cost on SP Group page; solar export price unavailable"
+        )
+        network_cost = 0.0
+
+    return TariffData(price=price, network_cost=network_cost, quarter=quarter, year=year)
 
 
 def _extract_quarter_year(soup: BeautifulSoup) -> tuple[str, int]:
     """Return (quarter, year) by scanning headings for date ranges."""
     text = soup.get_text(" ", strip=True)
 
-    # Match patterns like "1 January 2025 to 31 March 2025"
     year_match = re.search(r"\b(20\d{2})\b", text)
     year = int(year_match.group(1)) if year_match else 0
 
@@ -106,7 +122,6 @@ def _extract_quarter_year(soup: BeautifulSoup) -> tuple[str, int]:
         if start.lower() in text.lower():
             return quarter, year
 
-    # Fallback: infer from month numbers
     month_match = re.search(
         r"\b(\d{1,2})\s+(?:January|February|March|April|May|June|"
         r"July|August|September|October|November|December)\s+(20\d{2})",
@@ -119,42 +134,35 @@ def _extract_quarter_year(soup: BeautifulSoup) -> tuple[str, int]:
     return "Unknown", year
 
 
-def _extract_price(soup: BeautifulSoup) -> float | None:
+def _extract_row_value(
+    soup: BeautifulSoup, keywords: tuple[str, ...]
+) -> float | None:
     """
-    Extract the total residential electricity tariff in cents/kWh.
+    Find a table row whose label matches any of `keywords` and return its
+    numeric value (the last numeric cell in the row).
 
-    SP Group's table has rows labelled "Total" or "Residential" with
-    the aggregate rate as the last/second column.
+    Falls back to a regex scan of the full page text.
     """
-    # Strategy 1: look for a table cell containing "total" in the same row
+    # Strategy 1: table row keyword match
     for table in soup.find_all("table"):
         for row in table.find_all("tr"):
             cells = row.find_all(["td", "th"])
             row_text = " ".join(c.get_text(strip=True) for c in cells).lower()
-            if "total" in row_text or "residential" in row_text:
-                # Price is typically the last numeric cell
+            if any(kw in row_text for kw in keywords):
                 for cell in reversed(cells):
                     val = _to_float(cell.get_text(strip=True))
-                    if val is not None and 5.0 < val < 100.0:
+                    if val is not None and 0.5 < val < 100.0:
                         return val
 
-    # Strategy 2: regex scan for a plausible cents/kWh value near "total"
+    # Strategy 2: regex scan near the keyword
     text = soup.get_text(" ", strip=True)
-    matches = re.findall(
-        r"(?:total|residential)[^0-9]{0,60}?(\d{1,3}\.\d{1,2})\s*(?:cents?)?",
-        text,
-        re.IGNORECASE,
+    pattern = (
+        r"(?:" + "|".join(re.escape(kw) for kw in keywords) + r")"
+        r"[^0-9]{0,60}?(\d{1,3}\.\d{1,2})\s*(?:cents?)?"
     )
-    for m in matches:
+    for m in re.findall(pattern, text, re.IGNORECASE):
         val = _to_float(m)
-        if val is not None and 5.0 < val < 100.0:
-            return val
-
-    # Strategy 3: grab the first plausible standalone price anywhere on page
-    all_numbers = re.findall(r"\b(\d{2}\.\d{1,2})\b", text)
-    for n in all_numbers:
-        val = _to_float(n)
-        if val is not None and 5.0 < val < 100.0:
+        if val is not None and 0.5 < val < 100.0:
             return val
 
     return None

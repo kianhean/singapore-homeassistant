@@ -1,8 +1,8 @@
 {
-  "domain": "singapore_hello",
-  "name": "Singapore Electricity Tariff",
+  "domain": "singapore",
+  "name": "Singapore",
   "version": "0.2.0",
-  "description": "Tracks the current Singapore residential electricity tariff from SP Group",
+  "description": "Singapore Home Assistant integration — electricity tariff, solar export price, and more",
   "documentation": "https://github.com/kianhean/singapore-homeassistant",
   "issue_tracker": "https://github.com/kianhean/singapore-homeassistant/issues",
   "dependencies": [],
