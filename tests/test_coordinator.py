@@ -53,6 +53,16 @@ _HTML_NO_PRICE = """
 <html><body><p>Service unavailable.</p></body></html>
 """
 
+# SP Group banner format as of 2026 (Next.js SSR, no tables)
+_HTML_BANNER = """
+<html><body>
+<p>29.72 cents/kWh 27.27 cents/kWh (w/o GST) ELECTRICITY TARIFF (wef 1 Apr - 30 Jun 26)</p>
+<p>23.89 cents/kWh 21.92 cents/kWh (w/o GST) GAS TARIFF (wef 1 Apr - 30 Jun 26)</p>
+<p>$1.56 or $1.97/m 3 $1.43 or $1.81/m 3 (w/o GST) WATER TARIFF (&lt;40m 3 or &gt; 40m 3)</p>
+<p>Network charges 6.25 cents/kWh</p>
+</body></html>
+"""
+
 
 # ---------------------------------------------------------------------------
 # TariffData unit tests (no I/O)
@@ -131,6 +141,24 @@ def test_parse_missing_water_defaults_zero():
     """
     data = _parse_tariff(html)
     assert data.water_price == 0.0
+
+
+def test_parse_banner_format():
+    """Parser must handle the 2026 Next.js banner layout."""
+    data = _parse_tariff(_HTML_BANNER)
+    assert data.electricity_price == 29.72  # with-GST, not 27.27
+    assert data.gas_price == 23.89  # with-GST, not 21.92
+    assert data.water_price == 1.56  # lower residential tier
+    assert data.network_cost == 6.25
+    assert data.quarter == "Q2"
+    assert data.year == 2026
+
+
+def test_parse_banner_excludes_ex_gst():
+    """Electricity and gas must be the with-GST values, not the w/o GST ones."""
+    data = _parse_tariff(_HTML_BANNER)
+    assert data.electricity_price != 27.27
+    assert data.gas_price != 21.92
 
 
 def test_parse_unknown_quarter():

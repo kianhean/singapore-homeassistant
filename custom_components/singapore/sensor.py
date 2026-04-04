@@ -30,9 +30,16 @@ async def async_setup_entry(
 
 
 class _BaseTariffSensor(CoordinatorEntity[SPGroupCoordinator], SensorEntity):
-    """Shared base for SP Group tariff sensors."""
+    """Shared base for SP Group tariff sensors.
+
+    Tariff sensors report price-per-unit values (e.g. ¢/kWh, SGD/m³).
+    These are not standard HA energy/gas/water units, so device_class is
+    explicitly None to prevent HA's unit-validation warning at line 729 of
+    homeassistant/components/sensor/__init__.py.
+    """
 
     _attr_has_entity_name = False
+    _attr_device_class = None  # custom price-rate units; no HA device class applies
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator: SPGroupCoordinator, entry_id: str) -> None:

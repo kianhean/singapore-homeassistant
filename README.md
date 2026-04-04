@@ -10,7 +10,7 @@ utility tariffs published by [SP Group](https://www.spgroup.com.sg), updated eve
 | `sensor.singapore_electricity_tariff` | Singapore Electricity Tariff | ¢/kWh | Total residential electricity tariff |
 | `sensor.singapore_solar_export_price` | Singapore Solar Export Price | ¢/kWh | Electricity tariff minus network costs |
 | `sensor.singapore_gas_tariff` | Singapore Gas Tariff | ¢/kWh | Piped natural gas tariff |
-| `sensor.singapore_water_tariff` | Singapore Water Tariff | SGD/m³ | Water tariff |
+| `sensor.singapore_water_tariff` | Singapore Water Tariff | SGD/m³ | Water tariff, lower residential tier (≤40 m³, with GST) |
 
 All sensors expose `quarter` (e.g. `Q1`), `year`, and `source` as state attributes.
 The solar export price sensor additionally exposes `network_cost` and `total_tariff`.
@@ -45,11 +45,11 @@ sensor.singapore_gas_tariff:
     source: SP Group
 
 sensor.singapore_water_tariff:
-  state: 3.69
+  state: 1.56      # lower residential tier (≤40 m³); upper tier is ~$1.97/m³
   unit_of_measurement: SGD/m³
   attributes:
-    quarter: Q1
-    year: 2025
+    quarter: Q2
+    year: 2026
     source: SP Group
 ```
 
@@ -73,7 +73,8 @@ Tariff data is scraped from the [SP Group tariff information page](https://www.s
 Prices are published quarterly.
 
 - Electricity and gas prices are in Singapore cents per kilowatt-hour (¢/kWh)
-- Water price is in Singapore dollars per cubic metre (SGD/m³)
+- Water price is in Singapore dollars per cubic metre (SGD/m³); SP Group publishes
+  two residential tiers (≤40 m³ and >40 m³) — the sensor reports the lower tier
 - Solar export price = electricity tariff − network costs (network charges don't apply to exported electricity)
 
 ## Development
