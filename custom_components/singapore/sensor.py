@@ -1,4 +1,4 @@
-"""Sensor platform for Singapore SP Group tariffs."""
+"""Sensor platform for Singapore SP Group tariffs and COE results."""
 
 from __future__ import annotations
 
@@ -9,6 +9,13 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import DOMAIN
+from .coe_coordinator import (
+    _CATEGORY_DESCRIPTIONS,
+    _CATEGORY_NAMES,
+    COE_CATEGORIES,
+    UNIT_COE,
+    CoeCoordinator,
+)
 from .coordinator import UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER, SPGroupCoordinator
 
 
@@ -17,16 +24,21 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up SP Group tariff sensors."""
-    coordinator: SPGroupCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(
-        [
-            SingaporeElectricityTariffSensor(coordinator, entry.entry_id),
-            SingaporeSolarExportPriceSensor(coordinator, entry.entry_id),
-            SingaporeGasTariffSensor(coordinator, entry.entry_id),
-            SingaporeWaterTariffSensor(coordinator, entry.entry_id),
-        ]
-    )
+    """Set up SP Group tariff and COE sensors."""
+    entry_data = hass.data[DOMAIN][entry.entry_id]
+    tariff_coordinator: SPGroupCoordinator = entry_data["tariff"]
+    coe_coordinator: CoeCoordinator = entry_data["coe"]
+
+    entities: list[SensorEntity] = [
+        SingaporeElectricityTariffSensor(tariff_coordinator, entry.entry_id),
+        SingaporeSolarExportPriceSensor(tariff_coordinator, entry.entry_id),
+        SingaporeGasTariffSensor(tariff_coordinator, entry.entry_id),
+        SingaporeWaterTariffSensor(tariff_coordinator, entry.entry_id),
+    ]
+    for cat in COE_CATEGORIES:
+        entities.append(SingaporeCoeResultSensor(coe_coordinator, entry.entry_id, cat))
+
+    async_add_entities(entities)
 
 
 class _BaseTariffSensor(CoordinatorEntity[SPGroupCoordinator], SensorEntity):
@@ -142,3 +154,39 @@ class SingaporeWaterTariffSensor(_BaseTariffSensor):
     @property
     def extra_state_attributes(self) -> dict:
         return self._common_attrs()
+
+
+class SingaporeCoeResultSensor(CoordinatorEntity[CoeCoordinator], SensorEntity):
+    """COE bidding result (premium in SGD) for a single vehicle category."""
+
+    _attr_has_entity_name = False
+    _attr_device_class = None
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UNIT_COE
+    _attr_icon = "mdi:car"
+
+    def __init__(
+        self, coordinator: CoeCoordinator, entry_id: str, category: str
+    ) -> None:
+        super().__init__(coordinator)
+        self._category = category
+        self._attr_unique_id = f"{entry_id}_coe_cat_{category.lower()}"
+        self._attr_name = _CATEGORY_NAMES[category]
+
+    @property
+    def native_value(self) -> int | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.premiums.get(self._category)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        if self.coordinator.data is None:
+            return {}
+        return {
+            "category": f"Category {self._category}",
+            "description": _CATEGORY_DESCRIPTIONS[self._category],
+            "month": self.coordinator.data.month,
+            "bidding_no": self.coordinator.data.bidding_no,
+            "source": "data.gov.sg / LTA",
+        }

@@ -8,6 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
+from .coe_coordinator import CoeCoordinator
 from .coordinator import SPGroupCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -18,10 +19,16 @@ PLATFORMS = [Platform.SENSOR]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the integration and kick off the first data fetch."""
-    coordinator = SPGroupCoordinator(hass)
-    await coordinator.async_config_entry_first_refresh()
+    tariff_coordinator = SPGroupCoordinator(hass)
+    await tariff_coordinator.async_config_entry_first_refresh()
 
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    coe_coordinator = CoeCoordinator(hass)
+    await coe_coordinator.async_config_entry_first_refresh()
+
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
+        "tariff": tariff_coordinator,
+        "coe": coe_coordinator,
+    }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
