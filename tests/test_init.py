@@ -1,4 +1,5 @@
 """Tests for integration constants and domain."""
+
 from custom_components.singapore import DOMAIN
 
 

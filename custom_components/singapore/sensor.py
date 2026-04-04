@@ -1,4 +1,5 @@
 """Sensor platform for Singapore SP Group tariffs."""
+
 from __future__ import annotations
 
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
@@ -18,12 +19,14 @@ async def async_setup_entry(
 ) -> None:
     """Set up SP Group tariff sensors."""
     coordinator: SPGroupCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([
-        SingaporeElectricityTariffSensor(coordinator, entry.entry_id),
-        SingaporeSolarExportPriceSensor(coordinator, entry.entry_id),
-        SingaporeGasTariffSensor(coordinator, entry.entry_id),
-        SingaporeWaterTariffSensor(coordinator, entry.entry_id),
-    ])
+    async_add_entities(
+        [
+            SingaporeElectricityTariffSensor(coordinator, entry.entry_id),
+            SingaporeSolarExportPriceSensor(coordinator, entry.entry_id),
+            SingaporeGasTariffSensor(coordinator, entry.entry_id),
+            SingaporeWaterTariffSensor(coordinator, entry.entry_id),
+        ]
+    )
 
 
 class _BaseTariffSensor(CoordinatorEntity[SPGroupCoordinator], SensorEntity):
@@ -59,7 +62,9 @@ class SingaporeElectricityTariffSensor(_BaseTariffSensor):
 
     @property
     def native_value(self) -> float | None:
-        return self.coordinator.data.electricity_price if self.coordinator.data else None
+        return (
+            self.coordinator.data.electricity_price if self.coordinator.data else None
+        )
 
     @property
     def extra_state_attributes(self) -> dict:
@@ -79,7 +84,9 @@ class SingaporeSolarExportPriceSensor(_BaseTariffSensor):
 
     @property
     def native_value(self) -> float | None:
-        return self.coordinator.data.solar_export_price if self.coordinator.data else None
+        return (
+            self.coordinator.data.solar_export_price if self.coordinator.data else None
+        )
 
     @property
     def extra_state_attributes(self) -> dict:

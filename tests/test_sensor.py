@@ -1,7 +1,13 @@
 """Tests for Singapore SP Group tariff sensor entities."""
+
 from unittest.mock import MagicMock
 
-from custom_components.singapore.coordinator import TariffData, UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER
+from custom_components.singapore.coordinator import (
+    UNIT_ELECTRICITY,
+    UNIT_GAS,
+    UNIT_WATER,
+    TariffData,
+)
 from custom_components.singapore.sensor import (
     SingaporeElectricityTariffSensor,
     SingaporeGasTariffSensor,

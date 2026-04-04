@@ -1,4 +1,5 @@
 """Data coordinator for Singapore SP Group tariffs."""
+
 from __future__ import annotations
 
 import logging
@@ -7,7 +8,6 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from bs4 import BeautifulSoup
-
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -49,11 +49,11 @@ _WATER_KEYWORDS = ("water",)
 class TariffData:
     """SP Group tariff data for electricity, gas and water."""
 
-    electricity_price: float   # total residential tariff, ¢/kWh
-    network_cost: float        # electricity network component, ¢/kWh
-    gas_price: float           # piped natural gas tariff, ¢/kWh
-    water_price: float         # water tariff, SGD/m³
-    quarter: str               # e.g. "Q1"
+    electricity_price: float  # total residential tariff, ¢/kWh
+    network_cost: float  # electricity network component, ¢/kWh
+    gas_price: float  # piped natural gas tariff, ¢/kWh
+    water_price: float  # water tariff, SGD/m³
+    quarter: str  # e.g. "Q1"
     year: int
 
     @property
@@ -104,7 +104,9 @@ def _parse_tariff(html: str) -> TariffData:
 
     network_cost = _extract_row_value(soup, keywords=_NETWORK_KEYWORDS)
     if network_cost is None:
-        _LOGGER.warning("Could not find network cost; solar export price will equal total tariff")
+        _LOGGER.warning(
+            "Could not find network cost; solar export price will equal total tariff"
+        )
         network_cost = 0.0
 
     gas_price = _extract_row_value(soup, keywords=_GAS_KEYWORDS)
@@ -150,9 +152,7 @@ def _extract_quarter_year(soup: BeautifulSoup) -> tuple[str, int]:
     return "Unknown", year
 
 
-def _extract_row_value(
-    soup: BeautifulSoup, keywords: tuple[str, ...]
-) -> float | None:
+def _extract_row_value(soup: BeautifulSoup, keywords: tuple[str, ...]) -> float | None:
     """Find a table row matching any keyword and return its last numeric cell.
 
     Falls back to a regex scan of the full page text.

@@ -1,7 +1,8 @@
 """Tests for SP Group tariff coordinator and HTML parser."""
-import pytest
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.singapore.coordinator import TariffData, _parse_tariff
@@ -133,18 +134,23 @@ def test_parse_missing_water_defaults_zero():
 
 
 def test_parse_unknown_quarter():
-    html = "<html><body><table><tr><td>Total</td><td>27.00</td></tr></table></body></html>"
+    html = (
+        "<html><body><table><tr><td>Total</td><td>27.00</td></tr></table></body></html>"
+    )
     data = _parse_tariff(html)
     assert data.quarter == "Unknown"
     assert data.year == 0
 
 
-@pytest.mark.parametrize("quarter,date_str", [
-    ("Q1", "1 January 2025 to 31 March 2025"),
-    ("Q2", "1 April 2025 to 30 June 2025"),
-    ("Q3", "1 July 2025 to 30 September 2025"),
-    ("Q4", "1 October 2025 to 31 December 2025"),
-])
+@pytest.mark.parametrize(
+    "quarter,date_str",
+    [
+        ("Q1", "1 January 2025 to 31 March 2025"),
+        ("Q2", "1 April 2025 to 30 June 2025"),
+        ("Q3", "1 July 2025 to 30 September 2025"),
+        ("Q4", "1 October 2025 to 31 December 2025"),
+    ],
+)
 def test_parse_all_quarters(quarter, date_str):
     html = f"""
     <html><body>

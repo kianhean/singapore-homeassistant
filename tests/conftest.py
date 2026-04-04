@@ -5,14 +5,12 @@ The integration imports several HA symbols. We inject lightweight fakes into
 sys.modules before any integration code is imported, so pytest can collect
 and run tests on pure Python 3.11+ without the full HA wheel.
 """
+
 from __future__ import annotations
 
-import asyncio
 import sys
 from types import ModuleType
-from typing import Any
 from unittest.mock import MagicMock
-
 
 # ---------------------------------------------------------------------------
 # Minimal HA fakes
@@ -109,8 +107,12 @@ def _mod(name: str, **attrs) -> ModuleType:
 
 _HA_MODULES: dict[str, ModuleType] = {
     "homeassistant": _mod("homeassistant"),
-    "homeassistant.core": _mod("homeassistant.core", HomeAssistant=HomeAssistant, callback=lambda f: f),
-    "homeassistant.const": _mod("homeassistant.const", Platform=Platform, CONF_NAME="name"),
+    "homeassistant.core": _mod(
+        "homeassistant.core", HomeAssistant=HomeAssistant, callback=lambda f: f
+    ),
+    "homeassistant.const": _mod(
+        "homeassistant.const", Platform=Platform, CONF_NAME="name"
+    ),
     "homeassistant.helpers": _mod("homeassistant.helpers"),
     "homeassistant.helpers.update_coordinator": _mod(
         "homeassistant.helpers.update_coordinator",
@@ -148,4 +150,6 @@ for _name, _mod_obj in _HA_MODULES.items():
 try:
     import voluptuous  # noqa: F401
 except ImportError:
-    sys.modules.setdefault("voluptuous", _mod("voluptuous", Schema=dict, Required=lambda k, **kw: k))
+    sys.modules.setdefault(
+        "voluptuous", _mod("voluptuous", Schema=dict, Required=lambda k, **kw: k)
+    )

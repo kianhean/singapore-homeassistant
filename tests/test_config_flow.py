@@ -1,6 +1,8 @@
 """Tests for config flow constants."""
-from custom_components.singapore.config_flow import STEP_USER_DATA_SCHEMA
+
 from homeassistant.const import CONF_NAME
+
+from custom_components.singapore.config_flow import STEP_USER_DATA_SCHEMA
 
 
 def test_schema_has_name_field():
