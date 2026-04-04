@@ -66,6 +66,12 @@ class CoordinatorEntity:
 
 
 class SensorEntity:
+    @property
+    def device_class(self):
+        return getattr(self, "_attr_device_class", None)
+
+
+class SensorDeviceClass:
     pass
 
 
@@ -132,6 +138,7 @@ _HA_MODULES: dict[str, ModuleType] = {
     "homeassistant.components.sensor": _mod(
         "homeassistant.components.sensor",
         SensorEntity=SensorEntity,
+        SensorDeviceClass=SensorDeviceClass,
         SensorStateClass=SensorStateClass,
     ),
     "homeassistant.config_entries": _mod(

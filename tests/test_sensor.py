@@ -63,6 +63,12 @@ def test_electricity_none_when_no_data():
     assert sensor.native_value is None
 
 
+def test_electricity_no_device_class():
+    """¢/kWh is not a valid HA energy unit; device_class must be None."""
+    sensor = SingaporeElectricityTariffSensor(_coordinator(), "entry1")
+    assert sensor.device_class is None
+
+
 # ---------------------------------------------------------------------------
 # Solar export price
 # ---------------------------------------------------------------------------
@@ -97,6 +103,12 @@ def test_solar_none_when_no_data():
     assert sensor.native_value is None
 
 
+def test_solar_no_device_class():
+    """¢/kWh is not a valid HA energy unit; device_class must be None."""
+    sensor = SingaporeSolarExportPriceSensor(_coordinator(), "entry1")
+    assert sensor.device_class is None
+
+
 # ---------------------------------------------------------------------------
 # Gas tariff
 # ---------------------------------------------------------------------------
@@ -127,6 +139,12 @@ def test_gas_none_when_no_data():
     assert sensor.native_value is None
 
 
+def test_gas_no_device_class():
+    """¢/kWh is not a valid HA energy unit; device_class must be None."""
+    sensor = SingaporeGasTariffSensor(_coordinator(), "entry1")
+    assert sensor.device_class is None
+
+
 # ---------------------------------------------------------------------------
 # Water tariff
 # ---------------------------------------------------------------------------
@@ -155,3 +173,9 @@ def test_water_unique_id():
 def test_water_none_when_no_data():
     sensor = SingaporeWaterTariffSensor(_coordinator(data=None), "entry1")
     assert sensor.native_value is None
+
+
+def test_water_no_device_class():
+    """SGD/m³ is not a valid HA water unit; device_class must be None."""
+    sensor = SingaporeWaterTariffSensor(_coordinator(), "entry1")
+    assert sensor.device_class is None
