@@ -10,8 +10,10 @@ custom_components/singapore/
 ├── __init__.py           # Entry setup/teardown; creates and stores both coordinators
 ├── coordinator.py        # SPGroupCoordinator: fetches + parses SP Group tariff page
 ├── coe_coordinator.py    # CoeCoordinator: fetches COE results from data.gov.sg API
+├── weather_coordinator.py # SingaporeWeatherCoordinator: 2-hour forecasts + collection 1459 readings
+├── weather.py            # Weather entities (one per Singapore forecast area)
 ├── config_flow.py        # UI config flow (name input)
-├── sensor.py             # Sensor entities (tariff + COE)
+├── sensor.py             # Sensor entities (tariff + COE + weather readings)
 ├── manifest.json         # Integration metadata; declares beautifulsoup4 dep
 ├── strings.json          # Config flow UI strings
 └── translations/
@@ -31,7 +33,11 @@ tests/
 
 Entry data is stored as a dict per `entry_id`:
 ```python
-hass.data[DOMAIN][entry_id] = {"tariff": SPGroupCoordinator, "coe": CoeCoordinator}
+hass.data[DOMAIN][entry_id] = {
+    "tariff": SPGroupCoordinator,
+    "coe": CoeCoordinator,
+    "weather": SingaporeWeatherCoordinator,
+}
 ```
 
 ## Sensors
@@ -54,6 +60,22 @@ hass.data[DOMAIN][entry_id] = {"tariff": SPGroupCoordinator, "coe": CoeCoordinat
 | `sensor.singapore_coe_category_c` | Singapore COE Category C | SGD | Goods vehicles and buses |
 | `sensor.singapore_coe_category_d` | Singapore COE Category D | SGD | Motorcycles |
 | `sensor.singapore_coe_category_e` | Singapore COE Category E (Open) | SGD | All except motorcycles |
+
+### NEA Realtime Weather Readings (Collection 1459)
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.singapore_temperature` | Singapore Temperature | °C | Aggregated air temperature |
+| `sensor.singapore_humidity` | Singapore Humidity | % | Aggregated relative humidity |
+| `sensor.singapore_wind_speed` | Singapore Wind Speed | km/h | Aggregated wind speed |
+| `sensor.singapore_wind_bearing` | Singapore Wind Bearing | ° | Aggregated wind direction |
+| `sensor.singapore_rainfall` | Singapore Rainfall | mm | Aggregated rainfall |
+
+### Weather Entities (collection 1456)
+
+One `weather` entity is created per forecast area (e.g. Bedok, Woodlands, Ang Mo Kio).
+The entity exposes Home Assistant weather conditions and hourly forecasts approximated
+from NEA's 2-hour periods.
 
 ## Development Setup
 
@@ -126,6 +148,21 @@ Quarter is inferred from date strings in two formats:
 - Abbreviated: `"wef 1 Apr - 30 Jun 26"` (maps via `_MONTH_ABBR_TO_Q`)
 
 Solar export price = total electricity tariff − network costs.
+
+## How the Weather Coordinator Works
+
+`weather_coordinator.py` fetches:
+
+- 2-hour forecast areas from `https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast`
+- realtime readings from collection 1459 endpoints (`air-temperature`, `relative-humidity`,
+  `wind-speed`, `wind-direction`, `rainfall`)
+
+Forecast parsing supports both common payload styles:
+- `items[0].forecasts` (legacy shape)
+- `data.records[0].periods[0].regions` (newer shape)
+
+Each weather entity converts a single 2-hour interval into two hourly forecast points
+for Home Assistant (`t` and `t+1h`) with mapped HA conditions.
 
 ## Adding a New Sensor
 
