@@ -7,8 +7,8 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+import niquests
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 _LOGGER = logging.getLogger(__name__)
@@ -23,6 +23,10 @@ _READINGS_ENDPOINTS = {
     "wind_bearing": "https://api.data.gov.sg/v1/environment/wind-direction",
     "precipitation": "https://api.data.gov.sg/v1/environment/rainfall",
 }
+
+_READINGS_CONCURRENCY = 2  # cap parallel requests to avoid 429s
+_MAX_RETRIES = 3  # retry attempts on 429
+_RETRY_BACKOFF_BASE = 2  # base backoff in seconds (doubles per attempt)
 
 
 @dataclass
@@ -65,21 +69,23 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
             name="Singapore NEA Weather",
             update_interval=UPDATE_INTERVAL,
         )
+        self._readings_sem = asyncio.Semaphore(_READINGS_CONCURRENCY)
 
     async def _async_update_data(self) -> WeatherData:
-        session = async_get_clientsession(self.hass)
         try:
-            async with session.get(WEATHER_URL, timeout=30) as response:
-                if response.status != 200:
+            async with niquests.AsyncSession() as session:
+                response = await session.get(WEATHER_URL, timeout=30)
+                if response.status_code != 200:
                     raise UpdateFailed(
-                        f"data.gov.sg weather endpoint returned HTTP {response.status}"
+                        f"data.gov.sg weather endpoint returned HTTP {response.status_code}"
                     )
-                payload = await response.json()
-            parsed = _parse_weather(payload)
-            if not parsed.areas:
-                raise UpdateFailed("No area forecasts found in weather payload")
-
-            parsed.readings = await _fetch_aggregated_readings(session)
+                payload = response.json()
+                parsed = _parse_weather(payload)
+                if not parsed.areas:
+                    raise UpdateFailed("No area forecasts found in weather payload")
+                parsed.readings = await _fetch_aggregated_readings(
+                    session, self._readings_sem
+                )
             return parsed
         except Exception as err:
             if self.data is not None:
@@ -90,10 +96,42 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
             raise UpdateFailed(f"Error fetching weather data: {err}") from err
 
 
-async def _fetch_aggregated_readings(session) -> WeatherReadings:
+async def _fetch_with_retry(
+    session: niquests.AsyncSession, url: str, timeout: int = 20
+) -> niquests.Response:
+    """GET url, retrying up to _MAX_RETRIES times on HTTP 429.
+
+    Respects the Retry-After response header when present; falls back to
+    exponential backoff (_RETRY_BACKOFF_BASE ** attempt seconds).
+    """
+    response = await session.get(url, timeout=timeout)
+    for attempt in range(_MAX_RETRIES):
+        if response.status_code != 429:
+            return response
+        retry_after = float(
+            response.headers.get("Retry-After", _RETRY_BACKOFF_BASE**attempt)
+        )
+        _LOGGER.debug(
+            "429 on %s; waiting %.1fs before retry %d/%d",
+            url,
+            retry_after,
+            attempt + 1,
+            _MAX_RETRIES,
+        )
+        await asyncio.sleep(retry_after)
+        response = await session.get(url, timeout=timeout)
+    return response  # last response (may still be 429 if all retries exhausted)
+
+
+async def _fetch_aggregated_readings(
+    session: niquests.AsyncSession, sem: asyncio.Semaphore
+) -> WeatherReadings:
     keys = list(_READINGS_ENDPOINTS.keys())
     results = await asyncio.gather(
-        *(_fetch_reading_average(session, _READINGS_ENDPOINTS[k], k) for k in keys),
+        *(
+            _fetch_reading_average(session, sem, _READINGS_ENDPOINTS[k], k)
+            for k in keys
+        ),
         return_exceptions=True,
     )
     values: dict[str, float | None] = {}
@@ -106,7 +144,12 @@ async def _fetch_aggregated_readings(session) -> WeatherReadings:
     return WeatherReadings(**values)
 
 
-async def _fetch_reading_average(session, url: str, metric_key: str) -> float | None:
+async def _fetch_reading_average(
+    session: niquests.AsyncSession,
+    sem: asyncio.Semaphore,
+    url: str,
+    metric_key: str,
+) -> float | None:
     """Return station-average reading for a metric endpoint.
 
     Handles common payload variants where the metric value may be located as:
@@ -114,15 +157,18 @@ async def _fetch_reading_average(session, url: str, metric_key: str) -> float | 
     - data.items[0].readings[].value
     - data.readings[]
     """
-    try:
-        async with session.get(url, timeout=20) as response:
-            if response.status != 200:
-                _LOGGER.debug("Skipping %s due to HTTP %s", metric_key, response.status)
+    async with sem:
+        try:
+            response = await _fetch_with_retry(session, url)
+            if response.status_code != 200:
+                _LOGGER.debug(
+                    "Skipping %s due to HTTP %s", metric_key, response.status_code
+                )
                 return None
-            payload = await response.json()
-    except Exception as err:  # noqa: BLE001
-        _LOGGER.debug("Skipping %s due to fetch error: %s", metric_key, err)
-        return None
+            payload = response.json()
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Skipping %s due to fetch error: %s", metric_key, err)
+            return None
 
     rows = _extract_readings_rows(payload)
     numeric_values: list[float] = []

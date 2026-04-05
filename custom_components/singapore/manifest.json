@@ -7,7 +7,7 @@
   "issue_tracker": "https://github.com/kianhean/singapore-homeassistant/issues",
   "dependencies": [],
   "codeowners": ["@kianhean"],
-  "requirements": ["beautifulsoup4==4.12.3"],
+  "requirements": ["beautifulsoup4==4.12.3", "niquests>=3.0"],
   "iot_class": "cloud_polling",
   "config_flow": true,
   "hacs": "1.0.0"

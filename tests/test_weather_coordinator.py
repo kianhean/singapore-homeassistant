@@ -90,18 +90,18 @@ async def test_weather_coordinator_http_error_without_cache_fails():
 
     hass = MagicMock()
 
-    mock_response = AsyncMock()
-    mock_response.status = 503
-    mock_response.__aenter__ = AsyncMock(return_value=mock_response)
-    mock_response.__aexit__ = AsyncMock(return_value=False)
+    mock_response = MagicMock()
+    mock_response.status_code = 503
 
-    mock_session = MagicMock()
-    mock_session.get = MagicMock(return_value=mock_response)
+    mock_session = AsyncMock()
+    mock_session.get = AsyncMock(return_value=mock_response)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
 
     coordinator = SingaporeWeatherCoordinator(hass)
 
     with patch(
-        "custom_components.singapore.weather_coordinator.async_get_clientsession",
+        "custom_components.singapore.weather_coordinator.niquests.AsyncSession",
         return_value=mock_session,
     ):
         await coordinator.async_refresh()
@@ -120,13 +120,13 @@ async def test_weather_coordinator_http_error_uses_last_known_data():
 
     hass = MagicMock()
 
-    mock_response = AsyncMock()
-    mock_response.status = 503
-    mock_response.__aenter__ = AsyncMock(return_value=mock_response)
-    mock_response.__aexit__ = AsyncMock(return_value=False)
+    mock_response = MagicMock()
+    mock_response.status_code = 503
 
-    mock_session = MagicMock()
-    mock_session.get = MagicMock(return_value=mock_response)
+    mock_session = AsyncMock()
+    mock_session.get = AsyncMock(return_value=mock_response)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
 
     coordinator = SingaporeWeatherCoordinator(hass)
     cached = WeatherData(
@@ -144,7 +144,7 @@ async def test_weather_coordinator_http_error_uses_last_known_data():
     coordinator.data = cached
 
     with patch(
-        "custom_components.singapore.weather_coordinator.async_get_clientsession",
+        "custom_components.singapore.weather_coordinator.niquests.AsyncSession",
         return_value=mock_session,
     ):
         await coordinator.async_refresh()
