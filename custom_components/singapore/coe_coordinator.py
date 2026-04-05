@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 
@@ -19,6 +20,8 @@ COE_API_URL = (
 )
 
 UNIT_COE = "SGD"
+_MAX_FETCH_ATTEMPTS = 3
+_INITIAL_BACKOFF_SECONDS = 1
 
 # COE vehicle categories
 COE_CATEGORIES = ("A", "B", "C", "D", "E")
@@ -62,17 +65,45 @@ class CoeCoordinator(DataUpdateCoordinator[CoeData]):
 
     async def _async_update_data(self) -> CoeData:
         session = async_get_clientsession(self.hass)
-        try:
-            async with session.get(COE_API_URL, timeout=30) as response:
-                if response.status != 200:
-                    raise UpdateFailed(f"data.gov.sg returned HTTP {response.status}")
-                payload = await response.json()
-        except UpdateFailed:
-            raise
-        except Exception as err:
-            raise UpdateFailed(f"Error fetching COE results: {err}") from err
+        last_error: UpdateFailed | None = None
 
-        return _parse_coe(payload)
+        for attempt in range(1, _MAX_FETCH_ATTEMPTS + 1):
+            try:
+                async with session.get(COE_API_URL, timeout=30) as response:
+                    if response.status != 200:
+                        raise UpdateFailed(
+                            f"data.gov.sg returned HTTP {response.status}"
+                        )
+                    payload = await response.json()
+                return _parse_coe(payload)
+            except asyncio.CancelledError:
+                raise
+            except UpdateFailed as err:
+                last_error = err
+            except Exception as err:
+                last_error = UpdateFailed(f"Error fetching COE results: {err}")
+
+            if attempt == _MAX_FETCH_ATTEMPTS:
+                break
+
+            delay_seconds = _backoff_delay_seconds(attempt)
+            _LOGGER.warning(
+                "COE fetch attempt %s/%s failed (%s). Retrying in %s seconds",
+                attempt,
+                _MAX_FETCH_ATTEMPTS,
+                last_error,
+                delay_seconds,
+            )
+            await asyncio.sleep(delay_seconds)
+
+        raise UpdateFailed(
+            f"Failed to fetch COE results after {_MAX_FETCH_ATTEMPTS} attempts: {last_error}"
+        )
+
+
+def _backoff_delay_seconds(attempt: int) -> int:
+    """Return exponential backoff delay (seconds) for a 1-indexed attempt."""
+    return _INITIAL_BACKOFF_SECONDS * (2 ** (attempt - 1))
 
 
 def _parse_coe(payload: dict) -> CoeData:
