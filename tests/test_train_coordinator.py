@@ -16,7 +16,7 @@ def test_parse_train_status_planned():
     data = _parse_train_status(html)
     assert data.status == "planned"
     assert data.line_statuses["North-South Line"] == "planned"
-    assert data.line_statuses["East-West Line"] == "unknown"
+    assert data.line_statuses["East-West Line"] == "normal"
 
 
 def test_parse_train_status_disruption():
