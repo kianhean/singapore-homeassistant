@@ -9,9 +9,6 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_track_time_change
 
-from .coe_coordinator import CoeCoordinator
-from .coordinator import SPGroupCoordinator
-
 _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "singapore"
@@ -24,11 +21,18 @@ _COE_REFRESH_MINUTE = 30
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the integration and kick off the first data fetch."""
+    from .coe_coordinator import CoeCoordinator
+    from .coordinator import SPGroupCoordinator
+
     tariff_coordinator = SPGroupCoordinator(hass)
     await tariff_coordinator.async_config_entry_first_refresh()
 
     coe_coordinator = CoeCoordinator(hass)
-    await coe_coordinator.async_config_entry_first_refresh()
+    await coe_coordinator.async_refresh()
+    if not coe_coordinator.last_update_success:
+        _LOGGER.warning(
+            "Initial COE refresh failed; continuing setup and retrying later"
+        )
 
     async def _refresh_coe(_now) -> None:
         await coe_coordinator.async_refresh()
