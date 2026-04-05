@@ -95,7 +95,7 @@ def _parse_train_status(html: str) -> TrainStatusData:
     else:
         status = "normal"
 
-    details = _extract_detail(text)
+    details = _extract_detail(text, status)
     line_statuses = _extract_line_statuses(raw_text, status)
     return TrainStatusData(status=status, details=details, line_statuses=line_statuses)
 
@@ -118,17 +118,23 @@ def _looks_disrupted(text: str) -> bool:
 
 def _looks_planned(text: str) -> bool:
     planned_patterns = (
+        r"\b[a-z]{2,5}-planned\b",
         r"\bplanned disruption(?:s)?\b",
         r"\bplanned maintenance\b",
+        r"\bplanned train service adjustment(?:s)?\b",
+        r"\bplanned train service\b",
+        r"\bplanned(?:\s+\w+){0,3}\s+works?\b",
     )
     return any(re.search(pattern, text, re.IGNORECASE) for pattern in planned_patterns)
 
 
-def _extract_detail(text: str) -> str:
+def _extract_detail(text: str, status: str) -> str:
     """Extract a compact detail snippet for attributes/debugging."""
     clean = re.sub(r"\s+", " ", text).strip()
     if not clean:
         return "No detail available from source page"
+    if status in {"planned", "disruption"}:
+        return clean
     return clean[:240]
 
 
