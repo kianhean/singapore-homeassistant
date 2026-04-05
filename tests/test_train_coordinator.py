@@ -55,6 +55,17 @@ def test_parse_train_status_mixed_per_line():
     assert data.line_statuses["Circle Line"] == "planned"
 
 
+def test_parse_train_status_planned_disruptions_plural():
+    html = """
+    <html><body>
+      <div>Circle Line planned disruptions due to engineering works.</div>
+    </body></html>
+    """
+    data = _parse_train_status(html)
+    assert data.status == "planned"
+    assert data.line_statuses["Circle Line"] == "planned"
+
+
 @pytest.mark.asyncio
 async def test_train_coordinator_http_error_without_cache_fails():
     from custom_components.singapore.train_coordinator import TrainStatusCoordinator
