@@ -15,6 +15,25 @@ _LOGGER = logging.getLogger(__name__)
 WEATHER_URL = "https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast"
 UPDATE_INTERVAL = timedelta(minutes=30)
 
+_READINGS_ENDPOINTS = {
+    "temperature": "https://api.data.gov.sg/v1/environment/air-temperature",
+    "humidity": "https://api.data.gov.sg/v1/environment/relative-humidity",
+    "wind_speed": "https://api.data.gov.sg/v1/environment/wind-speed",
+    "wind_bearing": "https://api.data.gov.sg/v1/environment/wind-direction",
+    "precipitation": "https://api.data.gov.sg/v1/environment/rainfall",
+}
+
+
+@dataclass
+class WeatherReadings:
+    """Realtime readings (collection 1459) aggregated across stations."""
+
+    temperature: float | None = None
+    humidity: float | None = None
+    wind_speed: float | None = None
+    wind_bearing: float | None = None
+    precipitation: float | None = None
+
 
 @dataclass
 class WeatherAreaData:
@@ -32,6 +51,7 @@ class WeatherData:
 
     areas: dict[str, WeatherAreaData]
     updated_at: datetime | None
+    readings: WeatherReadings
 
 
 class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
@@ -60,7 +80,67 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
         parsed = _parse_weather(payload)
         if not parsed.areas:
             raise UpdateFailed("No area forecasts found in weather payload")
+
+        parsed.readings = await _fetch_aggregated_readings(session)
         return parsed
+
+
+async def _fetch_aggregated_readings(session) -> WeatherReadings:
+    values: dict[str, float | None] = {}
+    for key, url in _READINGS_ENDPOINTS.items():
+        values[key] = await _fetch_reading_average(session, url, key)
+    return WeatherReadings(**values)
+
+
+async def _fetch_reading_average(session, url: str, metric_key: str) -> float | None:
+    """Return station-average reading for a metric endpoint.
+
+    Handles common payload variants where the metric value may be located as:
+    - items[0].readings[].value
+    - data.items[0].readings[].value
+    - data.readings[]
+    """
+    try:
+        async with session.get(url, timeout=20) as response:
+            if response.status != 200:
+                _LOGGER.debug("Skipping %s due to HTTP %s", metric_key, response.status)
+                return None
+            payload = await response.json()
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.debug("Skipping %s due to fetch error: %s", metric_key, err)
+        return None
+
+    rows = _extract_readings_rows(payload)
+    numeric_values: list[float] = []
+    for row in rows:
+        val = _to_float(row.get("value"))
+        if val is not None:
+            numeric_values.append(val)
+
+    if not numeric_values:
+        return None
+    return round(sum(numeric_values) / len(numeric_values), 2)
+
+
+def _extract_readings_rows(payload: dict) -> list[dict]:
+    items = payload.get("items") or payload.get("data", {}).get("items") or []
+    if items and isinstance(items[0], dict):
+        rows = items[0].get("readings")
+        if isinstance(rows, list):
+            return rows
+
+    rows = payload.get("data", {}).get("readings")
+    if isinstance(rows, list):
+        return rows
+
+    return []
+
+
+def _to_float(value) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _parse_iso_datetime(value: str | None) -> datetime | None:
@@ -113,7 +193,11 @@ def _parse_weather(payload: dict) -> WeatherData:
                 )
 
         if areas:
-            return WeatherData(areas=areas, updated_at=updated_at)
+            return WeatherData(
+                areas=areas,
+                updated_at=updated_at,
+                readings=WeatherReadings(),
+            )
 
     # Shape B: data.records[0].periods[0].regions mapping.
     records = payload.get("data", {}).get("records", [])
@@ -141,4 +225,4 @@ def _parse_weather(payload: dict) -> WeatherData:
                         valid_end=end,
                     )
 
-    return WeatherData(areas=areas, updated_at=updated_at)
+    return WeatherData(areas=areas, updated_at=updated_at, readings=WeatherReadings())

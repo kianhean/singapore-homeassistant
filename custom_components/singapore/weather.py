@@ -97,12 +97,18 @@ class SingaporeAreaWeatherEntity(
         )
         if area is None:
             return {}
+        readings = self.coordinator.data.readings
         return {
             "forecast_area": self._area,
             "source": "data.gov.sg / NEA",
             "raw_condition": area.condition_text,
             "valid_start": area.valid_start.isoformat(),
             "valid_end": area.valid_end.isoformat(),
+            "temperature": readings.temperature,
+            "humidity": readings.humidity,
+            "wind_speed": readings.wind_speed,
+            "wind_bearing": readings.wind_bearing,
+            "precipitation": readings.precipitation,
         }
 
     async def async_forecast_hourly(self) -> list[Forecast] | None:
@@ -118,15 +124,28 @@ class SingaporeAreaWeatherEntity(
         start_utc = area.valid_start.astimezone(timezone.utc)
         condition = _map_condition(area.condition_text)
 
+        readings = self.coordinator.data.readings
+
+        def _point(dt):
+            payload = {
+                "datetime": dt.isoformat(),
+                "condition": condition,
+            }
+            if readings.temperature is not None:
+                payload["temperature"] = readings.temperature
+            if readings.humidity is not None:
+                payload["humidity"] = readings.humidity
+            if readings.wind_speed is not None:
+                payload["wind_speed"] = readings.wind_speed
+            if readings.wind_bearing is not None:
+                payload["wind_bearing"] = readings.wind_bearing
+            if readings.precipitation is not None:
+                payload["precipitation"] = readings.precipitation
+            return Forecast(**payload)
+
         return [
-            Forecast(
-                datetime=start_utc.isoformat(),
-                condition=condition,
-            ),
-            Forecast(
-                datetime=(start_utc + timedelta(hours=1)).isoformat(),
-                condition=condition,
-            ),
+            _point(start_utc),
+            _point(start_utc + timedelta(hours=1)),
         ]
 
 

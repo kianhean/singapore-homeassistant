@@ -2,7 +2,11 @@
 
 from datetime import timezone
 
-from custom_components.singapore.weather_coordinator import _parse_weather
+from custom_components.singapore.weather_coordinator import (
+    _extract_readings_rows,
+    _parse_weather,
+    _to_float,
+)
 
 
 def test_parse_v1_shape_area_forecasts():
@@ -55,3 +59,21 @@ def test_parse_v2_regions_shape():
 
     assert set(data.areas) == {"North", "South"}
     assert data.areas["South"].condition_text == "Showers"
+
+
+def test_extract_reading_rows_from_items_shape():
+    payload = {"items": [{"readings": [{"value": 1.2}, {"value": 2.3}]}]}
+    rows = _extract_readings_rows(payload)
+    assert len(rows) == 2
+
+
+def test_extract_reading_rows_from_data_shape():
+    payload = {"data": {"readings": [{"value": 55}]}}
+    rows = _extract_readings_rows(payload)
+    assert rows[0]["value"] == 55
+
+
+def test_to_float_handles_invalid_values():
+    assert _to_float("2.5") == 2.5
+    assert _to_float(None) is None
+    assert _to_float("bad") is None
