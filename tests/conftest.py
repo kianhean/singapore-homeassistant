@@ -41,6 +41,9 @@ class DataUpdateCoordinator:
             self._logger.warning("Update failed: %s", err)
             self.last_update_success = False
 
+    async def async_config_entry_first_refresh(self):
+        await self.async_refresh()
+
     async def _async_update_data(self):
         raise NotImplementedError
 
@@ -81,6 +84,7 @@ class SensorStateClass:
 
 class Platform:
     SENSOR = "sensor"
+    WEATHER = "weather"
 
 
 class HomeAssistant:
@@ -100,6 +104,23 @@ class AddEntitiesCallback:
     pass
 
 
+class WeatherEntity:
+    pass
+
+
+class WeatherEntityFeature:
+    FORECAST_HOURLY = 1
+
+
+class UnitOfTemperature:
+    CELSIUS = "°C"
+
+
+class Forecast(dict):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+
 # ---------------------------------------------------------------------------
 # Build fake module tree and inject into sys.modules
 # ---------------------------------------------------------------------------
@@ -117,7 +138,10 @@ _HA_MODULES: dict[str, ModuleType] = {
         "homeassistant.core", HomeAssistant=HomeAssistant, callback=lambda f: f
     ),
     "homeassistant.const": _mod(
-        "homeassistant.const", Platform=Platform, CONF_NAME="name"
+        "homeassistant.const",
+        Platform=Platform,
+        CONF_NAME="name",
+        UnitOfTemperature=UnitOfTemperature,
     ),
     "homeassistant.helpers": _mod("homeassistant.helpers"),
     "homeassistant.helpers.update_coordinator": _mod(
@@ -139,6 +163,12 @@ _HA_MODULES: dict[str, ModuleType] = {
         async_track_time_change=MagicMock(return_value=MagicMock()),
     ),
     "homeassistant.components": _mod("homeassistant.components"),
+    "homeassistant.components.weather": _mod(
+        "homeassistant.components.weather",
+        WeatherEntity=WeatherEntity,
+        WeatherEntityFeature=WeatherEntityFeature,
+        Forecast=Forecast,
+    ),
     "homeassistant.components.sensor": _mod(
         "homeassistant.components.sensor",
         SensorEntity=SensorEntity,
@@ -161,6 +191,64 @@ for _name, _mod_obj in _HA_MODULES.items():
 try:
     import voluptuous  # noqa: F401
 except ImportError:
+
+    class _Schema:
+        def __init__(self, schema):
+            self.schema = schema
+
+        def __call__(self, value):
+            return value
+
     sys.modules.setdefault(
-        "voluptuous", _mod("voluptuous", Schema=dict, Required=lambda k, **kw: k)
+        "voluptuous",
+        _mod("voluptuous", Schema=_Schema, Required=lambda k, **kw: k),
     )
+
+
+# bs4 fallback for environments without beautifulsoup4 installed
+try:
+    import bs4  # noqa: F401
+except ImportError:
+    import re
+
+    class _FakeScript:
+        def __init__(self, text: str | None):
+            self.string = text
+
+    class BeautifulSoup:  # minimal subset used by tests
+        def __init__(self, html: str, _parser: str):
+            self._html = html
+
+        def get_text(self, sep: str = " ", strip: bool = False) -> str:
+            text = re.sub(r"<[^>]+>", " ", self._html)
+            text = re.sub(r"\s+", " ", text)
+            return text.strip() if strip else text
+
+        def find_all(self, tag: str):
+            if tag.lower() != "script":
+                return []
+            out = []
+            for m in re.finditer(
+                r"<script[^>]*>(.*?)</script>", self._html, re.I | re.S
+            ):
+                out.append(_FakeScript(m.group(1)))
+            return out
+
+    sys.modules.setdefault("bs4", _mod("bs4", BeautifulSoup=BeautifulSoup))
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "asyncio: mark test as asyncio")
+
+
+def pytest_pyfunc_call(pyfuncitem):
+    import asyncio
+    import inspect
+
+    if inspect.iscoroutinefunction(pyfuncitem.obj):
+        kwargs = {
+            name: pyfuncitem.funcargs[name] for name in pyfuncitem._fixtureinfo.argnames
+        }
+        asyncio.run(pyfuncitem.obj(**kwargs))
+        return True
+    return None
