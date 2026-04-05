@@ -14,7 +14,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 _LOGGER = logging.getLogger(__name__)
 
 WEATHER_URL = "https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast"
-UPDATE_INTERVAL = timedelta(minutes=30)
+UPDATE_INTERVAL = timedelta(minutes=10)
 
 _READINGS_ENDPOINTS = {
     "temperature": "https://api.data.gov.sg/v1/environment/air-temperature",
