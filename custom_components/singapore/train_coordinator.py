@@ -6,6 +6,7 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import timedelta
+from typing import Final
 
 from bs4 import BeautifulSoup
 from homeassistant.core import HomeAssistant
@@ -16,6 +17,28 @@ _LOGGER = logging.getLogger(__name__)
 
 TRAIN_STATUS_URL = "https://www.mytransport.sg/trainstatus#"
 UPDATE_INTERVAL = timedelta(minutes=5)
+TRAIN_LINES: Final[tuple[str, ...]] = (
+    "North-South Line",
+    "East-West Line",
+    "North East Line",
+    "Circle Line",
+    "Downtown Line",
+    "Thomson-East Coast Line",
+    "Bukit Panjang LRT",
+    "Sengkang LRT",
+    "Punggol LRT",
+)
+_LINE_ALIASES: Final[dict[str, tuple[str, ...]]] = {
+    "North-South Line": ("north-south line", "nsl"),
+    "East-West Line": ("east-west line", "ewl"),
+    "North East Line": ("north east line", "north-east line", "nel"),
+    "Circle Line": ("circle line", "ccl"),
+    "Downtown Line": ("downtown line", "dtl"),
+    "Thomson-East Coast Line": ("thomson-east coast line", "tel"),
+    "Bukit Panjang LRT": ("bukit panjang lrt", "bplrt"),
+    "Sengkang LRT": ("sengkang lrt", "sklrt"),
+    "Punggol LRT": ("punggol lrt", "pglrt"),
+}
 
 
 @dataclass
@@ -24,6 +47,7 @@ class TrainStatusData:
 
     status: str
     details: str
+    line_statuses: dict[str, str]
 
 
 class TrainStatusCoordinator(DataUpdateCoordinator[TrainStatusData]):
@@ -46,15 +70,21 @@ class TrainStatusCoordinator(DataUpdateCoordinator[TrainStatusData]):
                         f"mytransport.sg train status returned HTTP {response.status}"
                     )
                 html = await response.text()
+            return _parse_train_status(html)
         except Exception as err:
+            if self.data is not None:
+                _LOGGER.warning(
+                    "Error fetching train status data (%s); using last known values",
+                    err,
+                )
+                return self.data
             raise UpdateFailed(f"Error fetching train status data: {err}") from err
-
-        return _parse_train_status(html)
 
 
 def _parse_train_status(html: str) -> TrainStatusData:
     """Parse overall train status from the MRT/LRT status page text."""
     soup = BeautifulSoup(html, "html.parser")
+    raw_text = soup.get_text("\n", strip=True)
     text = soup.get_text(" ", strip=True)
     lowered = text.lower()
 
@@ -66,7 +96,8 @@ def _parse_train_status(html: str) -> TrainStatusData:
         status = "normal"
 
     details = _extract_detail(text)
-    return TrainStatusData(status=status, details=details)
+    line_statuses = _extract_line_statuses(raw_text, status)
+    return TrainStatusData(status=status, details=details, line_statuses=line_statuses)
 
 
 def _looks_disrupted(text: str) -> bool:
@@ -91,3 +122,43 @@ def _extract_detail(text: str) -> str:
     if not clean:
         return "No detail available from source page"
     return clean[:240]
+
+
+def _extract_line_statuses(text: str, network_status: str) -> dict[str, str]:
+    """Extract per-line status from page text."""
+    line_statuses = {
+        line: ("normal" if network_status == "normal" else "unknown")
+        for line in TRAIN_LINES
+    }
+    sentences = [
+        chunk.strip()
+        for chunk in re.split(r"[\n.!?;]+", text)
+        if chunk and chunk.strip()
+    ]
+
+    for sentence in sentences:
+        lowered = sentence.lower()
+        sentence_status = _classify_sentence_status(lowered)
+        if sentence_status is None:
+            continue
+        for line, aliases in _LINE_ALIASES.items():
+            if any(alias in lowered for alias in aliases):
+                line_statuses[line] = sentence_status
+
+    return line_statuses
+
+
+def _classify_sentence_status(text: str) -> str | None:
+    """Map a sentence to a canonical status."""
+    if "planned disruption" in text or "planned maintenance" in text:
+        return "planned"
+    if (
+        "normal" in text
+        or "operating normally" in text
+        or "no delays" in text
+        or "no disruption" in text
+    ):
+        return "normal"
+    if _looks_disrupted(text):
+        return "disruption"
+    return None

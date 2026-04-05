@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -17,7 +19,7 @@ from .coe_coordinator import (
     CoeCoordinator,
 )
 from .coordinator import UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER, SPGroupCoordinator
-from .train_coordinator import TrainStatusCoordinator
+from .train_coordinator import TRAIN_LINES, TrainStatusCoordinator
 from .weather_coordinator import SingaporeWeatherCoordinator
 
 UNIT_TEMP = "°C"
@@ -58,6 +60,10 @@ async def async_setup_entry(
             SingaporeTrainStatusSensor(train_coordinator, entry.entry_id),
         ]
     )
+    for line in TRAIN_LINES:
+        entities.append(
+            SingaporeTrainLineStatusSensor(train_coordinator, entry.entry_id, line)
+        )
 
     async_add_entities(entities)
 
@@ -365,6 +371,51 @@ class SingaporeTrainStatusSensor(
             return {}
         return {
             "details": self.coordinator.data.details,
+            "line_statuses": self.coordinator.data.line_statuses,
+            "source": "mytransport.sg",
+            "url": "https://www.mytransport.sg/trainstatus#",
+        }
+
+    @property
+    def device_info(self) -> dict:
+        return {
+            "identifiers": {(DOMAIN, f"{self._entry_id}_train")},
+            "name": "Singapore MRT/LRT",
+            "manufacturer": "Singapore",
+            "model": "MyTransport Train Status",
+        }
+
+
+class SingaporeTrainLineStatusSensor(
+    CoordinatorEntity[TrainStatusCoordinator], SensorEntity
+):
+    """Status sensor for a single MRT/LRT line."""
+
+    _attr_has_entity_name = False
+    _attr_icon = "mdi:train"
+    _attr_device_class = None
+    _attr_state_class = None
+
+    def __init__(
+        self, coordinator: TrainStatusCoordinator, entry_id: str, line_name: str
+    ) -> None:
+        super().__init__(coordinator)
+        self._entry_id = entry_id
+        self._line_name = line_name
+        slug = re.sub(r"[^a-z0-9]+", "_", line_name.lower()).strip("_")
+        self._attr_unique_id = f"{entry_id}_train_{slug}_status"
+        self._attr_name = f"Singapore {line_name} Status"
+
+    @property
+    def native_value(self) -> str | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.line_statuses.get(self._line_name, "unknown")
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {
+            "line": self._line_name,
             "source": "mytransport.sg",
             "url": "https://www.mytransport.sg/trainstatus#",
         }

@@ -215,3 +215,37 @@ async def test_coe_coordinator_network_error():
         await coordinator.async_refresh()
 
     assert coordinator.last_update_success is False
+
+
+@pytest.mark.asyncio
+async def test_coe_coordinator_http_error_uses_last_known_data():
+    from custom_components.singapore.coe_coordinator import CoeCoordinator
+
+    hass = MagicMock()
+
+    mock_response = AsyncMock()
+    mock_response.status = 503
+    mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_response.__aexit__ = AsyncMock(return_value=False)
+
+    mock_session = MagicMock()
+    mock_session.get = MagicMock(return_value=mock_response)
+
+    coordinator = CoeCoordinator(hass)
+    coordinator.data = CoeData(
+        premiums={"A": 95501},
+        month="2026-03",
+        bidding_no=1,
+    )
+
+    with (
+        patch(
+            "custom_components.singapore.coe_coordinator.async_get_clientsession",
+            return_value=mock_session,
+        ),
+        patch("custom_components.singapore.coe_coordinator.asyncio.sleep", AsyncMock()),
+    ):
+        await coordinator.async_refresh()
+
+    assert coordinator.last_update_success is True
+    assert coordinator.data.premiums["A"] == 95501
