@@ -12,7 +12,7 @@ from homeassistant.helpers.event import async_track_time_change
 _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "singapore"
-PLATFORMS = [Platform.SENSOR]
+PLATFORMS = [Platform.SENSOR, Platform.WEATHER]
 
 # COE results are published after each bidding exercise; refresh daily at 19:30.
 _COE_REFRESH_HOUR = 19
@@ -23,9 +23,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the integration and kick off the first data fetch."""
     from .coe_coordinator import CoeCoordinator
     from .coordinator import SPGroupCoordinator
+    from .weather_coordinator import SingaporeWeatherCoordinator
 
     tariff_coordinator = SPGroupCoordinator(hass)
     await tariff_coordinator.async_config_entry_first_refresh()
+
+    weather_coordinator = SingaporeWeatherCoordinator(hass)
+    await weather_coordinator.async_config_entry_first_refresh()
 
     coe_coordinator = CoeCoordinator(hass)
 
@@ -53,6 +57,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "tariff": tariff_coordinator,
         "coe": coe_coordinator,
+        "weather": weather_coordinator,
         "unsub_coe": unsub_coe,
     }
 

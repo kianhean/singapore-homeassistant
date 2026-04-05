@@ -1,7 +1,8 @@
 # Singapore Home Assistant Integration
 
-A [HACS](https://hacs.xyz) custom integration for Home Assistant that tracks Singapore
-utility tariffs and COE (Certificate of Entitlement) bidding results.
+A [HACS](https://hacs.xyz) custom integration for Home Assistant that provides relevant
+Singapore information for Home Assistant users in Singapore, including utility tariffs,
+COE (Certificate of Entitlement) bidding results, and NEA weather data.
 
 ## Sensors
 
@@ -33,6 +34,34 @@ Sensor value is the COE premium in SGD from the latest completed bidding exercis
 | `sensor.singapore_coe_category_e` | Singapore COE Category E (Open) | SGD | Open — all except motorcycles |
 
 COE sensors expose `category`, `description`, `month`, `bidding_no`, and `source` as state attributes.
+
+### NEA Realtime Weather Readings (Collection 1459)
+
+Updated every 30 minutes from [data.gov.sg weather datasets](https://data.gov.sg/collections/1459/view).
+Values are station-aggregated (mean across available stations at fetch time).
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.singapore_temperature` | Singapore Temperature | °C | Aggregated air temperature |
+| `sensor.singapore_humidity` | Singapore Humidity | % | Aggregated relative humidity |
+| `sensor.singapore_wind_speed` | Singapore Wind Speed | km/h | Aggregated wind speed |
+| `sensor.singapore_wind_bearing` | Singapore Wind Bearing | ° | Aggregated wind direction |
+| `sensor.singapore_rainfall` | Singapore Rainfall | mm | Aggregated rainfall |
+
+### Weather Entities (2-hour Forecast, by Area)
+
+One weather entity is created per forecast area from [data.gov.sg collection 1456](https://data.gov.sg/collections/1456/view).
+The integration approximates each 2-hour forecast block into two hourly forecast points for Home Assistant.
+
+Example entities:
+- `weather.singapore_weather_bedok`
+- `weather.singapore_weather_ang_mo_kio`
+- `weather.singapore_weather_woodlands`
+
+Each weather entity exposes:
+- mapped HA condition (`sunny`, `partlycloudy`, `rainy`, etc.)
+- hourly forecast list (2 points from each 2-hour period)
+- extra attributes such as `raw_condition`, `valid_start`, `valid_end`, and realtime reading context
 
 ## Example sensor states
 
@@ -90,6 +119,12 @@ sensor.singapore_coe_category_e:
     month: "2026-03"
     bidding_no: 1
     source: data.gov.sg / LTA
+
+sensor.singapore_temperature:
+  state: 31.2
+  unit_of_measurement: °C
+  attributes:
+    source: data.gov.sg / NEA (collection 1459)
 ```
 
 ## Installation via HACS
@@ -113,6 +148,8 @@ sensor.singapore_coe_category_e:
   - Water: SGD per cubic metre (SGD/m³); lower residential tier (≤40 m³)
   - Solar export price = electricity tariff − network costs
 - **COE results** — fetched from the LTA dataset on [data.gov.sg](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view); refreshed daily at 19:30 to pick up results after each bidding exercise.
+- **Weather forecast** — fetched from [data.gov.sg collection 1456](https://data.gov.sg/collections/1456/view); refreshed every 30 minutes.
+- **Weather readings** — fetched from [data.gov.sg collection 1459](https://data.gov.sg/collections/1459/view); refreshed every 30 minutes and exposed as weather sensor entities.
 
 ## Development
 
