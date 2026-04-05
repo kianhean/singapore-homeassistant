@@ -58,10 +58,15 @@ class PublicHolidayCoordinator(DataUpdateCoordinator[list[PublicHoliday]]):
                 if response.status != 200:
                     raise UpdateFailed(f"MOM returned HTTP {response.status}")
                 html = await response.text()
+            return _parse_public_holidays(html)
         except Exception as err:
+            if self.data is not None:
+                _LOGGER.warning(
+                    "Error fetching MOM public holidays (%s); using last known values",
+                    err,
+                )
+                return self.data
             raise UpdateFailed(f"Error fetching MOM public holidays: {err}") from err
-
-        return _parse_public_holidays(html)
 
 
 def _parse_public_holidays(html: str) -> list[PublicHoliday]:

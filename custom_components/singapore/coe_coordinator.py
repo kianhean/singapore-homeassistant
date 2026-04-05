@@ -96,6 +96,14 @@ class CoeCoordinator(DataUpdateCoordinator[CoeData]):
             )
             await asyncio.sleep(delay_seconds)
 
+        if self.data is not None:
+            _LOGGER.warning(
+                "Failed to fetch COE results after %s attempts (%s); using last known values",
+                _MAX_FETCH_ATTEMPTS,
+                last_error,
+            )
+            return self.data
+
         raise UpdateFailed(
             f"Failed to fetch COE results after {_MAX_FETCH_ATTEMPTS} attempts: {last_error}"
         )

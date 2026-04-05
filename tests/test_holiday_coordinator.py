@@ -90,3 +90,30 @@ async def test_holiday_coordinator_http_error():
         await coordinator.async_refresh()
 
     assert coordinator.last_update_success is False
+
+
+@pytest.mark.asyncio
+async def test_holiday_coordinator_http_error_uses_last_known_data():
+    hass = MagicMock()
+
+    mock_response = AsyncMock()
+    mock_response.status = 503
+    mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_response.__aexit__ = AsyncMock(return_value=False)
+
+    mock_session = MagicMock()
+    mock_session.get = MagicMock(return_value=mock_response)
+
+    coordinator = PublicHolidayCoordinator(hass)
+    coordinator.data = [
+        PublicHoliday(name="New Year's Day", day=datetime(2026, 1, 1).date())
+    ]
+
+    with patch(
+        "custom_components.singapore.holiday_coordinator.async_get_clientsession",
+        return_value=mock_session,
+    ):
+        await coordinator.async_refresh()
+
+    assert coordinator.last_update_success is True
+    assert coordinator.data[0].name == "New Year's Day"

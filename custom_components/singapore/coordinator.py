@@ -102,10 +102,15 @@ class SPGroupCoordinator(DataUpdateCoordinator[TariffData]):
                 if response.status != 200:
                     raise UpdateFailed(f"SP Group returned HTTP {response.status}")
                 html = await response.text()
+            return _parse_tariff(html)
         except Exception as err:
+            if self.data is not None:
+                _LOGGER.warning(
+                    "Error fetching SP Group tariffs (%s); using last known values",
+                    err,
+                )
+                return self.data
             raise UpdateFailed(f"Error fetching SP Group tariffs: {err}") from err
-
-        return _parse_tariff(html)
 
 
 def _parse_tariff(html: str) -> TariffData:

@@ -22,6 +22,7 @@ from custom_components.singapore.sensor import (
     SingaporeRainfallSensor,
     SingaporeSolarExportPriceSensor,
     SingaporeTemperatureSensor,
+    SingaporeTrainLineStatusSensor,
     SingaporeTrainStatusSensor,
     SingaporeWaterTariffSensor,
     SingaporeWindBearingSensor,
@@ -326,6 +327,17 @@ def _train_coordinator(
     data=TrainStatusData(
         status="planned",
         details="East-West Line planned disruption due to maintenance.",
+        line_statuses={
+            "North-South Line": "normal",
+            "East-West Line": "planned",
+            "North East Line": "normal",
+            "Circle Line": "normal",
+            "Downtown Line": "normal",
+            "Thomson-East Coast Line": "normal",
+            "Bukit Panjang LRT": "normal",
+            "Sengkang LRT": "normal",
+            "Punggol LRT": "normal",
+        },
     ),
 ):
     coordinator = MagicMock()
@@ -344,9 +356,33 @@ def test_train_status_sensor_attributes():
     sensor = SingaporeTrainStatusSensor(_train_coordinator(), "entry1")
     attrs = sensor.extra_state_attributes
     assert "planned disruption" in attrs["details"]
+    assert attrs["line_statuses"]["East-West Line"] == "planned"
     assert attrs["source"] == "mytransport.sg"
 
 
 def test_train_status_sensor_none_when_no_data():
     sensor = SingaporeTrainStatusSensor(_train_coordinator(data=None), "entry1")
     assert sensor.native_value is None
+
+
+def test_train_line_status_sensor_value_and_id():
+    sensor = SingaporeTrainLineStatusSensor(
+        _train_coordinator(), "entry1", "East-West Line"
+    )
+    assert sensor.native_value == "planned"
+    assert sensor.unique_id == "entry1_train_east_west_line_status"
+
+
+def test_train_line_status_sensor_unknown_when_line_missing():
+    sensor = SingaporeTrainLineStatusSensor(
+        _train_coordinator(
+            data=TrainStatusData(
+                status="disruption",
+                details="Limited details.",
+                line_statuses={},
+            )
+        ),
+        "entry1",
+        "East-West Line",
+    )
+    assert sensor.native_value == "unknown"

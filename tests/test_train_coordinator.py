@@ -1,5 +1,9 @@
 """Tests for train status parser."""
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
 from custom_components.singapore.train_coordinator import _parse_train_status
 
 
@@ -11,6 +15,8 @@ def test_parse_train_status_planned():
     """
     data = _parse_train_status(html)
     assert data.status == "planned"
+    assert data.line_statuses["North-South Line"] == "planned"
+    assert data.line_statuses["East-West Line"] == "unknown"
 
 
 def test_parse_train_status_disruption():
@@ -21,6 +27,7 @@ def test_parse_train_status_disruption():
     """
     data = _parse_train_status(html)
     assert data.status == "disruption"
+    assert data.line_statuses["Circle Line"] == "disruption"
 
 
 def test_parse_train_status_normal():
@@ -31,3 +38,78 @@ def test_parse_train_status_normal():
     """
     data = _parse_train_status(html)
     assert data.status == "normal"
+    assert all(status == "normal" for status in data.line_statuses.values())
+
+
+def test_parse_train_status_mixed_per_line():
+    html = """
+    <html><body>
+      <div>North-South Line operating normally.</div>
+      <div>East-West Line service disruption due to signaling fault.</div>
+      <div>Circle Line planned disruption tonight.</div>
+    </body></html>
+    """
+    data = _parse_train_status(html)
+    assert data.line_statuses["North-South Line"] == "normal"
+    assert data.line_statuses["East-West Line"] == "disruption"
+    assert data.line_statuses["Circle Line"] == "planned"
+
+
+@pytest.mark.asyncio
+async def test_train_coordinator_http_error_without_cache_fails():
+    from custom_components.singapore.train_coordinator import TrainStatusCoordinator
+
+    hass = MagicMock()
+
+    mock_response = AsyncMock()
+    mock_response.status = 503
+    mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_response.__aexit__ = AsyncMock(return_value=False)
+
+    mock_session = MagicMock()
+    mock_session.get = MagicMock(return_value=mock_response)
+
+    coordinator = TrainStatusCoordinator(hass)
+
+    with patch(
+        "custom_components.singapore.train_coordinator.async_get_clientsession",
+        return_value=mock_session,
+    ):
+        await coordinator.async_refresh()
+
+    assert coordinator.last_update_success is False
+
+
+@pytest.mark.asyncio
+async def test_train_coordinator_http_error_uses_last_known_data():
+    from custom_components.singapore.train_coordinator import (
+        TRAIN_LINES,
+        TrainStatusCoordinator,
+        TrainStatusData,
+    )
+
+    hass = MagicMock()
+
+    mock_response = AsyncMock()
+    mock_response.status = 503
+    mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_response.__aexit__ = AsyncMock(return_value=False)
+
+    mock_session = MagicMock()
+    mock_session.get = MagicMock(return_value=mock_response)
+
+    coordinator = TrainStatusCoordinator(hass)
+    coordinator.data = TrainStatusData(
+        status="normal",
+        details="All lines are operating normally.",
+        line_statuses={line: "normal" for line in TRAIN_LINES},
+    )
+
+    with patch(
+        "custom_components.singapore.train_coordinator.async_get_clientsession",
+        return_value=mock_session,
+    ):
+        await coordinator.async_refresh()
+
+    assert coordinator.last_update_success is True
+    assert coordinator.data.status == "normal"

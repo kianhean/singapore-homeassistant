@@ -74,15 +74,19 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
                         f"data.gov.sg weather endpoint returned HTTP {response.status}"
                     )
                 payload = await response.json()
+            parsed = _parse_weather(payload)
+            if not parsed.areas:
+                raise UpdateFailed("No area forecasts found in weather payload")
+
+            parsed.readings = await _fetch_aggregated_readings(session)
+            return parsed
         except Exception as err:
+            if self.data is not None:
+                _LOGGER.warning(
+                    "Error fetching weather data (%s); using last known values", err
+                )
+                return self.data
             raise UpdateFailed(f"Error fetching weather data: {err}") from err
-
-        parsed = _parse_weather(payload)
-        if not parsed.areas:
-            raise UpdateFailed("No area forecasts found in weather payload")
-
-        parsed.readings = await _fetch_aggregated_readings(session)
-        return parsed
 
 
 async def _fetch_aggregated_readings(session) -> WeatherReadings:

@@ -1,11 +1,10 @@
-"""End-to-end tests that hit the live SP Group tariff page.
+"""End-to-end tests that hit live external APIs used by the integration.
 
 Run with:
     pytest tests/test_e2e.py -v -m e2e
 
 Skipped by default in CI (no ``-m e2e`` flag).  These tests are the canary
-for website structure changes: if _parse_tariff raises or returns zeroes,
-the scraper needs updating before users see "Failed setup" errors.
+for upstream payload/markup changes across every external source.
 """
 
 from __future__ import annotations
@@ -32,7 +31,17 @@ _HEADERS = {
     "Cache-Control": "no-cache",
 }
 
-_URL = "https://www.spgroup.com.sg/our-services/utilities/tariff-information"
+_SP_URL = "https://www.spgroup.com.sg/our-services/utilities/tariff-information"
+_COE_URL = (
+    "https://data.gov.sg/api/action/datastore_search"
+    "?resource_id=d_69b3380ad7e51aff3a7dcc84eba52b8a"
+    "&limit=10"
+    "&sort=month%20desc%2Cbidding_no%20desc"
+)
+_WEATHER_URL = "https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast"
+_WEATHER_READING_URL = "https://api.data.gov.sg/v1/environment/air-temperature"
+_HOLIDAY_URL = "https://www.mom.gov.sg/employment-practices/public-holidays"
+_TRAIN_URL = "https://www.mytransport.sg/trainstatus#"
 
 # Sanity-check bounds: tariffs that fall outside these ranges almost certainly
 # indicate a parse error rather than a real rate.
@@ -43,16 +52,41 @@ _NETWORK_MIN, _NETWORK_MAX = 1.0, 20.0  # ¢/kWh
 
 
 def _fetch_html() -> str:
-    """Fetch the tariff page synchronously using requests."""
-    import requests  # imported lazily so unit tests don't need it
+    """Fetch a URL synchronously and return text."""
+    return _fetch_url_html(_SP_URL)
 
-    resp = requests.get(_URL, headers=_HEADERS, timeout=30)
-    resp.raise_for_status()
-    return resp.text
+
+def _fetch_url_html(url: str) -> str:
+    import urllib.request
+    from urllib.error import HTTPError, URLError
+
+    req = urllib.request.Request(url, headers=_HEADERS)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            return response.read().decode("utf-8", errors="replace")
+    except (HTTPError, URLError) as err:
+        pytest.skip(
+            f"Skipping e2e due to external network/proxy error for {url}: {err}"
+        )
+
+
+def _fetch_json(url: str) -> dict:
+    import json
+    import urllib.request
+    from urllib.error import HTTPError, URLError
+
+    req = urllib.request.Request(url)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError) as err:
+        pytest.skip(
+            f"Skipping e2e due to external network/proxy error for {url}: {err}"
+        )
 
 
 # ---------------------------------------------------------------------------
-# Live fetch → parse
+# Live fetch → parse (all external APIs)
 # ---------------------------------------------------------------------------
 
 
@@ -91,6 +125,73 @@ def test_e2e_fetch_and_parse():
         "Q4",
     ), f"quarter={data.quarter!r} not recognised — date parsing may be broken"
     assert data.year >= 2024, f"year={data.year} looks wrong"
+
+
+def test_e2e_coe_api_fetch_and_parse():
+    """Fetch live COE API and assert parser returns a recent exercise."""
+    from custom_components.singapore.coe_coordinator import _parse_coe
+
+    payload = _fetch_json(_COE_URL)
+    data = _parse_coe(payload)
+
+    assert data.month.count("-") == 1, f"month={data.month!r} has unexpected format"
+    assert data.bidding_no in (1, 2), f"bidding_no={data.bidding_no} is invalid"
+    assert data.premiums, "Expected at least one COE premium"
+    assert all(v > 0 for v in data.premiums.values()), (
+        f"Non-positive COE premium found: {data.premiums}"
+    )
+
+
+def test_e2e_weather_forecast_api_fetch_and_parse():
+    """Fetch live 2-hour forecast endpoint and assert at least one area forecast."""
+    from custom_components.singapore.weather_coordinator import _parse_weather
+
+    payload = _fetch_json(_WEATHER_URL)
+    data = _parse_weather(payload)
+
+    assert data.areas, "No forecast areas parsed from data.gov.sg weather payload"
+    first_area = next(iter(data.areas.values()))
+    assert first_area.area, "Parsed area name is empty"
+    assert first_area.condition_text, "Parsed condition text is empty"
+
+
+def test_e2e_weather_reading_api_shape():
+    """Fetch one live reading endpoint and verify expected rows exist."""
+    from custom_components.singapore.weather_coordinator import _extract_readings_rows
+
+    payload = _fetch_json(_WEATHER_READING_URL)
+    rows = _extract_readings_rows(payload)
+
+    assert rows, "No reading rows parsed from live air-temperature payload"
+    assert any("value" in row for row in rows), "No 'value' key found in readings rows"
+
+
+def test_e2e_holiday_page_fetch_and_parse():
+    """Fetch live MOM public holiday page and assert holidays parse."""
+    from custom_components.singapore.holiday_coordinator import _parse_public_holidays
+
+    html = _fetch_url_html(_HOLIDAY_URL)
+    holidays = _parse_public_holidays(html)
+
+    assert holidays, "No holidays parsed from MOM public holidays page"
+    assert all(h.name for h in holidays), "Found holiday with empty name"
+
+
+def test_e2e_train_status_page_fetch_and_parse():
+    """Fetch live train status page and assert parser emits overall + per-line status."""
+    from custom_components.singapore.train_coordinator import (
+        TRAIN_LINES,
+        _parse_train_status,
+    )
+
+    html = _fetch_url_html(_TRAIN_URL)
+    data = _parse_train_status(html)
+
+    assert data.status in {"normal", "planned", "disruption"}, (
+        f"Unexpected network status: {data.status}"
+    )
+    assert data.line_statuses, "No per-line statuses parsed"
+    assert set(data.line_statuses) == set(TRAIN_LINES), "Per-line status keys mismatch"
 
 
 def test_e2e_raw_html_debug(capsys):

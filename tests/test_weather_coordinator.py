@@ -1,6 +1,9 @@
 """Tests for weather payload parsing and coordinator output models."""
 
-from datetime import timezone
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from custom_components.singapore.weather_coordinator import (
     _extract_readings_rows,
@@ -77,3 +80,74 @@ def test_to_float_handles_invalid_values():
     assert _to_float("2.5") == 2.5
     assert _to_float(None) is None
     assert _to_float("bad") is None
+
+
+@pytest.mark.asyncio
+async def test_weather_coordinator_http_error_without_cache_fails():
+    from custom_components.singapore.weather_coordinator import (
+        SingaporeWeatherCoordinator,
+    )
+
+    hass = MagicMock()
+
+    mock_response = AsyncMock()
+    mock_response.status = 503
+    mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_response.__aexit__ = AsyncMock(return_value=False)
+
+    mock_session = MagicMock()
+    mock_session.get = MagicMock(return_value=mock_response)
+
+    coordinator = SingaporeWeatherCoordinator(hass)
+
+    with patch(
+        "custom_components.singapore.weather_coordinator.async_get_clientsession",
+        return_value=mock_session,
+    ):
+        await coordinator.async_refresh()
+
+    assert coordinator.last_update_success is False
+
+
+@pytest.mark.asyncio
+async def test_weather_coordinator_http_error_uses_last_known_data():
+    from custom_components.singapore.weather_coordinator import (
+        SingaporeWeatherCoordinator,
+        WeatherAreaData,
+        WeatherData,
+        WeatherReadings,
+    )
+
+    hass = MagicMock()
+
+    mock_response = AsyncMock()
+    mock_response.status = 503
+    mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_response.__aexit__ = AsyncMock(return_value=False)
+
+    mock_session = MagicMock()
+    mock_session.get = MagicMock(return_value=mock_response)
+
+    coordinator = SingaporeWeatherCoordinator(hass)
+    cached = WeatherData(
+        areas={
+            "Bedok": WeatherAreaData(
+                area="Bedok",
+                condition_text="Cloudy",
+                valid_start=datetime(2026, 4, 5, 0, 0, tzinfo=timezone.utc),
+                valid_end=datetime(2026, 4, 5, 2, 0, tzinfo=timezone.utc),
+            )
+        },
+        updated_at=None,
+        readings=WeatherReadings(temperature=30.1),
+    )
+    coordinator.data = cached
+
+    with patch(
+        "custom_components.singapore.weather_coordinator.async_get_clientsession",
+        return_value=mock_session,
+    ):
+        await coordinator.async_refresh()
+
+    assert coordinator.last_update_success is True
+    assert coordinator.data.readings.temperature == 30.1
