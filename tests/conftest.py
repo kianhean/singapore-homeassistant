@@ -85,6 +85,7 @@ class SensorStateClass:
 class Platform:
     SENSOR = "sensor"
     WEATHER = "weather"
+    CALENDAR = "calendar"
 
 
 class HomeAssistant:
@@ -117,6 +118,15 @@ class UnitOfTemperature:
 
 
 class Forecast(dict):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+
+class CalendarEntity:
+    pass
+
+
+class CalendarEvent(dict):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -168,6 +178,11 @@ _HA_MODULES: dict[str, ModuleType] = {
         WeatherEntity=WeatherEntity,
         WeatherEntityFeature=WeatherEntityFeature,
         Forecast=Forecast,
+    ),
+    "homeassistant.components.calendar": _mod(
+        "homeassistant.components.calendar",
+        CalendarEntity=CalendarEntity,
+        CalendarEvent=CalendarEvent,
     ),
     "homeassistant.components.sensor": _mod(
         "homeassistant.components.sensor",
