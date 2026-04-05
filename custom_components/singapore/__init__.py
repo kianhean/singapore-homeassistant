@@ -28,11 +28,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await tariff_coordinator.async_config_entry_first_refresh()
 
     coe_coordinator = CoeCoordinator(hass)
-    await coe_coordinator.async_refresh()
-    if not coe_coordinator.last_update_success:
-        _LOGGER.warning(
-            "Initial COE refresh failed; continuing setup and retrying later"
-        )
+
+    async def _initial_refresh_coe() -> None:
+        await coe_coordinator.async_refresh()
+        if not coe_coordinator.last_update_success:
+            _LOGGER.warning(
+                "Initial COE refresh failed; continuing setup and retrying later"
+            )
+
+    # Don't block setup on COE API availability/rate limits.
+    hass.async_create_task(_initial_refresh_coe())
 
     async def _refresh_coe(_now) -> None:
         await coe_coordinator.async_refresh()
