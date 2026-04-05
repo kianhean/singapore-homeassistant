@@ -1,7 +1,8 @@
 # Singapore Home Assistant Integration
 
-A [HACS](https://hacs.xyz) custom integration for Home Assistant that tracks Singapore
-utility tariffs, COE (Certificate of Entitlement) bidding results, and NEA weather data.
+A [HACS](https://hacs.xyz) custom integration for Home Assistant that provides relevant
+Singapore information for Home Assistant users in Singapore, including utility tariffs,
+COE (Certificate of Entitlement) bidding results, and NEA weather data.
 
 ## Sensors
 
