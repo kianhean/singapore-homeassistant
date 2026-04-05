@@ -69,6 +69,7 @@ def test_electricity_attributes():
 def test_electricity_unique_id():
     sensor = SingaporeElectricityTariffSensor(_coordinator(), "entry1")
     assert sensor.unique_id == "entry1_electricity_tariff"
+    assert sensor.device_info["identifiers"] == {("singapore", "entry1_energy")}
 
 
 def test_electricity_none_when_no_data():
@@ -229,6 +230,7 @@ def test_coe_unit():
 def test_coe_unique_id():
     sensor = SingaporeCoeResultSensor(_coe_coordinator(), "entry1", "A")
     assert sensor.unique_id == "entry1_coe_cat_a"
+    assert sensor.device_info["identifiers"] == {("singapore", "entry1_coe")}
 
 
 def test_coe_name():
@@ -278,6 +280,7 @@ def test_temperature_sensor_value_unit_and_id():
     assert sensor.native_value == 31.2
     assert sensor.native_unit_of_measurement == UNIT_TEMP
     assert sensor.unique_id == "entry1_temperature"
+    assert sensor.device_info["identifiers"] == {("singapore", "entry1_weather")}
 
 
 def test_humidity_sensor_value_unit_and_id():

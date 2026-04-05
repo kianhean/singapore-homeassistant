@@ -40,6 +40,7 @@ def test_weather_condition_mapping_and_attrs():
 
     assert ent.unique_id == "entry1_weather_bedok"
     assert ent.condition == "lightning-rainy"
+    assert ent.device_info["identifiers"] == {("singapore", "entry1_weather")}
 
     attrs = ent.extra_state_attributes
     assert attrs["forecast_area"] == "Bedok"

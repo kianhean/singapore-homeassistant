@@ -85,6 +85,15 @@ class _BaseTariffSensor(CoordinatorEntity[SPGroupCoordinator], SensorEntity):
             "source": "SP Group",
         }
 
+    @property
+    def device_info(self) -> dict:
+        return {
+            "identifiers": {(DOMAIN, f"{self._entry_id}_energy")},
+            "name": "Singapore Energy",
+            "manufacturer": "Singapore",
+            "model": "SP Group Tariffs",
+        }
+
 
 class SingaporeElectricityTariffSensor(_BaseTariffSensor):
     """Total residential electricity tariff (¢/kWh)."""
@@ -187,6 +196,7 @@ class SingaporeCoeResultSensor(CoordinatorEntity[CoeCoordinator], SensorEntity):
         self, coordinator: CoeCoordinator, entry_id: str, category: str
     ) -> None:
         super().__init__(coordinator)
+        self._entry_id = entry_id
         self._category = category
         self._attr_unique_id = f"{entry_id}_coe_cat_{category.lower()}"
         self._attr_name = _CATEGORY_NAMES[category]
@@ -209,6 +219,15 @@ class SingaporeCoeResultSensor(CoordinatorEntity[CoeCoordinator], SensorEntity):
             "source": "data.gov.sg / LTA",
         }
 
+    @property
+    def device_info(self) -> dict:
+        return {
+            "identifiers": {(DOMAIN, f"{self._entry_id}_coe")},
+            "name": "Singapore COE",
+            "manufacturer": "Singapore",
+            "model": "LTA COE Results",
+        }
+
 
 class _BaseWeatherReadingSensor(
     CoordinatorEntity[SingaporeWeatherCoordinator], SensorEntity
@@ -223,11 +242,21 @@ class _BaseWeatherReadingSensor(
         self, coordinator: SingaporeWeatherCoordinator, entry_id: str, suffix: str
     ) -> None:
         super().__init__(coordinator)
+        self._entry_id = entry_id
         self._attr_unique_id = f"{entry_id}_{suffix}"
 
     @property
     def extra_state_attributes(self) -> dict:
         return {"source": "data.gov.sg / NEA (collection 1459)"}
+
+    @property
+    def device_info(self) -> dict:
+        return {
+            "identifiers": {(DOMAIN, f"{self._entry_id}_weather")},
+            "name": "Singapore Weather",
+            "manufacturer": "Singapore",
+            "model": "NEA Weather",
+        }
 
 
 class SingaporeTemperatureSensor(_BaseWeatherReadingSensor):

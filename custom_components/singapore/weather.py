@@ -72,6 +72,7 @@ class SingaporeAreaWeatherEntity(
         self, coordinator: SingaporeWeatherCoordinator, entry_id: str, area: str
     ) -> None:
         super().__init__(coordinator)
+        self._entry_id = entry_id
         self._area = area
         slug = area.lower().replace(" ", "_")
         self._attr_unique_id = f"{entry_id}_weather_{slug}"
@@ -147,6 +148,15 @@ class SingaporeAreaWeatherEntity(
             _point(start_utc),
             _point(start_utc + timedelta(hours=1)),
         ]
+
+    @property
+    def device_info(self) -> dict:
+        return {
+            "identifiers": {(DOMAIN, f"{self._entry_id}_weather")},
+            "name": "Singapore Weather",
+            "manufacturer": "Singapore",
+            "model": "NEA Weather",
+        }
 
 
 def _map_condition(text: str) -> str:
