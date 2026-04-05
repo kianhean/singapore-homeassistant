@@ -9,3 +9,7 @@ def test_domain():
 
 def test_platforms_include_weather():
     assert "weather" in PLATFORMS
+
+
+def test_platforms_include_calendar():
+    assert "calendar" in PLATFORMS
