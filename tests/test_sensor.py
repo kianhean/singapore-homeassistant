@@ -22,10 +22,12 @@ from custom_components.singapore.sensor import (
     SingaporeRainfallSensor,
     SingaporeSolarExportPriceSensor,
     SingaporeTemperatureSensor,
+    SingaporeTrainStatusSensor,
     SingaporeWaterTariffSensor,
     SingaporeWindBearingSensor,
     SingaporeWindSpeedSensor,
 )
+from custom_components.singapore.train_coordinator import TrainStatusData
 from custom_components.singapore.weather_coordinator import WeatherData, WeatherReadings
 
 _DATA = TariffData(
@@ -318,3 +320,33 @@ def test_weather_sensors_none_when_no_data():
     assert SingaporeWindSpeedSensor(weather_none, "entry1").native_value is None
     assert SingaporeWindBearingSensor(weather_none, "entry1").native_value is None
     assert SingaporeRainfallSensor(weather_none, "entry1").native_value is None
+
+
+def _train_coordinator(
+    data=TrainStatusData(
+        status="planned",
+        details="East-West Line planned disruption due to maintenance.",
+    ),
+):
+    coordinator = MagicMock()
+    coordinator.data = data
+    return coordinator
+
+
+def test_train_status_sensor_value_and_id():
+    sensor = SingaporeTrainStatusSensor(_train_coordinator(), "entry1")
+    assert sensor.native_value == "planned"
+    assert sensor.unique_id == "entry1_train_status"
+    assert sensor.device_info["identifiers"] == {("singapore", "entry1_train")}
+
+
+def test_train_status_sensor_attributes():
+    sensor = SingaporeTrainStatusSensor(_train_coordinator(), "entry1")
+    attrs = sensor.extra_state_attributes
+    assert "planned disruption" in attrs["details"]
+    assert attrs["source"] == "mytransport.sg"
+
+
+def test_train_status_sensor_none_when_no_data():
+    sensor = SingaporeTrainStatusSensor(_train_coordinator(data=None), "entry1")
+    assert sensor.native_value is None

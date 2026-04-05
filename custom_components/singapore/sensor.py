@@ -17,6 +17,7 @@ from .coe_coordinator import (
     CoeCoordinator,
 )
 from .coordinator import UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER, SPGroupCoordinator
+from .train_coordinator import TrainStatusCoordinator
 from .weather_coordinator import SingaporeWeatherCoordinator
 
 UNIT_TEMP = "°C"
@@ -36,6 +37,7 @@ async def async_setup_entry(
     tariff_coordinator: SPGroupCoordinator = entry_data["tariff"]
     coe_coordinator: CoeCoordinator = entry_data["coe"]
     weather_coordinator: SingaporeWeatherCoordinator = entry_data["weather"]
+    train_coordinator: TrainStatusCoordinator = entry_data["train"]
 
     entities: list[SensorEntity] = [
         SingaporeElectricityTariffSensor(tariff_coordinator, entry.entry_id),
@@ -53,6 +55,7 @@ async def async_setup_entry(
             SingaporeWindSpeedSensor(weather_coordinator, entry.entry_id),
             SingaporeWindBearingSensor(weather_coordinator, entry.entry_id),
             SingaporeRainfallSensor(weather_coordinator, entry.entry_id),
+            SingaporeTrainStatusSensor(train_coordinator, entry.entry_id),
         ]
     )
 
@@ -332,3 +335,45 @@ class SingaporeRainfallSensor(_BaseWeatherReadingSensor):
         if self.coordinator.data is None:
             return None
         return self.coordinator.data.readings.precipitation
+
+
+class SingaporeTrainStatusSensor(
+    CoordinatorEntity[TrainStatusCoordinator], SensorEntity
+):
+    """Overall MRT/LRT network status from mytransport.sg."""
+
+    _attr_has_entity_name = False
+    _attr_name = "Singapore Train Status"
+    _attr_icon = "mdi:train"
+    _attr_device_class = None
+    _attr_state_class = None
+
+    def __init__(self, coordinator: TrainStatusCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._entry_id = entry_id
+        self._attr_unique_id = f"{entry_id}_train_status"
+
+    @property
+    def native_value(self) -> str | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.status
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        if self.coordinator.data is None:
+            return {}
+        return {
+            "details": self.coordinator.data.details,
+            "source": "mytransport.sg",
+            "url": "https://www.mytransport.sg/trainstatus#",
+        }
+
+    @property
+    def device_info(self) -> dict:
+        return {
+            "identifiers": {(DOMAIN, f"{self._entry_id}_train")},
+            "name": "Singapore MRT/LRT",
+            "manufacturer": "Singapore",
+            "model": "MyTransport Train Status",
+        }

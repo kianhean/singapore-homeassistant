@@ -23,6 +23,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the integration and kick off the first data fetch."""
     from .coe_coordinator import CoeCoordinator
     from .coordinator import SPGroupCoordinator
+    from .train_coordinator import TrainStatusCoordinator
     from .weather_coordinator import SingaporeWeatherCoordinator
 
     tariff_coordinator = SPGroupCoordinator(hass)
@@ -32,6 +33,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await weather_coordinator.async_config_entry_first_refresh()
 
     coe_coordinator = CoeCoordinator(hass)
+    train_coordinator = TrainStatusCoordinator(hass)
+    await train_coordinator.async_config_entry_first_refresh()
 
     async def _initial_refresh_coe() -> None:
         await coe_coordinator.async_refresh()
@@ -58,6 +61,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "tariff": tariff_coordinator,
         "coe": coe_coordinator,
         "weather": weather_coordinator,
+        "train": train_coordinator,
         "unsub_coe": unsub_coe,
     }
 
