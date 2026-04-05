@@ -146,17 +146,23 @@ def _extract_detail(text: str, status: str) -> str:
 
 
 def _extract_line_statuses(text: str, network_status: str) -> dict[str, str]:
-    """Extract per-line status from page text."""
-    line_statuses = {
-        line: ("normal" if network_status == "normal" else "unknown")
-        for line in TRAIN_LINES
-    }
+    """Extract per-line status from page text.
+
+    Lines not explicitly mentioned with a disruption/planned keyword are
+    assumed normal — the live page only shows status text for affected lines;
+    unaffected lines show only a green checkmark with no text.
+
+    If no per-line sentences match but the network has a non-normal status,
+    it is treated as a full-network event and all lines are flagged.
+    """
+    line_statuses = {line: "normal" for line in TRAIN_LINES}
     sentences = [
         chunk.strip()
         for chunk in re.split(r"[\n.!?;]+", text)
         if chunk and chunk.strip()
     ]
 
+    found_any = False
     for sentence in sentences:
         lowered = sentence.lower()
         sentence_status = _classify_sentence_status(lowered)
@@ -165,6 +171,12 @@ def _extract_line_statuses(text: str, network_status: str) -> dict[str, str]:
         for line, aliases in _LINE_ALIASES.items():
             if any(alias in lowered for alias in aliases):
                 line_statuses[line] = sentence_status
+                found_any = True
+
+    # No per-line sentences matched → full-network event; flag all lines.
+    if network_status != "normal" and not found_any:
+        for line in TRAIN_LINES:
+            line_statuses[line] = network_status
 
     return line_statuses
 

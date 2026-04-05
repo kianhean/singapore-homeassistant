@@ -16,7 +16,7 @@ custom_components/singapore/
 ├── weather.py            # Weather entities (one per Singapore forecast area)
 ├── config_flow.py        # UI config flow (name input)
 ├── sensor.py             # Sensor entities (tariff + COE + weather readings)
-├── manifest.json         # Integration metadata; declares beautifulsoup4 dep
+├── manifest.json         # Integration metadata; declares beautifulsoup4 + niquests deps
 ├── strings.json          # Config flow UI strings
 └── translations/
     └── en.json           # English translations (mirrors strings.json)
@@ -42,6 +42,8 @@ hass.data[DOMAIN][entry_id] = {
     "coe": CoeCoordinator,
     "weather": SingaporeWeatherCoordinator,
     "holiday": PublicHolidayCoordinator,
+    "train": TrainStatusCoordinator,
+    "unsub_coe": <unsubscribe callable>,
 }
 ```
 
@@ -98,7 +100,7 @@ Unit tests (no network, always fast):
 pytest tests/ -v -m "not e2e"
 ```
 
-Live e2e tests (hit the real SP Group website — run locally when the scraper may have broken):
+Live e2e tests (hit real external APIs — run locally when a scraper may have broken):
 
 ```bash
 pytest tests/test_e2e.py -v -s -m e2e
@@ -156,11 +158,19 @@ Solar export price = total electricity tariff − network costs.
 
 ## How the Weather Coordinator Works
 
-`weather_coordinator.py` fetches:
+`weather_coordinator.py` fetches (every **10 minutes**):
 
 - 2-hour forecast areas from `https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast`
 - realtime readings from collection 1459 endpoints (`air-temperature`, `relative-humidity`,
   `wind-speed`, `wind-direction`, `rainfall`)
+
+HTTP is handled via **`niquests.AsyncSession`** (not HA's `async_get_clientsession`) to get
+HTTP/2 connection reuse and rate-limit protection:
+
+- `_READINGS_CONCURRENCY = 2` — `asyncio.Semaphore` caps the 5 parallel readings requests
+  to 2 in-flight at a time, avoiding 429s from data.gov.sg.
+- `_fetch_with_retry()` — retries up to `_MAX_RETRIES = 3` times on HTTP 429, respecting
+  the `Retry-After` response header (falls back to exponential backoff).
 
 Forecast parsing supports both common payload styles:
 - `items[0].forecasts` (legacy shape)
@@ -207,7 +217,9 @@ Both commands must exit cleanly — CI will fail otherwise.
 ## Key Conventions
 
 - All HA I/O must be `async`; use `async_`-prefixed HA helpers
-- Use `async_get_clientsession(hass)` — never create a bare `aiohttp.ClientSession`
+- Use `async_get_clientsession(hass)` for aiohttp — never create a bare `aiohttp.ClientSession`
+- Exception: `weather_coordinator.py` uses `niquests.AsyncSession` directly for HTTP/2 and
+  built-in rate-limit retry; all other coordinators use `async_get_clientsession`
 - Entity unique IDs must be stable: `{entry_id}_{suffix}`
 - Keep `manifest.json` version in sync with releases
 - Translations live in `translations/en.json` and must mirror `strings.json`

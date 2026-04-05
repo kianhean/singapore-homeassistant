@@ -51,42 +51,29 @@ _WATER_MIN, _WATER_MAX = 1.0, 10.0  # SGD/m³
 _NETWORK_MIN, _NETWORK_MAX = 1.0, 20.0  # ¢/kWh
 
 
-def _fetch_html() -> str:
-    """Fetch a URL synchronously and return text."""
-    return _fetch_url_html(_SP_URL)
-
-
 def _fetch_url_html(url: str) -> str:
-    import gzip
-    import urllib.request
-    from urllib.error import HTTPError, URLError
+    import niquests
 
-    req_headers = dict(_HEADERS)
-    req_headers["Accept-Encoding"] = "identity"
-    req = urllib.request.Request(url, headers=req_headers)
     try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            raw = response.read()
-            encoding = (response.headers.get("Content-Encoding") or "").lower()
-            if "gzip" in encoding or raw.startswith(b"\x1f\x8b"):
-                raw = gzip.decompress(raw)
-            return raw.decode("utf-8", errors="replace")
-    except (HTTPError, URLError) as err:
+        with niquests.Session() as session:
+            response = session.get(url, headers=_HEADERS, timeout=30)
+            response.raise_for_status()
+            return response.text
+    except Exception as err:
         pytest.skip(
             f"Skipping e2e due to external network/proxy error for {url}: {err}"
         )
 
 
 def _fetch_json(url: str) -> dict:
-    import json
-    import urllib.request
-    from urllib.error import HTTPError, URLError
+    import niquests
 
-    req = urllib.request.Request(url)
     try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError) as err:
+        with niquests.Session() as session:
+            response = session.get(url, timeout=30)
+            response.raise_for_status()
+            return response.json()
+    except Exception as err:
         pytest.skip(
             f"Skipping e2e due to external network/proxy error for {url}: {err}"
         )
@@ -101,7 +88,7 @@ def test_e2e_fetch_and_parse():
     """Fetch the live page and assert the parser returns plausible values."""
     from custom_components.singapore.coordinator import _parse_tariff
 
-    html = _fetch_html()
+    html = _fetch_url_html(_SP_URL)
     assert len(html) > 1000, (
         f"Page suspiciously short ({len(html)} bytes) — likely a bot-block page"
     )
@@ -211,7 +198,7 @@ def test_e2e_raw_html_debug(capsys):
 
     from bs4 import BeautifulSoup
 
-    html = _fetch_html()
+    html = _fetch_url_html(_SP_URL)
     soup = BeautifulSoup(html, "html.parser")
 
     with capsys.disabled():

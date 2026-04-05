@@ -4,5 +4,5 @@ pytest-cov>=4.1
 beautifulsoup4==4.12.3
 voluptuous>=0.13
 aiohttp>=3.9
-requests>=2.31
+niquests>=3.0
 ruff==0.14.11
