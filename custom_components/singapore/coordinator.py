@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from bs4 import BeautifulSoup
 from homeassistant.core import HomeAssistant
@@ -60,6 +60,33 @@ _NETWORK_KEYWORDS = ("network", "transmission", "distribution", "grid")
 _GAS_KEYWORDS = ("gas",)
 _WATER_KEYWORDS = ("water",)
 
+# Pre-compiled regex patterns for banner extraction
+_RE_BANNER_ELECTRICITY = re.compile(
+    r"(\d{1,3}\.\d{2})\s+cents/kWh\s+"
+    r"\d{1,3}\.\d{2}\s+cents/kWh\s+\(w/o\s+GST\)"
+    r".{0,40}ELECTRICITY",
+    re.IGNORECASE | re.DOTALL,
+)
+_RE_BANNER_GAS = re.compile(
+    r"(\d{1,3}\.\d{2})\s+cents/kWh\s+"
+    r"\d{1,3}\.\d{2}\s+cents/kWh\s+\(w/o\s+GST\)"
+    r".{0,40}GAS",
+    re.IGNORECASE | re.DOTALL,
+)
+_RE_WATER_TIERED = re.compile(r"\$(\d+\.\d+)\s+or\s+\$\d+\.\d+\s*/\s*m", re.IGNORECASE)
+_RE_YEAR = re.compile(r"\b(20\d{2})\b")
+_RE_ABBR_DATE = re.compile(
+    r"wef\s+\d{1,2}\s+([A-Za-z]{3})"
+    r"(?:\s*[-–]\s*\d{1,2}\s+[A-Za-z]{3})?"
+    r"\s+(\d{2})\b",
+    re.IGNORECASE,
+)
+_RE_GENERIC_MONTH = re.compile(
+    r"\b(\d{1,2})\s+(?:January|February|March|April|May|June|"
+    r"July|August|September|October|November|December)\s+(20\d{2})",
+    re.IGNORECASE,
+)
+
 
 @dataclass
 class TariffData:
@@ -92,6 +119,7 @@ class SPGroupCoordinator(DataUpdateCoordinator[TariffData]):
             name="SP Group Tariffs",
             update_interval=UPDATE_INTERVAL,
         )
+        self.last_updated: datetime | None = None
 
     async def _async_update_data(self) -> TariffData:
         session = async_get_clientsession(self.hass)
@@ -102,7 +130,9 @@ class SPGroupCoordinator(DataUpdateCoordinator[TariffData]):
                 if response.status != 200:
                     raise UpdateFailed(f"SP Group returned HTTP {response.status}")
                 html = await response.text()
-            return _parse_tariff(html)
+            result = _parse_tariff(html)
+            self.last_updated = datetime.now(timezone.utc)
+            return result
         except Exception as err:
             if self.data is not None:
                 _LOGGER.warning(
@@ -172,18 +202,22 @@ def _parse_tariff(html: str) -> TariffData:
     )
 
 
+_BANNER_PATTERNS = {
+    "ELECTRICITY": _RE_BANNER_ELECTRICITY,
+    "GAS": _RE_BANNER_GAS,
+}
+
+
 def _extract_banner_cents_kwh(text: str, label: str) -> float | None:
     """Parse SP Group's hero-banner format.
 
     Matches: ``XX.XX cents/kWh YY.YY cents/kWh (w/o GST) <LABEL> TARIFF``
     Returns the with-GST price (the first number).
     """
-    pattern = (
-        r"(\d{1,3}\.\d{2})\s+cents/kWh\s+"
-        r"\d{1,3}\.\d{2}\s+cents/kWh\s+\(w/o\s+GST\)"
-        r".{0,40}" + re.escape(label)
-    )
-    m = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+    pattern = _BANNER_PATTERNS.get(label.upper())
+    if pattern is None:
+        return None
+    m = pattern.search(text)
     if m:
         val = _to_float(m.group(1))
         if val is not None and 0.1 < val < 200.0:
@@ -197,7 +231,7 @@ def _extract_water_tiered(text: str) -> float | None:
     Matches: ``$X.XX or $Y.YY/m`` (with or without spaces around the slash).
     Returns the lower residential tier (≤40 m³, with GST).
     """
-    m = re.search(r"\$(\d+\.\d+)\s+or\s+\$\d+\.\d+\s*/\s*m", text, re.IGNORECASE)
+    m = _RE_WATER_TIERED.search(text)
     if m:
         val = _to_float(m.group(1))
         if val is not None and 0.1 < val < 20.0:
@@ -208,7 +242,7 @@ def _extract_water_tiered(text: str) -> float | None:
 def _extract_quarter_year(text: str) -> tuple[str, int]:
     """Return (quarter, year) by scanning text for SP Group date ranges."""
     # Full month name + 4-digit year: "1 January 2025 to 31 March 2025"
-    year_match = re.search(r"\b(20\d{2})\b", text)
+    year_match = _RE_YEAR.search(text)
     year = int(year_match.group(1)) if year_match else 0
 
     for quarter, (start, _end) in _QUARTER_RANGES.items():
@@ -217,13 +251,7 @@ def _extract_quarter_year(text: str) -> tuple[str, int]:
 
     # Abbreviated format: "wef 1 Apr - 30 Jun 26"
     # Capture the START month (→ quarter) and the trailing 2-digit year.
-    abbr_match = re.search(
-        r"wef\s+\d{1,2}\s+([A-Za-z]{3})"  # start: day + month abbr
-        r"(?:\s*[-–]\s*\d{1,2}\s+[A-Za-z]{3})?"  # optional: "- 30 Jun"
-        r"\s+(\d{2})\b",  # trailing 2-digit year
-        text,
-        re.IGNORECASE,
-    )
+    abbr_match = _RE_ABBR_DATE.search(text)
     if abbr_match:
         month_abbr = abbr_match.group(1).lower()
         year_2d = int(abbr_match.group(2))
@@ -232,12 +260,7 @@ def _extract_quarter_year(text: str) -> tuple[str, int]:
         return quarter, year
 
     # Generic month match fallback
-    month_match = re.search(
-        r"\b(\d{1,2})\s+(?:January|February|March|April|May|June|"
-        r"July|August|September|October|November|December)\s+(20\d{2})",
-        text,
-        re.IGNORECASE,
-    )
+    month_match = _RE_GENERIC_MONTH.search(text)
     if month_match:
         year = int(month_match.group(2))
 

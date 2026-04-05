@@ -9,6 +9,10 @@
         }
       }
     },
+    "error": {
+      "empty_name": "Name cannot be empty.",
+      "name_too_long": "Name must be 64 characters or fewer."
+    },
     "abort": {
       "already_configured": "This integration is already configured."
     }

@@ -135,9 +135,13 @@ def test_parse_coe_two_bidding_exercises_picks_latest():
 
 
 def test_backoff_delay_seconds_exponential():
-    assert _backoff_delay_seconds(1) == 1
-    assert _backoff_delay_seconds(2) == 2
-    assert _backoff_delay_seconds(3) == 4
+    # With jitter, delay is base + uniform(0, base*0.5), so within [base, base*1.5)
+    d1 = _backoff_delay_seconds(1)
+    assert 1.0 <= d1 < 1.5
+    d2 = _backoff_delay_seconds(2)
+    assert 2.0 <= d2 < 3.0
+    d3 = _backoff_delay_seconds(3)
+    assert 4.0 <= d3 < 6.0
 
 
 # ---------------------------------------------------------------------------

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -90,9 +91,18 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
 
 
 async def _fetch_aggregated_readings(session) -> WeatherReadings:
+    keys = list(_READINGS_ENDPOINTS.keys())
+    results = await asyncio.gather(
+        *(_fetch_reading_average(session, _READINGS_ENDPOINTS[k], k) for k in keys),
+        return_exceptions=True,
+    )
     values: dict[str, float | None] = {}
-    for key, url in _READINGS_ENDPOINTS.items():
-        values[key] = await _fetch_reading_average(session, url, key)
+    for key, result in zip(keys, results):
+        if isinstance(result, BaseException):
+            _LOGGER.debug("Reading %s raised %s; treating as None", key, result)
+            values[key] = None
+        else:
+            values[key] = result
     return WeatherReadings(**values)
 
 

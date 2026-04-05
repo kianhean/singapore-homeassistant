@@ -88,11 +88,14 @@ class _BaseTariffSensor(CoordinatorEntity[SPGroupCoordinator], SensorEntity):
     def _common_attrs(self) -> dict:
         if self.coordinator.data is None:
             return {}
-        return {
+        attrs: dict = {
             "quarter": self.coordinator.data.quarter,
             "year": self.coordinator.data.year,
             "source": "SP Group",
         }
+        if self.coordinator.last_updated is not None:
+            attrs["last_updated"] = self.coordinator.last_updated.isoformat()
+        return attrs
 
     @property
     def device_info(self) -> dict:
@@ -220,13 +223,16 @@ class SingaporeCoeResultSensor(CoordinatorEntity[CoeCoordinator], SensorEntity):
     def extra_state_attributes(self) -> dict:
         if self.coordinator.data is None:
             return {}
-        return {
+        attrs: dict = {
             "category": f"Category {self._category}",
             "description": _CATEGORY_DESCRIPTIONS[self._category],
             "month": self.coordinator.data.month,
             "bidding_no": self.coordinator.data.bidding_no,
             "source": "data.gov.sg / LTA",
         }
+        if self.coordinator.last_updated is not None:
+            attrs["last_updated"] = self.coordinator.last_updated.isoformat()
+        return attrs
 
     @property
     def device_info(self) -> dict:
