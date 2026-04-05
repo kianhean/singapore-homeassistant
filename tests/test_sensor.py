@@ -10,12 +10,23 @@ from custom_components.singapore.coordinator import (
     TariffData,
 )
 from custom_components.singapore.sensor import (
+    UNIT_HUMIDITY,
+    UNIT_RAINFALL,
+    UNIT_TEMP,
+    UNIT_WIND_BEARING,
+    UNIT_WIND_SPEED,
     SingaporeCoeResultSensor,
     SingaporeElectricityTariffSensor,
     SingaporeGasTariffSensor,
+    SingaporeHumiditySensor,
+    SingaporeRainfallSensor,
     SingaporeSolarExportPriceSensor,
+    SingaporeTemperatureSensor,
     SingaporeWaterTariffSensor,
+    SingaporeWindBearingSensor,
+    SingaporeWindSpeedSensor,
 )
+from custom_components.singapore.weather_coordinator import WeatherData, WeatherReadings
 
 _DATA = TariffData(
     electricity_price=29.29,
@@ -242,3 +253,65 @@ def test_coe_none_when_no_data():
 def test_coe_no_device_class():
     sensor = SingaporeCoeResultSensor(_coe_coordinator(), "entry1", "A")
     assert sensor.device_class is None
+
+
+def _weather_coordinator(
+    data=WeatherData(
+        areas={},
+        updated_at=None,
+        readings=WeatherReadings(
+            temperature=31.2,
+            humidity=74.0,
+            wind_speed=12.5,
+            wind_bearing=180.0,
+            precipitation=0.4,
+        ),
+    ),
+):
+    coordinator = MagicMock()
+    coordinator.data = data
+    return coordinator
+
+
+def test_temperature_sensor_value_unit_and_id():
+    sensor = SingaporeTemperatureSensor(_weather_coordinator(), "entry1")
+    assert sensor.native_value == 31.2
+    assert sensor.native_unit_of_measurement == UNIT_TEMP
+    assert sensor.unique_id == "entry1_temperature"
+
+
+def test_humidity_sensor_value_unit_and_id():
+    sensor = SingaporeHumiditySensor(_weather_coordinator(), "entry1")
+    assert sensor.native_value == 74.0
+    assert sensor.native_unit_of_measurement == UNIT_HUMIDITY
+    assert sensor.unique_id == "entry1_humidity"
+
+
+def test_wind_speed_sensor_value_unit_and_id():
+    sensor = SingaporeWindSpeedSensor(_weather_coordinator(), "entry1")
+    assert sensor.native_value == 12.5
+    assert sensor.native_unit_of_measurement == UNIT_WIND_SPEED
+    assert sensor.unique_id == "entry1_wind_speed"
+
+
+def test_wind_bearing_sensor_value_unit_and_id():
+    sensor = SingaporeWindBearingSensor(_weather_coordinator(), "entry1")
+    assert sensor.native_value == 180.0
+    assert sensor.native_unit_of_measurement == UNIT_WIND_BEARING
+    assert sensor.unique_id == "entry1_wind_bearing"
+
+
+def test_rainfall_sensor_value_unit_and_id():
+    sensor = SingaporeRainfallSensor(_weather_coordinator(), "entry1")
+    assert sensor.native_value == 0.4
+    assert sensor.native_unit_of_measurement == UNIT_RAINFALL
+    assert sensor.unique_id == "entry1_rainfall"
+
+
+def test_weather_sensors_none_when_no_data():
+    weather_none = _weather_coordinator(data=None)
+    assert SingaporeTemperatureSensor(weather_none, "entry1").native_value is None
+    assert SingaporeHumiditySensor(weather_none, "entry1").native_value is None
+    assert SingaporeWindSpeedSensor(weather_none, "entry1").native_value is None
+    assert SingaporeWindBearingSensor(weather_none, "entry1").native_value is None
+    assert SingaporeRainfallSensor(weather_none, "entry1").native_value is None

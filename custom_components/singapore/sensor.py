@@ -17,6 +17,13 @@ from .coe_coordinator import (
     CoeCoordinator,
 )
 from .coordinator import UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER, SPGroupCoordinator
+from .weather_coordinator import SingaporeWeatherCoordinator
+
+UNIT_TEMP = "°C"
+UNIT_HUMIDITY = "%"
+UNIT_WIND_SPEED = "km/h"
+UNIT_WIND_BEARING = "°"
+UNIT_RAINFALL = "mm"
 
 
 async def async_setup_entry(
@@ -28,6 +35,7 @@ async def async_setup_entry(
     entry_data = hass.data[DOMAIN][entry.entry_id]
     tariff_coordinator: SPGroupCoordinator = entry_data["tariff"]
     coe_coordinator: CoeCoordinator = entry_data["coe"]
+    weather_coordinator: SingaporeWeatherCoordinator = entry_data["weather"]
 
     entities: list[SensorEntity] = [
         SingaporeElectricityTariffSensor(tariff_coordinator, entry.entry_id),
@@ -37,6 +45,16 @@ async def async_setup_entry(
     ]
     for cat in COE_CATEGORIES:
         entities.append(SingaporeCoeResultSensor(coe_coordinator, entry.entry_id, cat))
+
+    entities.extend(
+        [
+            SingaporeTemperatureSensor(weather_coordinator, entry.entry_id),
+            SingaporeHumiditySensor(weather_coordinator, entry.entry_id),
+            SingaporeWindSpeedSensor(weather_coordinator, entry.entry_id),
+            SingaporeWindBearingSensor(weather_coordinator, entry.entry_id),
+            SingaporeRainfallSensor(weather_coordinator, entry.entry_id),
+        ]
+    )
 
     async_add_entities(entities)
 
@@ -190,3 +208,98 @@ class SingaporeCoeResultSensor(CoordinatorEntity[CoeCoordinator], SensorEntity):
             "bidding_no": self.coordinator.data.bidding_no,
             "source": "data.gov.sg / LTA",
         }
+
+
+class _BaseWeatherReadingSensor(
+    CoordinatorEntity[SingaporeWeatherCoordinator], SensorEntity
+):
+    """Base class for realtime weather reading sensors from data.gov.sg collection 1459."""
+
+    _attr_has_entity_name = False
+    _attr_device_class = None
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self, coordinator: SingaporeWeatherCoordinator, entry_id: str, suffix: str
+    ) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry_id}_{suffix}"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {"source": "data.gov.sg / NEA (collection 1459)"}
+
+
+class SingaporeTemperatureSensor(_BaseWeatherReadingSensor):
+    _attr_name = "Singapore Temperature"
+    _attr_icon = "mdi:thermometer"
+    _attr_native_unit_of_measurement = UNIT_TEMP
+
+    def __init__(self, coordinator: SingaporeWeatherCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "temperature")
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.readings.temperature
+
+
+class SingaporeHumiditySensor(_BaseWeatherReadingSensor):
+    _attr_name = "Singapore Humidity"
+    _attr_icon = "mdi:water-percent"
+    _attr_native_unit_of_measurement = UNIT_HUMIDITY
+
+    def __init__(self, coordinator: SingaporeWeatherCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "humidity")
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.readings.humidity
+
+
+class SingaporeWindSpeedSensor(_BaseWeatherReadingSensor):
+    _attr_name = "Singapore Wind Speed"
+    _attr_icon = "mdi:weather-windy"
+    _attr_native_unit_of_measurement = UNIT_WIND_SPEED
+
+    def __init__(self, coordinator: SingaporeWeatherCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "wind_speed")
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.readings.wind_speed
+
+
+class SingaporeWindBearingSensor(_BaseWeatherReadingSensor):
+    _attr_name = "Singapore Wind Bearing"
+    _attr_icon = "mdi:compass-outline"
+    _attr_native_unit_of_measurement = UNIT_WIND_BEARING
+
+    def __init__(self, coordinator: SingaporeWeatherCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "wind_bearing")
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.readings.wind_bearing
+
+
+class SingaporeRainfallSensor(_BaseWeatherReadingSensor):
+    _attr_name = "Singapore Rainfall"
+    _attr_icon = "mdi:weather-rainy"
+    _attr_native_unit_of_measurement = UNIT_RAINFALL
+
+    def __init__(self, coordinator: SingaporeWeatherCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "rainfall")
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.readings.precipitation
