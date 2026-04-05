@@ -88,14 +88,14 @@ def _parse_train_status(html: str) -> TrainStatusData:
     text = soup.get_text(" ", strip=True)
     lowered = text.lower()
 
-    if "planned disruption" in lowered or "planned maintenance" in lowered:
+    if _looks_planned(lowered):
         status = "planned"
     elif _looks_disrupted(lowered):
         status = "disruption"
     else:
         status = "normal"
 
-    details = _extract_detail(text)
+    details = _extract_detail(text, status)
     line_statuses = _extract_line_statuses(raw_text, status)
     return TrainStatusData(status=status, details=details, line_statuses=line_statuses)
 
@@ -116,11 +116,25 @@ def _looks_disrupted(text: str) -> bool:
     )
 
 
-def _extract_detail(text: str) -> str:
+def _looks_planned(text: str) -> bool:
+    planned_patterns = (
+        r"\b[a-z]{2,5}-planned\b",
+        r"\bplanned disruption(?:s)?\b",
+        r"\bplanned maintenance\b",
+        r"\bplanned train service adjustment(?:s)?\b",
+        r"\bplanned train service\b",
+        r"\bplanned(?:\s+\w+){0,3}\s+works?\b",
+    )
+    return any(re.search(pattern, text, re.IGNORECASE) for pattern in planned_patterns)
+
+
+def _extract_detail(text: str, status: str) -> str:
     """Extract a compact detail snippet for attributes/debugging."""
     clean = re.sub(r"\s+", " ", text).strip()
     if not clean:
         return "No detail available from source page"
+    if status in {"planned", "disruption"}:
+        return clean
     return clean[:240]
 
 
@@ -150,7 +164,7 @@ def _extract_line_statuses(text: str, network_status: str) -> dict[str, str]:
 
 def _classify_sentence_status(text: str) -> str | None:
     """Map a sentence to a canonical status."""
-    if "planned disruption" in text or "planned maintenance" in text:
+    if _looks_planned(text):
         return "planned"
     if (
         "normal" in text

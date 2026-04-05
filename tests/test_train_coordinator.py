@@ -55,6 +55,44 @@ def test_parse_train_status_mixed_per_line():
     assert data.line_statuses["Circle Line"] == "planned"
 
 
+def test_parse_train_status_planned_disruptions_plural():
+    html = """
+    <html><body>
+      <div>Circle Line planned disruptions due to engineering works.</div>
+    </body></html>
+    """
+    data = _parse_train_status(html)
+    assert data.status == "planned"
+    assert data.line_statuses["Circle Line"] == "planned"
+
+
+def test_parse_train_status_ccl_planned_service_adjustments():
+    html = """
+    <html><body>
+      <div>Circle Line</div>
+      <div>21:00-CCL-Planned train service adjustments from 17 January to 9 April 2026.</div>
+    </body></html>
+    """
+    data = _parse_train_status(html)
+    assert data.status == "planned"
+    assert data.line_statuses["Circle Line"] == "planned"
+
+
+def test_parse_train_status_keeps_full_details_for_planned_or_disruption():
+    long_notice = "Circle Line planned disruption due to engineering works. " + (
+        "A" * 400
+    )
+    html = f"""
+    <html><body>
+      <div>{long_notice}</div>
+    </body></html>
+    """
+    data = _parse_train_status(html)
+    assert data.status == "planned"
+    assert data.details.endswith("A" * 400)
+    assert len(data.details) > 240
+
+
 @pytest.mark.asyncio
 async def test_train_coordinator_http_error_without_cache_fails():
     from custom_components.singapore.train_coordinator import TrainStatusCoordinator
