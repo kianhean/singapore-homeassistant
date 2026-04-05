@@ -5,7 +5,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
-from custom_components.singapore.coe_coordinator import CoeData, _parse_coe
+from custom_components.singapore.coe_coordinator import (
+    CoeData,
+    _backoff_delay_seconds,
+    _parse_coe,
+)
 
 # ---------------------------------------------------------------------------
 # API response fixtures
@@ -128,6 +132,12 @@ def test_parse_coe_two_bidding_exercises_picks_latest():
     data = _parse_coe(payload)
     assert data.bidding_no == 2
     assert data.premiums["A"] == 99001
+
+
+def test_backoff_delay_seconds_exponential():
+    assert _backoff_delay_seconds(1) == 1
+    assert _backoff_delay_seconds(2) == 2
+    assert _backoff_delay_seconds(3) == 4
 
 
 # ---------------------------------------------------------------------------
