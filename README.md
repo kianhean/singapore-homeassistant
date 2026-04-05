@@ -1,15 +1,15 @@
 # Singapore Home Assistant Integration
 
-A [HACS](https://hacs.xyz) custom integration for Home Assistant that provides relevant
-Singapore information for Home Assistant users in Singapore, including utility tariffs,
-COE (Certificate of Entitlement) bidding results, NEA weather data, train status,
-and MOM public holidays.
+A [HACS](https://hacs.xyz) custom integration that brings Singapore-specific data into
+Home Assistant — utility tariffs, COE bidding results, live weather, train service status,
+and public holidays.
 
-## Sensors
+## What you get
 
 ### SP Group Utility Tariffs
 
-Updated every 24 hours from the [SP Group tariff page](https://www.spgroup.com.sg/our-services/utilities/tariff-information).
+Scraped from the [SP Group tariff page](https://www.spgroup.com.sg/our-services/utilities/tariff-information)
+and refreshed every 24 hours.
 
 | Entity ID | Name | Unit | Description |
 |-----------|------|------|-------------|
@@ -23,8 +23,8 @@ The solar export price sensor additionally exposes `network_cost` and `total_tar
 
 ### COE Bidding Results
 
-Updated daily at **19:30** from the [LTA dataset on data.gov.sg](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view).
-Sensor value is the COE premium in SGD from the latest completed bidding exercise.
+Fetched from the [LTA dataset on data.gov.sg](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view)
+and refreshed daily at **19:30** to pick up results after each bidding exercise.
 
 | Entity ID | Name | Unit | Category |
 |-----------|------|------|----------|
@@ -36,10 +36,10 @@ Sensor value is the COE premium in SGD from the latest completed bidding exercis
 
 COE sensors expose `category`, `description`, `month`, `bidding_no`, and `source` as state attributes.
 
-### NEA Realtime Weather Readings (Collection 1459)
+### NEA Realtime Weather Readings
 
-Updated every 30 minutes from [data.gov.sg weather datasets](https://data.gov.sg/collections/1459/view).
-Values are station-aggregated (mean across available stations at fetch time).
+Refreshed every **10 minutes** from [data.gov.sg collection 1459](https://data.gov.sg/collections/1459/view).
+Values are averaged across all available stations at fetch time.
 
 | Entity ID | Name | Unit | Description |
 |-----------|------|------|-------------|
@@ -51,31 +51,37 @@ Values are station-aggregated (mean across available stations at fetch time).
 
 ### Weather Entities (2-hour Forecast, by Area)
 
-One weather entity is created per forecast area from [data.gov.sg collection 1456](https://data.gov.sg/collections/1456/view).
-The integration approximates each 2-hour forecast block into two hourly forecast points for Home Assistant.
+One weather entity per forecast area from [data.gov.sg collection 1456](https://data.gov.sg/collections/1456/view),
+refreshed every **10 minutes**. Each 2-hour NEA forecast block is split into two hourly
+forecast points for Home Assistant.
 
-Example entities:
-- `weather.singapore_weather_bedok`
-- `weather.singapore_weather_ang_mo_kio`
-- `weather.singapore_weather_woodlands`
+Example entities: `weather.singapore_weather_bedok`, `weather.singapore_weather_ang_mo_kio`,
+`weather.singapore_weather_woodlands`.
 
-Each weather entity exposes:
-- mapped HA condition (`sunny`, `partlycloudy`, `rainy`, etc.)
-- hourly forecast list (2 points from each 2-hour period)
-- extra attributes such as `raw_condition`, `valid_start`, `valid_end`, and realtime reading context
+Each entity exposes a mapped HA condition (`sunny`, `partlycloudy`, `rainy`, etc.), an hourly
+forecast list, and extra attributes such as `raw_condition`, `valid_start`, and `valid_end`.
 
-### Calendar
+### MRT/LRT Train Status
 
-#### Singapore Public Holidays
-
-Updated every 24 hours from MOM:
-<https://www.mom.gov.sg/employment-practices/public-holidays>
+Refreshed every **5 minutes** from [mytransport.sg](https://www.mytransport.sg/trainstatus).
+Reports both an overall network status and a per-line status for every MRT/LRT line.
 
 | Entity ID | Name | Description |
 |-----------|------|-------------|
-| `calendar.singapore_public_holidays` | Singapore Public Holidays | All-day events for Singapore public holidays where year is >= current year |
+| `sensor.singapore_train_status` | Singapore Train Status | Overall network status: `normal`, `planned`, or `disruption` |
+| `sensor.singapore_<line>_status` | e.g. Singapore Circle Line Status | Per-line status |
 
-Calendar attributes include `source`, `events`, and `url`.
+Lines covered: North-South, East-West, North East, Circle, Downtown, Thomson-East Coast,
+Bukit Panjang LRT, Sengkang LRT, Punggol LRT.
+
+### Singapore Public Holidays
+
+Refreshed every 24 hours from [MOM](https://www.mom.gov.sg/employment-practices/public-holidays)
+and exposed as a Home Assistant calendar with all-day events for the current year and beyond.
+
+| Entity ID | Name |
+|-----------|------|
+| `calendar.singapore_public_holidays` | Singapore Public Holidays |
 
 ## Example sensor states
 
@@ -98,38 +104,12 @@ sensor.singapore_solar_export_price:
     network_cost: 6.25
     total_tariff: 29.72
 
-sensor.singapore_gas_tariff:
-  state: 23.89
-  unit_of_measurement: ¢/kWh
-  attributes:
-    quarter: Q2
-    year: 2026
-    source: SP Group
-
-sensor.singapore_water_tariff:
-  state: 1.56
-  unit_of_measurement: SGD/m³
-  attributes:
-    quarter: Q2
-    year: 2026
-    source: SP Group
-
 sensor.singapore_coe_category_a:
   state: 95501
   unit_of_measurement: SGD
   attributes:
     category: Category A
     description: Cars up to 1600cc / 97kW (electric)
-    month: "2026-03"
-    bidding_no: 1
-    source: data.gov.sg / LTA
-
-sensor.singapore_coe_category_e:
-  state: 118001
-  unit_of_measurement: SGD
-  attributes:
-    category: Category E
-    description: Open (all except motorcycles)
     month: "2026-03"
     bidding_no: 1
     source: data.gov.sg / LTA
@@ -157,14 +137,14 @@ sensor.singapore_temperature:
 
 ## Data sources
 
-- **Utility tariffs** — scraped from the SP Group tariff information page; published quarterly.
-  - Electricity and gas: Singapore cents per kilowatt-hour (¢/kWh)
-  - Water: SGD per cubic metre (SGD/m³); lower residential tier (≤40 m³)
-  - Solar export price = electricity tariff − network costs
-- **COE results** — fetched from the LTA dataset on [data.gov.sg](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view); refreshed daily at 19:30 to pick up results after each bidding exercise.
-- **Weather forecast** — fetched from [data.gov.sg collection 1456](https://data.gov.sg/collections/1456/view); refreshed every 30 minutes.
-- **Weather readings** — fetched from [data.gov.sg collection 1459](https://data.gov.sg/collections/1459/view); refreshed every 30 minutes and exposed as weather sensor entities.
-- **Public holidays** — fetched from [MOM public holidays](https://www.mom.gov.sg/employment-practices/public-holidays); refreshed every 24 hours and filtered to years >= current year.
+| Source | Data | Refresh |
+|--------|------|---------|
+| [SP Group](https://www.spgroup.com.sg/our-services/utilities/tariff-information) | Electricity, gas, water tariffs | Every 24 h |
+| [data.gov.sg / LTA](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view) | COE bidding results | Daily at 19:30 |
+| [data.gov.sg / NEA (collection 1456)](https://data.gov.sg/collections/1456/view) | 2-hour area weather forecasts | Every 10 min |
+| [data.gov.sg / NEA (collection 1459)](https://data.gov.sg/collections/1459/view) | Realtime weather readings | Every 10 min |
+| [MOM](https://www.mom.gov.sg/employment-practices/public-holidays) | Public holidays | Every 24 h |
+| [mytransport.sg](https://www.mytransport.sg/trainstatus) | MRT/LRT train status | Every 5 min |
 
 ## Development
 
