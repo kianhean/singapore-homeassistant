@@ -1,16 +1,18 @@
 # Singapore Home Assistant Integration
 
-A general-purpose HACS integration for Singapore-specific Home Assistant sensors.
+A general-purpose HACS integration for Singapore-specific Home Assistant entities.
 The integration domain is `singapore`.
 
 ## Structure
 
 ```
 custom_components/singapore/
-├── __init__.py           # Entry setup/teardown; creates and stores both coordinators
+├── __init__.py           # Entry setup/teardown; creates and stores coordinators
 ├── coordinator.py        # SPGroupCoordinator: fetches + parses SP Group tariff page
 ├── coe_coordinator.py    # CoeCoordinator: fetches COE results from data.gov.sg API
+├── holiday_coordinator.py # PublicHolidayCoordinator: fetches + parses MOM holidays
 ├── weather_coordinator.py # SingaporeWeatherCoordinator: 2-hour forecasts + collection 1459 readings
+├── calendar.py           # Calendar entity (Singapore public holidays)
 ├── weather.py            # Weather entities (one per Singapore forecast area)
 ├── config_flow.py        # UI config flow (name input)
 ├── sensor.py             # Sensor entities (tariff + COE + weather readings)
@@ -25,6 +27,8 @@ tests/
 ├── test_config_flow.py      # Config flow schema check
 ├── test_coordinator.py      # SP Group parser unit tests + coordinator HTTP mock tests
 ├── test_coe_coordinator.py  # COE parser unit tests + coordinator HTTP mock tests
+├── test_holiday_coordinator.py # MOM parser unit tests + coordinator HTTP mock tests
+├── test_calendar.py         # Calendar event and range query tests
 ├── test_sensor.py           # Sensor value, unit, attributes, unique_id, None-safety
 └── test_e2e.py              # Live scrape tests (run with -m e2e, skipped in CI by default)
 
@@ -37,6 +41,7 @@ hass.data[DOMAIN][entry_id] = {
     "tariff": SPGroupCoordinator,
     "coe": CoeCoordinator,
     "weather": SingaporeWeatherCoordinator,
+    "holiday": PublicHolidayCoordinator,
 }
 ```
 
@@ -163,6 +168,16 @@ Forecast parsing supports both common payload styles:
 
 Each weather entity converts a single 2-hour interval into two hourly forecast points
 for Home Assistant (`t` and `t+1h`) with mapped HA conditions.
+
+### Calendar Entity
+
+| Entity ID | Name | Description |
+|-----------|------|-------------|
+| `calendar.singapore_public_holidays` | Singapore Public Holidays | Singapore public holiday all-day events (year >= current year) |
+
+Holiday data source: `https://www.mom.gov.sg/employment-practices/public-holidays`
+
+`holiday_coordinator.py` refreshes every 24 hours and parses holiday rows from MOM.
 
 ## Adding a New Sensor
 

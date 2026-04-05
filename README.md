@@ -2,7 +2,8 @@
 
 A [HACS](https://hacs.xyz) custom integration for Home Assistant that provides relevant
 Singapore information for Home Assistant users in Singapore, including utility tariffs,
-COE (Certificate of Entitlement) bidding results, and NEA weather data.
+COE (Certificate of Entitlement) bidding results, NEA weather data, train status,
+and MOM public holidays.
 
 ## Sensors
 
@@ -62,6 +63,19 @@ Each weather entity exposes:
 - mapped HA condition (`sunny`, `partlycloudy`, `rainy`, etc.)
 - hourly forecast list (2 points from each 2-hour period)
 - extra attributes such as `raw_condition`, `valid_start`, `valid_end`, and realtime reading context
+
+### Calendar
+
+#### Singapore Public Holidays
+
+Updated every 24 hours from MOM:
+<https://www.mom.gov.sg/employment-practices/public-holidays>
+
+| Entity ID | Name | Description |
+|-----------|------|-------------|
+| `calendar.singapore_public_holidays` | Singapore Public Holidays | All-day events for Singapore public holidays where year is >= current year |
+
+Calendar attributes include `source`, `events`, and `url`.
 
 ## Example sensor states
 
@@ -150,6 +164,7 @@ sensor.singapore_temperature:
 - **COE results** — fetched from the LTA dataset on [data.gov.sg](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view); refreshed daily at 19:30 to pick up results after each bidding exercise.
 - **Weather forecast** — fetched from [data.gov.sg collection 1456](https://data.gov.sg/collections/1456/view); refreshed every 30 minutes.
 - **Weather readings** — fetched from [data.gov.sg collection 1459](https://data.gov.sg/collections/1459/view); refreshed every 30 minutes and exposed as weather sensor entities.
+- **Public holidays** — fetched from [MOM public holidays](https://www.mom.gov.sg/employment-practices/public-holidays); refreshed every 24 hours and filtered to years >= current year.
 
 ## Development
 
