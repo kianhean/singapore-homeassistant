@@ -11,7 +11,7 @@ from homeassistant.components.weather import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfTemperature
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -77,6 +77,12 @@ class SingaporeAreaWeatherEntity(
         slug = area.lower().replace(" ", "_")
         self._attr_unique_id = f"{entry_id}_weather_{slug}"
         self._attr_name = f"Singapore Weather {area}"
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        super()._handle_coordinator_update()
+        self.hass.async_create_task(self.async_update_listeners())
 
     @property
     def condition(self) -> str | None:
