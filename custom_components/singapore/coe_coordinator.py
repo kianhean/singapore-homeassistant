@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -62,6 +64,7 @@ class CoeCoordinator(DataUpdateCoordinator[CoeData]):
             name="COE Bidding Results",
             update_interval=None,  # Refreshed daily at 19:30 via async_track_time_change
         )
+        self.last_updated: datetime | None = None
 
     async def _async_update_data(self) -> CoeData:
         session = async_get_clientsession(self.hass)
@@ -75,7 +78,9 @@ class CoeCoordinator(DataUpdateCoordinator[CoeData]):
                             f"data.gov.sg returned HTTP {response.status}"
                         )
                     payload = await response.json()
-                return _parse_coe(payload)
+                result = _parse_coe(payload)
+                self.last_updated = datetime.now(timezone.utc)
+                return result
             except asyncio.CancelledError:
                 raise
             except UpdateFailed as err:
@@ -109,9 +114,10 @@ class CoeCoordinator(DataUpdateCoordinator[CoeData]):
         )
 
 
-def _backoff_delay_seconds(attempt: int) -> int:
-    """Return exponential backoff delay (seconds) for a 1-indexed attempt."""
-    return _INITIAL_BACKOFF_SECONDS * (2 ** (attempt - 1))
+def _backoff_delay_seconds(attempt: int) -> float:
+    """Return exponential backoff delay with jitter (seconds) for a 1-indexed attempt."""
+    base = _INITIAL_BACKOFF_SECONDS * (2 ** (attempt - 1))
+    return base + random.uniform(0, base * 0.5)  # noqa: S311
 
 
 def _parse_coe(payload: dict) -> CoeData:

@@ -100,8 +100,9 @@ def _parse_train_status(html: str) -> TrainStatusData:
     return TrainStatusData(status=status, details=details, line_statuses=line_statuses)
 
 
-def _looks_disrupted(text: str) -> bool:
-    disruption_patterns = (
+_DISRUPTION_PATTERNS = tuple(
+    re.compile(p, re.IGNORECASE)
+    for p in (
         r"\bdisruption\b",
         r"\bservice alert\b",
         r"\bservice (?:delay|delays)\b",
@@ -111,13 +112,11 @@ def _looks_disrupted(text: str) -> bool:
         r"\byellow\b",
         r"\borange\b",
     )
-    return any(
-        re.search(pattern, text, re.IGNORECASE) for pattern in disruption_patterns
-    )
+)
 
-
-def _looks_planned(text: str) -> bool:
-    planned_patterns = (
+_PLANNED_PATTERNS = tuple(
+    re.compile(p, re.IGNORECASE)
+    for p in (
         r"\b[a-z]{2,5}-planned\b",
         r"\bplanned disruption(?:s)?\b",
         r"\bplanned maintenance\b",
@@ -125,7 +124,15 @@ def _looks_planned(text: str) -> bool:
         r"\bplanned train service\b",
         r"\bplanned(?:\s+\w+){0,3}\s+works?\b",
     )
-    return any(re.search(pattern, text, re.IGNORECASE) for pattern in planned_patterns)
+)
+
+
+def _looks_disrupted(text: str) -> bool:
+    return any(pattern.search(text) for pattern in _DISRUPTION_PATTERNS)
+
+
+def _looks_planned(text: str) -> bool:
+    return any(pattern.search(text) for pattern in _PLANNED_PATTERNS)
 
 
 def _extract_detail(text: str, status: str) -> str:

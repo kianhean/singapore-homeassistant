@@ -46,6 +46,7 @@ _COMMON_ATTRS = {"quarter": "Q1", "year": 2025, "source": "SP Group"}
 def _coordinator(data=_DATA):
     coordinator = MagicMock()
     coordinator.data = data
+    coordinator.last_updated = None
     return coordinator
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from homeassistant.config_entries import ConfigEntry
@@ -28,17 +29,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .weather_coordinator import SingaporeWeatherCoordinator
 
     tariff_coordinator = SPGroupCoordinator(hass)
-    await tariff_coordinator.async_config_entry_first_refresh()
-
     weather_coordinator = SingaporeWeatherCoordinator(hass)
-    await weather_coordinator.async_config_entry_first_refresh()
-
     holiday_coordinator = PublicHolidayCoordinator(hass)
-    await holiday_coordinator.async_config_entry_first_refresh()
-
-    coe_coordinator = CoeCoordinator(hass)
     train_coordinator = TrainStatusCoordinator(hass)
-    await train_coordinator.async_config_entry_first_refresh()
+    coe_coordinator = CoeCoordinator(hass)
+
+    # Fetch independent data sources concurrently to speed up setup.
+    await asyncio.gather(
+        tariff_coordinator.async_config_entry_first_refresh(),
+        weather_coordinator.async_config_entry_first_refresh(),
+        holiday_coordinator.async_config_entry_first_refresh(),
+        train_coordinator.async_config_entry_first_refresh(),
+    )
 
     async def _initial_refresh_coe() -> None:
         await coe_coordinator.async_refresh()
