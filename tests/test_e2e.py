@@ -57,13 +57,20 @@ def _fetch_html() -> str:
 
 
 def _fetch_url_html(url: str) -> str:
+    import gzip
     import urllib.request
     from urllib.error import HTTPError, URLError
 
-    req = urllib.request.Request(url, headers=_HEADERS)
+    req_headers = dict(_HEADERS)
+    req_headers["Accept-Encoding"] = "identity"
+    req = urllib.request.Request(url, headers=req_headers)
     try:
         with urllib.request.urlopen(req, timeout=30) as response:
-            return response.read().decode("utf-8", errors="replace")
+            raw = response.read()
+            encoding = (response.headers.get("Content-Encoding") or "").lower()
+            if "gzip" in encoding or raw.startswith(b"\x1f\x8b"):
+                raw = gzip.decompress(raw)
+            return raw.decode("utf-8", errors="replace")
     except (HTTPError, URLError) as err:
         pytest.skip(
             f"Skipping e2e due to external network/proxy error for {url}: {err}"
