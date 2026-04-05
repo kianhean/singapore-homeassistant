@@ -1,15 +1,14 @@
-# Singapore Home Assistant Integration
+# Singapore Home Assistant integration
 
-A [HACS](https://hacs.xyz) custom integration that brings Singapore-specific data into
-Home Assistant — utility tariffs, COE bidding results, live weather, train service status,
-and public holidays.
+A [HACS](https://hacs.xyz) custom integration for Singapore-specific data: utility
+tariffs, COE bidding results, live weather, train status, and public holidays.
 
 ## What you get
 
-### SP Group Utility Tariffs
+### SP Group utility tariffs
 
 Scraped from the [SP Group tariff page](https://www.spgroup.com.sg/our-services/utilities/tariff-information)
-and refreshed every 24 hours.
+every 24 hours.
 
 | Entity ID | Name | Unit | Description |
 |-----------|------|------|-------------|
@@ -18,13 +17,13 @@ and refreshed every 24 hours.
 | `sensor.singapore_gas_tariff` | Singapore Gas Tariff | ¢/kWh | Piped natural gas tariff |
 | `sensor.singapore_water_tariff` | Singapore Water Tariff | SGD/m³ | Water tariff, lower residential tier (≤40 m³, with GST) |
 
-Tariff sensors expose `quarter` (e.g. `Q1`), `year`, and `source` as state attributes.
-The solar export price sensor additionally exposes `network_cost` and `total_tariff`.
+Tariff sensors include `quarter` (e.g. `Q1`), `year`, and `source` as state attributes.
+The solar export price sensor also includes `network_cost` and `total_tariff`.
 
-### COE Bidding Results
+### COE bidding results
 
-Fetched from the [LTA dataset on data.gov.sg](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view)
-and refreshed daily at **19:30** to pick up results after each bidding exercise.
+Pulled from the [LTA dataset on data.gov.sg](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view)
+daily at **19:30**, after each bidding exercise.
 
 | Entity ID | Name | Unit | Category |
 |-----------|------|------|----------|
@@ -34,12 +33,13 @@ and refreshed daily at **19:30** to pick up results after each bidding exercise.
 | `sensor.singapore_coe_category_d` | Singapore COE Category D | SGD | Motorcycles |
 | `sensor.singapore_coe_category_e` | Singapore COE Category E (Open) | SGD | Open — all except motorcycles |
 
-COE sensors expose `category`, `description`, `month`, `bidding_no`, and `source` as state attributes.
+Each sensor includes `category`, `description`, `month`, `bidding_no`, and `source` as
+state attributes.
 
-### NEA Realtime Weather Readings
+### NEA realtime weather readings
 
-Refreshed every **10 minutes** from [data.gov.sg collection 1459](https://data.gov.sg/collections/1459/view).
-Values are averaged across all available stations at fetch time.
+Updated every **10 minutes** from [data.gov.sg collection 1459](https://data.gov.sg/collections/1459/view).
+Station readings are averaged across all available stations at fetch time.
 
 | Entity ID | Name | Unit | Description |
 |-----------|------|------|-------------|
@@ -49,35 +49,35 @@ Values are averaged across all available stations at fetch time.
 | `sensor.singapore_wind_bearing` | Singapore Wind Bearing | ° | Aggregated wind direction |
 | `sensor.singapore_rainfall` | Singapore Rainfall | mm | Aggregated rainfall |
 
-### Weather Entities (2-hour Forecast, by Area)
+### Weather entities (2-hour forecast, by area)
 
 One weather entity per forecast area from [data.gov.sg collection 1456](https://data.gov.sg/collections/1456/view),
-refreshed every **10 minutes**. Each 2-hour NEA forecast block is split into two hourly
-forecast points for Home Assistant.
+updated every **10 minutes**. Each 2-hour NEA forecast block becomes two hourly forecast
+points in Home Assistant.
 
 Example entities: `weather.singapore_weather_bedok`, `weather.singapore_weather_ang_mo_kio`,
 `weather.singapore_weather_woodlands`.
 
-Each entity exposes a mapped HA condition (`sunny`, `partlycloudy`, `rainy`, etc.), an hourly
-forecast list, and extra attributes such as `raw_condition`, `valid_start`, and `valid_end`.
+Each entity has a mapped HA condition (`sunny`, `partlycloudy`, `rainy`, etc.), an hourly
+forecast list, and attributes like `raw_condition`, `valid_start`, and `valid_end`.
 
-### MRT/LRT Train Status
+### MRT/LRT train status
 
-Refreshed every **5 minutes** from [mytransport.sg](https://www.mytransport.sg/trainstatus).
-Reports both an overall network status and a per-line status for every MRT/LRT line.
+Updated every **5 minutes** from [mytransport.sg](https://www.mytransport.sg/trainstatus).
+Tracks both an overall network status and a per-line status for each MRT/LRT line.
 
 | Entity ID | Name | Description |
 |-----------|------|-------------|
 | `sensor.singapore_train_status` | Singapore Train Status | Overall network status: `normal`, `planned`, or `disruption` |
 | `sensor.singapore_<line>_status` | e.g. Singapore Circle Line Status | Per-line status |
 
-Lines covered: North-South, East-West, North East, Circle, Downtown, Thomson-East Coast,
+Lines: North-South, East-West, North East, Circle, Downtown, Thomson-East Coast,
 Bukit Panjang LRT, Sengkang LRT, Punggol LRT.
 
-### Singapore Public Holidays
+### Public holidays
 
-Refreshed every 24 hours from [MOM](https://www.mom.gov.sg/employment-practices/public-holidays)
-and exposed as a Home Assistant calendar with all-day events for the current year and beyond.
+Updated every 24 hours from [MOM](https://www.mom.gov.sg/employment-practices/public-holidays).
+Shows up as a Home Assistant calendar with all-day events from the current year onward.
 
 | Entity ID | Name |
 |-----------|------|
