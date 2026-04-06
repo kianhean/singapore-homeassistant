@@ -208,6 +208,47 @@ _HA_MODULES: dict[str, ModuleType] = {
 for _name, _mod_obj in _HA_MODULES.items():
     sys.modules.setdefault(_name, _mod_obj)
 
+
+class _NiquestsResponse:
+    status_code = 200
+    headers: dict[str, str] = {}
+
+    def json(self):
+        return {}
+
+
+class _NiquestsAsyncSession:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def get(self, *args, **kwargs):
+        return _NiquestsResponse()
+
+
+class _NiquestsSession:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def get(self, *args, **kwargs):
+        return _NiquestsResponse()
+
+
+sys.modules.setdefault(
+    "niquests",
+    _mod(
+        "niquests",
+        AsyncSession=_NiquestsAsyncSession,
+        Session=_NiquestsSession,
+        Response=_NiquestsResponse,
+    ),
+)
+
 # voluptuous is a real package we can install
 try:
     import voluptuous  # noqa: F401
