@@ -7,8 +7,10 @@ import pytest
 
 from custom_components.singapore.weather_coordinator import (
     _extract_readings_rows,
+    _parse_four_day,
     _parse_weather,
     _to_float,
+    _wind_direction_to_degrees,
 )
 
 
@@ -151,3 +153,292 @@ async def test_weather_coordinator_http_error_uses_last_known_data():
 
     assert coordinator.last_update_success is True
     assert coordinator.data.readings.temperature == 30.1
+
+
+# ---------------------------------------------------------------------------
+# _parse_four_day tests
+# ---------------------------------------------------------------------------
+
+
+def test_parse_four_day_shape_a():
+    payload = {
+        "items": [
+            {
+                "forecasts": [
+                    {
+                        "date": "2026-04-05",
+                        "forecast": "Partly Cloudy",
+                        "temperature": {"low": 24, "high": 33},
+                        "relative_humidity": {"low": 60, "high": 90},
+                        "wind": {"speed": {"low": 10, "high": 20}, "direction": "S"},
+                    },
+                    {
+                        "date": "2026-04-06",
+                        "forecast": "Thundery Showers",
+                        "temperature": {"low": 25, "high": 32},
+                        "relative_humidity": {"low": 65, "high": 95},
+                        "wind": {"speed": {"low": 15, "high": 25}, "direction": "NE"},
+                    },
+                ]
+            }
+        ]
+    }
+    entries = _parse_four_day(payload)
+    assert len(entries) == 2
+    e0 = entries[0]
+    assert e0.condition_text == "Partly Cloudy"
+    assert e0.temp_high == 33
+    assert e0.temp_low == 24
+    assert e0.humidity_high == 90
+    assert e0.humidity_low == 60
+    assert e0.wind_speed_low == 10
+    assert e0.wind_speed_high == 20
+    assert e0.wind_direction == "S"
+    from datetime import timedelta, timezone
+
+    sgt = timezone(timedelta(hours=8))
+    assert e0.date.tzinfo == sgt
+    assert e0.date.hour == 0
+    assert e0.date.day == 5
+
+
+def test_parse_four_day_shape_b_camel_case():
+    payload = {
+        "data": {
+            "records": [
+                {
+                    "date": "2026-04-05",
+                    "forecast": "Cloudy",
+                    "temperature": {"low": 23, "high": 30},
+                    "relativeHumidity": {"low": 70, "high": 95},
+                    "wind": {"speed": {"low": 5, "high": 15}, "direction": "W"},
+                }
+            ]
+        }
+    }
+    entries = _parse_four_day(payload)
+    assert len(entries) == 1
+    assert entries[0].humidity_high == 95
+    assert entries[0].wind_direction == "W"
+
+
+def test_parse_four_day_shape_b_records_with_nested_forecasts():
+    payload = {
+        "data": {
+            "records": [
+                {
+                    "date": "2026-04-06",
+                    "forecasts": [
+                        {
+                            "day": "Tuesday",
+                            "timestamp": "2026-04-07T00:00:00+08:00",
+                            "forecast": {
+                                "summary": "Afternoon thundery showers",
+                                "text": "Thundery Showers",
+                            },
+                            "temperature": {"low": 24, "high": 34},
+                            "relativeHumidity": {"low": 60, "high": 95},
+                            "wind": {
+                                "speed": {"low": 5, "high": 15},
+                                "direction": "VARIABLE",
+                            },
+                        }
+                    ],
+                }
+            ]
+        }
+    }
+    entries = _parse_four_day(payload)
+    assert len(entries) == 1
+    assert entries[0].condition_text == "Afternoon thundery showers"
+    assert entries[0].temp_low == 24
+    assert entries[0].temp_high == 34
+    assert entries[0].wind_direction == "VARIABLE"
+
+
+def test_parse_four_day_skips_invalid_date():
+    payload = {
+        "data": {
+            "records": [
+                {"date": "not-a-date", "forecast": "Cloudy", "temperature": {}},
+                {
+                    "date": "2026-04-06",
+                    "forecast": "Rainy",
+                    "temperature": {"low": 24, "high": 31},
+                },
+            ]
+        }
+    }
+    entries = _parse_four_day(payload)
+    assert len(entries) == 1
+    assert entries[0].condition_text == "Rainy"
+
+
+def test_parse_four_day_empty_payload():
+    assert _parse_four_day({}) == []
+    assert _parse_four_day({"items": []}) == []
+    assert _parse_four_day({"data": {"records": []}}) == []
+
+
+def test_parse_four_day_missing_fields_are_none():
+    payload = {
+        "data": {
+            "records": [
+                {"date": "2026-04-05", "forecast": "Fair", "temperature": {}},
+            ]
+        }
+    }
+    entries = _parse_four_day(payload)
+    assert len(entries) == 1
+    assert entries[0].temp_high is None
+    assert entries[0].temp_low is None
+    assert entries[0].humidity_high is None
+    assert entries[0].wind_direction is None
+
+
+# ---------------------------------------------------------------------------
+# _wind_direction_to_degrees tests
+# ---------------------------------------------------------------------------
+
+
+def test_wind_direction_to_degrees():
+    assert _wind_direction_to_degrees("N") == 0.0
+    assert _wind_direction_to_degrees("S") == 180.0
+    assert _wind_direction_to_degrees("NE") == 45.0
+    assert _wind_direction_to_degrees("NNE") == 22.5
+    assert _wind_direction_to_degrees("SSW") == 202.5
+    assert _wind_direction_to_degrees("CALM") == 0.0
+    assert _wind_direction_to_degrees("s") == 180.0  # case-insensitive
+    assert _wind_direction_to_degrees("") is None
+    assert _wind_direction_to_degrees(None) is None
+    assert _wind_direction_to_degrees("BOGUS") is None
+
+
+# ---------------------------------------------------------------------------
+# Coordinator integration tests for four-day fetch
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_weather_coordinator_fetches_four_day():
+    from custom_components.singapore.weather_coordinator import (
+        SingaporeWeatherCoordinator,
+    )
+
+    hass = MagicMock()
+
+    two_hr_payload = {
+        "items": [
+            {
+                "timestamp": "2026-04-05T08:00:00+08:00",
+                "valid_period": {
+                    "start": "2026-04-05T08:00:00+08:00",
+                    "end": "2026-04-05T10:00:00+08:00",
+                },
+                "forecasts": [{"area": "Bedok", "forecast": "Cloudy"}],
+            }
+        ]
+    }
+    four_day_payload = {
+        "items": [
+            {
+                "forecasts": [
+                    {
+                        "date": "2026-04-05",
+                        "forecast": "Partly Cloudy",
+                        "temperature": {"low": 24, "high": 33},
+                        "relative_humidity": {"low": 60, "high": 90},
+                        "wind": {"speed": {"low": 10, "high": 20}, "direction": "S"},
+                    }
+                ]
+            }
+        ]
+    }
+
+    two_hr_resp = MagicMock()
+    two_hr_resp.status_code = 200
+    two_hr_resp.json = MagicMock(return_value=two_hr_payload)
+
+    four_day_resp = MagicMock()
+    four_day_resp.status_code = 200
+    four_day_resp.json = MagicMock(return_value=four_day_payload)
+
+    async def _mock_get(url, timeout=20):
+        if "four-day" in url:
+            return four_day_resp
+        if "two-hr" in url:
+            return two_hr_resp
+        r = MagicMock()
+        r.status_code = 404
+        return r
+
+    mock_session = AsyncMock()
+    mock_session.get = _mock_get
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+
+    coordinator = SingaporeWeatherCoordinator(hass)
+
+    with patch(
+        "custom_components.singapore.weather_coordinator.niquests.AsyncSession",
+        return_value=mock_session,
+    ):
+        await coordinator.async_refresh()
+
+    assert coordinator.last_update_success is True
+    assert coordinator.data.four_day_forecast is not None
+    assert len(coordinator.data.four_day_forecast) == 1
+    assert coordinator.data.four_day_forecast[0].temp_high == 33
+
+
+@pytest.mark.asyncio
+async def test_weather_coordinator_four_day_http_error_is_soft():
+    from custom_components.singapore.weather_coordinator import (
+        SingaporeWeatherCoordinator,
+    )
+
+    hass = MagicMock()
+
+    two_hr_payload = {
+        "items": [
+            {
+                "timestamp": "2026-04-05T08:00:00+08:00",
+                "valid_period": {
+                    "start": "2026-04-05T08:00:00+08:00",
+                    "end": "2026-04-05T10:00:00+08:00",
+                },
+                "forecasts": [{"area": "Bedok", "forecast": "Cloudy"}],
+            }
+        ]
+    }
+
+    two_hr_resp = MagicMock()
+    two_hr_resp.status_code = 200
+    two_hr_resp.json = MagicMock(return_value=two_hr_payload)
+
+    four_day_resp = MagicMock()
+    four_day_resp.status_code = 503
+
+    async def _mock_get(url, timeout=20):
+        if "four-day" in url:
+            return four_day_resp
+        if "two-hr" in url:
+            return two_hr_resp
+        r = MagicMock()
+        r.status_code = 404
+        return r
+
+    mock_session = AsyncMock()
+    mock_session.get = _mock_get
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+
+    coordinator = SingaporeWeatherCoordinator(hass)
+    with patch(
+        "custom_components.singapore.weather_coordinator.niquests.AsyncSession",
+        return_value=mock_session,
+    ):
+        await coordinator.async_refresh()
+
+    assert coordinator.last_update_success is True
+    assert coordinator.data.four_day_forecast is None

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta, timezone
 
 import niquests
 from homeassistant.core import HomeAssistant
@@ -14,7 +14,10 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 _LOGGER = logging.getLogger(__name__)
 
 WEATHER_URL = "https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast"
+FOUR_DAY_URL = "https://api-open.data.gov.sg/v2/real-time/api/four-day-outlook"
 UPDATE_INTERVAL = timedelta(minutes=10)
+
+_SGT = timezone(timedelta(hours=8))
 
 _READINGS_ENDPOINTS = {
     "temperature": "https://api.data.gov.sg/v1/environment/air-temperature",
@@ -29,6 +32,34 @@ _MAX_RETRIES = 3  # retry attempts on 429
 _RETRY_BACKOFF_BASE = 2  # base backoff in seconds (doubles per attempt)
 
 
+_WIND_DIRECTION_DEGREES: dict[str, float] = {
+    "N": 0.0,
+    "NNE": 22.5,
+    "NE": 45.0,
+    "ENE": 67.5,
+    "E": 90.0,
+    "ESE": 112.5,
+    "SE": 135.0,
+    "SSE": 157.5,
+    "S": 180.0,
+    "SSW": 202.5,
+    "SW": 225.0,
+    "WSW": 247.5,
+    "W": 270.0,
+    "WNW": 292.5,
+    "NW": 315.0,
+    "NNW": 337.5,
+    "CALM": 0.0,
+    "VARIABLE": 0.0,
+}
+
+
+def _wind_direction_to_degrees(text: str | None) -> float | None:
+    if not text:
+        return None
+    return _WIND_DIRECTION_DEGREES.get(text.strip().upper())
+
+
 @dataclass
 class WeatherReadings:
     """Realtime readings (collection 1459) aggregated across stations."""
@@ -38,6 +69,21 @@ class WeatherReadings:
     wind_speed: float | None = None
     wind_bearing: float | None = None
     precipitation: float | None = None
+
+
+@dataclass
+class FourDayForecastEntry:
+    """One daily forecast from the 4-day outlook API."""
+
+    date: datetime  # midnight SGT, timezone-aware
+    condition_text: str
+    temp_high: float | None = None
+    temp_low: float | None = None
+    humidity_high: float | None = None
+    humidity_low: float | None = None
+    wind_speed_low: float | None = None
+    wind_speed_high: float | None = None
+    wind_direction: str | None = None
 
 
 @dataclass
@@ -57,6 +103,7 @@ class WeatherData:
     areas: dict[str, WeatherAreaData]
     updated_at: datetime | None
     readings: WeatherReadings
+    four_day_forecast: list[FourDayForecastEntry] | None = field(default=None)
 
 
 class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
@@ -74,15 +121,24 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
     async def _async_update_data(self) -> WeatherData:
         try:
             async with niquests.AsyncSession() as session:
-                response = await session.get(WEATHER_URL, timeout=30)
-                if response.status_code != 200:
+                two_hr_resp, four_day_resp = await asyncio.gather(
+                    session.get(WEATHER_URL, timeout=30),
+                    session.get(FOUR_DAY_URL, timeout=30),
+                )
+                if two_hr_resp.status_code != 200:
                     raise UpdateFailed(
-                        f"data.gov.sg weather endpoint returned HTTP {response.status_code}"
+                        f"data.gov.sg weather endpoint returned HTTP {two_hr_resp.status_code}"
                     )
-                payload = response.json()
-                parsed = _parse_weather(payload)
+                parsed = _parse_weather(two_hr_resp.json())
                 if not parsed.areas:
                     raise UpdateFailed("No area forecasts found in weather payload")
+                if four_day_resp.status_code == 200:
+                    parsed.four_day_forecast = _parse_four_day(four_day_resp.json())
+                else:
+                    _LOGGER.warning(
+                        "four-day-outlook returned HTTP %s; skipping daily forecast",
+                        four_day_resp.status_code,
+                    )
                 parsed.readings = await _fetch_aggregated_readings(
                     session, self._readings_sem
                 )
@@ -203,6 +259,24 @@ def _to_float(value) -> float | None:
         return None
 
 
+def _to_int(value) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_date_sgt(value: str | None) -> datetime | None:
+    """Parse a bare YYYY-MM-DD string to timezone-aware midnight SGT."""
+    if not value:
+        return None
+    try:
+        d = date.fromisoformat(value)
+        return datetime(d.year, d.month, d.day, tzinfo=_SGT)
+    except (ValueError, TypeError):
+        return None
+
+
 def _parse_iso_datetime(value: str | None) -> datetime | None:
     if not value:
         return None
@@ -213,6 +287,81 @@ def _parse_iso_datetime(value: str | None) -> datetime | None:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt
+
+
+def _parse_four_day(payload: dict) -> list[FourDayForecastEntry]:
+    """Parse four-day-outlook API payload.
+
+    Supports:
+    - Shape A: {"items": [{"forecasts": [...]}]}
+    - Shape B: {"data": {"records": [...]}}
+    """
+    entries: list[FourDayForecastEntry] = []
+
+    def _append_entry(rec: dict, default_date: str | None = None) -> None:
+        dt = _parse_date_sgt(rec.get("date") or default_date)
+        if dt is None:
+            ts_dt = _parse_iso_datetime(rec.get("timestamp"))
+            if ts_dt is not None:
+                dt = ts_dt.astimezone(_SGT).replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
+        if dt is None:
+            return
+
+        forecast = rec.get("forecast")
+        if isinstance(forecast, dict):
+            condition_text = str(
+                forecast.get("summary") or forecast.get("text") or ""
+            ).strip()
+        else:
+            condition_text = str(forecast or "").strip()
+        if not condition_text:
+            return
+
+        temp = rec.get("temperature") or {}
+        rh = rec.get("relative_humidity") or rec.get("relativeHumidity") or {}
+        wind = rec.get("wind") or {}
+        wind_speed = wind.get("speed") or {}
+        wind_dir = (wind.get("direction") or "").strip() or None
+
+        entries.append(
+            FourDayForecastEntry(
+                date=dt,
+                condition_text=condition_text,
+                temp_high=_to_float(temp.get("high")),
+                temp_low=_to_float(temp.get("low")),
+                humidity_high=_to_float(rh.get("high")),
+                humidity_low=_to_float(rh.get("low")),
+                wind_speed_low=_to_float(wind_speed.get("low")),
+                wind_speed_high=_to_float(wind_speed.get("high")),
+                wind_direction=wind_dir,
+            )
+        )
+
+    # Shape A: {"items":[{"forecasts":[{daily}, ...]}]}
+    items = payload.get("items") or []
+    if items and isinstance(items[0], dict):
+        for rec in items[0].get("forecasts") or []:
+            if isinstance(rec, dict):
+                _append_entry(rec)
+        return entries
+
+    # Shape B can be either:
+    # - {"data":{"records":[{daily}, ...]}}
+    # - {"data":{"records":[{"date":"...", "forecasts":[{daily}, ...]}]}}
+    for rec in payload.get("data", {}).get("records") or []:
+        if not isinstance(rec, dict):
+            continue
+        nested = rec.get("forecasts")
+        if isinstance(nested, list):
+            for day_row in nested:
+                if isinstance(day_row, dict):
+                    _append_entry(day_row, default_date=rec.get("date"))
+        else:
+            _append_entry(rec)
+
+    return entries
 
 
 def _parse_weather(payload: dict) -> WeatherData:

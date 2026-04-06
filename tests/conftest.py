@@ -111,10 +111,15 @@ class WeatherEntity:
 
 class WeatherEntityFeature:
     FORECAST_HOURLY = 1
+    FORECAST_DAILY = 2
 
 
 class UnitOfTemperature:
     CELSIUS = "°C"
+
+
+class UnitOfSpeed:
+    KILOMETERS_PER_HOUR = "km/h"
 
 
 class Forecast(dict):
@@ -152,6 +157,7 @@ _HA_MODULES: dict[str, ModuleType] = {
         Platform=Platform,
         CONF_NAME="name",
         UnitOfTemperature=UnitOfTemperature,
+        UnitOfSpeed=UnitOfSpeed,
     ),
     "homeassistant.helpers": _mod("homeassistant.helpers"),
     "homeassistant.helpers.update_coordinator": _mod(

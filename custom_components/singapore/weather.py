@@ -10,13 +10,13 @@ from homeassistant.components.weather import (
     WeatherEntityFeature,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfTemperature
-from homeassistant.core import HomeAssistant
+from homeassistant.const import UnitOfSpeed, UnitOfTemperature
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import DOMAIN
-from .weather_coordinator import SingaporeWeatherCoordinator
+from .weather_coordinator import SingaporeWeatherCoordinator, _wind_direction_to_degrees
 
 _CONDITION_MAP = {
     "fair": "sunny",
@@ -65,8 +65,11 @@ class SingaporeAreaWeatherEntity(
     """One weather entity per Singapore forecast area."""
 
     _attr_has_entity_name = False
-    _attr_supported_features = WeatherEntityFeature.FORECAST_HOURLY
+    _attr_supported_features = (
+        WeatherEntityFeature.FORECAST_HOURLY | WeatherEntityFeature.FORECAST_DAILY
+    )
     _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_native_wind_speed_unit = UnitOfSpeed.KILOMETERS_PER_HOUR
 
     def __init__(
         self, coordinator: SingaporeWeatherCoordinator, entry_id: str, area: str
@@ -77,6 +80,24 @@ class SingaporeAreaWeatherEntity(
         slug = area.lower().replace(" ", "_")
         self._attr_unique_id = f"{entry_id}_weather_{slug}"
         self._attr_name = f"Singapore Weather {area}"
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        super()._handle_coordinator_update()
+        self.hass.async_create_task(self.async_update_listeners())
+
+    @property
+    def native_temperature(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        t = self.coordinator.data.readings.temperature
+        if t is not None:
+            return t
+        fc = self.coordinator.data.four_day_forecast
+        if fc:
+            return fc[0].temp_high
+        return None
 
     @property
     def condition(self) -> str | None:
@@ -133,11 +154,11 @@ class SingaporeAreaWeatherEntity(
                 "condition": condition,
             }
             if readings.temperature is not None:
-                payload["temperature"] = readings.temperature
+                payload["native_temperature"] = readings.temperature
             if readings.humidity is not None:
                 payload["humidity"] = readings.humidity
             if readings.wind_speed is not None:
-                payload["wind_speed"] = readings.wind_speed
+                payload["native_wind_speed"] = readings.wind_speed
             if readings.wind_bearing is not None:
                 payload["wind_bearing"] = readings.wind_bearing
             if readings.precipitation is not None:
@@ -148,6 +169,41 @@ class SingaporeAreaWeatherEntity(
             _point(start_utc),
             _point(start_utc + timedelta(hours=1)),
         ]
+
+    async def async_forecast_daily(self) -> list[Forecast] | None:
+        if self.coordinator.data is None:
+            return None
+        fc = self.coordinator.data.four_day_forecast
+        if not fc:
+            return None
+
+        result: list[Forecast] = []
+        for entry in fc:
+            payload: dict = {
+                "datetime": entry.date.isoformat(),
+                "condition": _map_condition(entry.condition_text),
+            }
+            if entry.temp_high is not None:
+                payload["native_temperature"] = entry.temp_high
+            if entry.temp_low is not None:
+                payload["native_templow"] = entry.temp_low
+            if entry.wind_speed_high is not None and entry.wind_speed_low is not None:
+                payload["native_wind_speed"] = round(
+                    (entry.wind_speed_low + entry.wind_speed_high) / 2, 1
+                )
+            elif entry.wind_speed_high is not None:
+                payload["native_wind_speed"] = entry.wind_speed_high
+            bearing = _wind_direction_to_degrees(entry.wind_direction)
+            if bearing is not None:
+                payload["wind_bearing"] = bearing
+            if entry.humidity_high is not None and entry.humidity_low is not None:
+                payload["humidity"] = round(
+                    (entry.humidity_low + entry.humidity_high) / 2, 1
+                )
+            elif entry.humidity_high is not None:
+                payload["humidity"] = entry.humidity_high
+            result.append(Forecast(**payload))
+        return result
 
     @property
     def device_info(self) -> dict:

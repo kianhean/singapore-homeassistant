@@ -7,30 +7,34 @@ The integration domain is `singapore`.
 
 ```
 custom_components/singapore/
-├── __init__.py           # Entry setup/teardown; creates and stores coordinators
-├── coordinator.py        # SPGroupCoordinator: fetches + parses SP Group tariff page
-├── coe_coordinator.py    # CoeCoordinator: fetches COE results from data.gov.sg API
-├── holiday_coordinator.py # PublicHolidayCoordinator: fetches + parses MOM holidays
-├── weather_coordinator.py # SingaporeWeatherCoordinator: 2-hour forecasts + collection 1459 readings
-├── calendar.py           # Calendar entity (Singapore public holidays)
-├── weather.py            # Weather entities (one per Singapore forecast area)
-├── config_flow.py        # UI config flow (name input)
-├── sensor.py             # Sensor entities (tariff + COE + weather readings)
-├── manifest.json         # Integration metadata; declares beautifulsoup4 + niquests deps
-├── strings.json          # Config flow UI strings
+├── __init__.py             # Entry setup/teardown; creates and stores coordinators
+├── coordinator.py          # SPGroupCoordinator: fetches + parses SP Group tariff page
+├── coe_coordinator.py      # CoeCoordinator: fetches COE results from data.gov.sg API
+├── holiday_coordinator.py  # PublicHolidayCoordinator: fetches + parses MOM holidays
+├── weather_coordinator.py  # SingaporeWeatherCoordinator: 2-hour forecasts + collection 1459 readings
+├── train_coordinator.py    # TrainStatusCoordinator: scrapes mytransport.sg MRT/LRT status
+├── calendar.py             # Calendar entity (Singapore public holidays)
+├── weather.py              # Weather entities (one per Singapore forecast area)
+├── config_flow.py          # UI config flow (name input)
+├── sensor.py               # Sensor entities (tariff + COE + weather readings + train status)
+├── manifest.json           # Integration metadata; declares beautifulsoup4 + niquests deps
+├── strings.json            # Config flow UI strings
 └── translations/
-    └── en.json           # English translations (mirrors strings.json)
+    └── en.json             # English translations (mirrors strings.json)
 
 tests/
-├── conftest.py              # Mocks HA modules so tests run without installing homeassistant
-├── test_init.py             # Domain constant check
-├── test_config_flow.py      # Config flow schema check
-├── test_coordinator.py      # SP Group parser unit tests + coordinator HTTP mock tests
-├── test_coe_coordinator.py  # COE parser unit tests + coordinator HTTP mock tests
-├── test_holiday_coordinator.py # MOM parser unit tests + coordinator HTTP mock tests
-├── test_calendar.py         # Calendar event and range query tests
-├── test_sensor.py           # Sensor value, unit, attributes, unique_id, None-safety
-└── test_e2e.py              # Live scrape tests (run with -m e2e, skipped in CI by default)
+├── conftest.py                  # Mocks HA modules so tests run without installing homeassistant
+├── test_init.py                 # Domain constant check
+├── test_config_flow.py          # Config flow schema check
+├── test_coordinator.py          # SP Group parser unit tests + coordinator HTTP mock tests
+├── test_coe_coordinator.py      # COE parser unit tests + coordinator HTTP mock tests
+├── test_holiday_coordinator.py  # MOM parser unit tests + coordinator HTTP mock tests
+├── test_weather_coordinator.py  # Weather coordinator parser + HTTP mock tests
+├── test_train_coordinator.py    # Train status parser + HTTP mock tests
+├── test_calendar.py             # Calendar event and range query tests
+├── test_sensor.py               # Sensor value, unit, attributes, unique_id, None-safety
+├── test_weather.py              # Weather entity condition mapping + forecast tests
+└── test_e2e.py                  # Live scrape tests (run with -m e2e, skipped in CI by default)
 
 .github/workflows/tests.yml   # CI: three jobs — unit tests, e2e scrape, ruff lint
 ```
@@ -83,6 +87,15 @@ hass.data[DOMAIN][entry_id] = {
 One `weather` entity is created per forecast area (e.g. Bedok, Woodlands, Ang Mo Kio).
 The entity exposes Home Assistant weather conditions and hourly forecasts approximated
 from NEA's 2-hour periods.
+
+### Train Status Sensors
+
+| Entity ID | Name | Description |
+|-----------|------|-------------|
+| `sensor.singapore_train_status` | Singapore Train Status | Overall MRT/LRT network status (`normal` / `disrupted`) |
+| `sensor.singapore_<line>_status` | Singapore \<Line\> Status | Per-line status for NSL, EWL, NEL, CCL, DTL, TEL, BPLRT, SKLRT, PGLRT |
+
+Train status is scraped from `https://www.mytransport.sg/trainstatus#` every **5 minutes**.
 
 ## Development Setup
 
@@ -178,6 +191,63 @@ Forecast parsing supports both common payload styles:
 
 Each weather entity converts a single 2-hour interval into two hourly forecast points
 for Home Assistant (`t` and `t+1h`) with mapped HA conditions.
+
+### Forecast Subscription Pattern
+
+In HA 2024.3+, weather forecast data is subscription-based. `SingaporeAreaWeatherEntity`
+overrides `_handle_coordinator_update` to call `async_update_listeners()` after every
+coordinator refresh — without this, forecast subscribers (the HA frontend weather card)
+never receive updated data and the spinner stays permanently:
+
+```python
+@callback
+def _handle_coordinator_update(self) -> None:
+    super()._handle_coordinator_update()
+    self.hass.async_create_task(self.async_update_listeners())
+```
+
+### Collection 1456 — Not Yet Integrated
+
+Two additional NEA forecast APIs in collection 1456 are unused:
+
+| Endpoint | Coverage | Periods | Has temp/humidity? |
+|----------|----------|---------|-------------------|
+| `twenty-four-hr-forecast` | 5 regions (N/S/E/W/central) | ~4 × 6-hour periods | No |
+| `four-day-outlook` | Singapore-wide | 4 daily forecasts | Yes (high/low ranges) |
+
+The 4-day outlook is the most valuable to add: it would enable `FORECAST_DAILY` support
+on weather entities with proper temperature, humidity, and wind ranges.
+The 24-hour forecast adds regional granularity for hourly forecasts beyond the current
+2-hour window, but provides no temperature/humidity data.
+
+#### four-day-outlook payload caveat (2026-04-06)
+
+The live `v2/real-time/api/four-day-outlook` payload may arrive in either shape:
+
+- Legacy-ish: `items[0].forecasts[]` with direct daily entries.
+- Current nested shape: `data.records[0].forecasts[]`, where each forecast row can include
+  `timestamp` and object-style forecast text:
+  - `forecast.text` (canonical short condition, e.g. `Thundery Showers`)
+  - `forecast.summary` (longer narrative)
+
+Parser guidance used in this repo:
+
+- Prefer per-row `date`; else derive from per-row `timestamp`; else fall back to parent
+  `record.date`.
+- Prefer `forecast.text` over `forecast.summary` for condition mapping consistency.
+- Support both `relative_humidity` and `relativeHumidity` field names.
+
+## How the Train Status Scraper Works
+
+`train_coordinator.py` scrapes `https://www.mytransport.sg/trainstatus#` (via
+`async_get_clientsession`) every **5 minutes**. It uses BeautifulSoup to parse
+disruption notices and map them to the 9 rail lines defined in `TRAIN_LINES` via
+`_LINE_ALIASES` (supports both full names and abbreviations like "NSL", "EWL").
+
+`TrainStatusData` contains:
+- `status` — `"normal"` or `"disrupted"` (overall network)
+- `details` — raw disruption text (empty string when all-clear)
+- `line_statuses` — dict mapping each line name to `"normal"` or `"disrupted"`
 
 ### Calendar Entity
 
