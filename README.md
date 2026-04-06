@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="image.png" alt="Singapore Data Home Assistant Integration" width="300">
+</p>
+
 # Singapore Home Assistant integration
 
 A [HACS](https://hacs.xyz) custom integration for Singapore-specific data: utility
