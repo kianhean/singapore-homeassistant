@@ -121,6 +121,18 @@ def test_details_empty_when_normal():
     assert result.details == ""
 
 
+def test_nel_not_matched_by_tunnel_substring():
+    """'nel' in 'tunnel' must not trigger North East Line status."""
+    data = _payload(
+        [
+            "21:00-CCL-Planned train service adjustments to facilitate tunnel strengthening works on the Circle Line."
+        ]
+    )
+    result = _parse_train_status(data)
+    assert result.line_statuses["North East Line"] == "normal"
+    assert result.line_statuses["Circle Line"] == "planned"
+
+
 def test_parse_empty_payload():
     result = _parse_train_status({})
     assert result.status == "normal"
