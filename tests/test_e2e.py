@@ -39,6 +39,7 @@ _COE_URL = (
     "&sort=month%20desc%2Cbidding_no%20desc"
 )
 _WEATHER_URL = "https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast"
+_FOUR_DAY_URL = "https://api-open.data.gov.sg/v2/real-time/api/four-day-outlook"
 _WEATHER_READING_URL = "https://api.data.gov.sg/v1/environment/air-temperature"
 _HOLIDAY_URL = "https://www.mom.gov.sg/employment-practices/public-holidays"
 _TRAIN_URL = "https://www.mytransport.sg/trainstatus#"
@@ -147,6 +148,33 @@ def test_e2e_weather_forecast_api_fetch_and_parse():
     first_area = next(iter(data.areas.values()))
     assert first_area.area, "Parsed area name is empty"
     assert first_area.condition_text, "Parsed condition text is empty"
+
+
+def test_e2e_four_day_forecast_api_fetch_and_parse():
+    """Fetch live 4-day outlook endpoint and assert plausible daily forecasts."""
+    from custom_components.singapore.weather_coordinator import _parse_four_day
+
+    payload = _fetch_json(_FOUR_DAY_URL)
+    entries = _parse_four_day(payload)
+
+    assert entries, "No four-day forecast entries parsed from data.gov.sg payload"
+    assert len(entries) <= 5, f"Unexpectedly many entries: {len(entries)}"
+
+    for entry in entries:
+        assert entry.condition_text, f"Entry has empty condition_text: {entry}"
+        assert entry.date.tzinfo is not None, "date must be timezone-aware"
+        if entry.temp_high is not None and entry.temp_low is not None:
+            assert 15.0 < entry.temp_low < entry.temp_high < 45.0, (
+                f"Temperature range looks wrong: {entry.temp_low}–{entry.temp_high}°C"
+            )
+        if entry.humidity_high is not None and entry.humidity_low is not None:
+            assert 0 <= entry.humidity_low <= entry.humidity_high <= 100, (
+                f"Humidity range out of bounds: {entry.humidity_low}–{entry.humidity_high}%"
+            )
+        if entry.wind_speed_high is not None:
+            assert 0 <= entry.wind_speed_high <= 150, (
+                f"Wind speed looks wrong: {entry.wind_speed_high} km/h"
+            )
 
 
 def test_e2e_weather_reading_api_shape():
