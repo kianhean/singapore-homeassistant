@@ -211,14 +211,35 @@ def test_e2e_holiday_page_fetch_and_parse():
 
 
 def test_e2e_train_status_page_fetch_and_parse():
-    """Fetch live train status page and assert parser emits overall + per-line status."""
+    """Fetch live train status API and assert parser emits overall + per-line status."""
+    import niquests
+
     from custom_components.singapore.train_coordinator import (
+        _TRAIN_STATUS_REFERER,
         TRAIN_LINES,
+        TRAIN_STATUS_URL,
         _parse_train_status,
     )
 
-    html = _fetch_url_html(_TRAIN_URL)
-    data = _parse_train_status(html)
+    try:
+        with niquests.Session() as session:
+            response = session.post(
+                TRAIN_STATUS_URL,
+                data={"serviceName": "LTAGOVTrainServiceAlerts", "param": ""},
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    "Accept": "application/json, text/javascript, */*; q=0.01",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Referer": _TRAIN_STATUS_REFERER,
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            payload = response.json()
+    except Exception as err:
+        pytest.skip(f"Skipping e2e due to network error: {err}")
+
+    data = _parse_train_status(payload)
 
     assert data.status in {"normal", "planned", "disruption"}, (
         f"Unexpected network status: {data.status}"

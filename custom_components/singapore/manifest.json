@@ -1,7 +1,7 @@
 {
   "domain": "singapore",
   "name": "Singapore",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Singapore Home Assistant integration — electricity tariff, solar export price, and more",
   "documentation": "https://github.com/kianhean/singapore-homeassistant",
   "issue_tracker": "https://github.com/kianhean/singapore-homeassistant/issues",
