@@ -291,5 +291,7 @@ Both commands must exit cleanly — CI will fail otherwise.
 - Exception: `weather_coordinator.py` uses `niquests.AsyncSession` directly for HTTP/2 and
   built-in rate-limit retry; all other coordinators use `async_get_clientsession`
 - Entity unique IDs must be stable: `{entry_id}_{suffix}`
-- Keep `manifest.json` version in sync with releases
+- Always bump `custom_components/singapore/manifest.json` `version` for every PR that changes
+  shipped integration behavior/code, so merge-to-main release automation can create the next
+  GitHub release tag from that version.
 - Translations live in `translations/en.json` and must mirror `strings.json`
