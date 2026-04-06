@@ -95,15 +95,19 @@ from NEA's 2-hour periods.
 | `sensor.singapore_train_status` | Singapore Train Status | Overall MRT/LRT network status (`normal` / `disrupted`) |
 | `sensor.singapore_<line>_status` | Singapore \<Line\> Status | Per-line status for NSL, EWL, NEL, CCL, DTL, TEL, BPLRT, SKLRT, PGLRT |
 
-Train status is scraped from `https://www.mytransport.sg/trainstatus#` every **5 minutes**.
+Train status data is fetched every **5 minutes** via a POST to the LTA DataMall AEM servlet
+(the page itself is JS-rendered and returns only a "Loading…" shell when scraped as HTML).
 
 ## Development Setup
 
 No full Home Assistant installation required. Tests mock all HA modules via `conftest.py`.
 
+Run tests with:
 ```bash
-pip install -r requirements_test.txt
+python3 -m pytest tests/ -v -m "not e2e"
 ```
+(Note: `pip install` requires `--break-system-packages` on macOS system Python. Use
+`python3 -m pytest` directly — `pytest` binary may not be on PATH.)
 
 ## Running Tests
 
@@ -237,17 +241,29 @@ Parser guidance used in this repo:
 - Prefer `forecast.text` over `forecast.summary` for condition mapping consistency.
 - Support both `relative_humidity` and `relativeHumidity` field names.
 
-## How the Train Status Scraper Works
+## How the Train Status Coordinator Works
 
-`train_coordinator.py` scrapes `https://www.mytransport.sg/trainstatus#` (via
-`async_get_clientsession`) every **5 minutes**. It uses BeautifulSoup to parse
-disruption notices and map them to the 9 rail lines defined in `TRAIN_LINES` via
-`_LINE_ALIASES` (supports both full names and abbreviations like "NSL", "EWL").
+`train_coordinator.py` POSTs to the AEM/LTA DataMall servlet every **5 minutes**:
+
+```
+POST https://www.mytransport.sg/content/ltagov/en/map/train/jcr:content/left-menu/ltaDatamallAPI.ltaDatamallAPI.POST.html
+Content-Type: application/x-www-form-urlencoded
+X-Requested-With: XMLHttpRequest
+Referer: https://www.mytransport.sg/trainstatus#
+
+serviceName=LTAGOVTrainServiceAlerts&param=
+```
+
+Response shape: `{ "value": { "Status": int, "AffectedSegments": [...], "Message": [...] } }`
+- `AffectedSegments` — real-time disruptions (line is currently down)
+- `Message[].Content` — planned/informational notices, format: `"HH:MM-{LINE}-{description}"`
+
+**Do not attempt to scrape the HTML page** — it is fully JS-rendered.
 
 `TrainStatusData` contains:
-- `status` — `"normal"` or `"disrupted"` (overall network)
-- `details` — raw disruption text (empty string when all-clear)
-- `line_statuses` — dict mapping each line name to `"normal"` or `"disrupted"`
+- `status` — `"normal"`, `"planned"`, or `"disruption"` (overall network)
+- `details` — all message content joined with ` | ` (empty string when normal); exposed as `details` attribute on `sensor.singapore_train_status`
+- `line_statuses` — dict mapping each line name to `"normal"`, `"planned"`, or `"disruption"`
 
 ### Calendar Entity
 
@@ -295,3 +311,4 @@ Both commands must exit cleanly — CI will fail otherwise.
   shipped integration behavior/code, so merge-to-main release automation can create the next
   GitHub release tag from that version.
 - Translations live in `translations/en.json` and must mirror `strings.json`
+- For quick one-off API/scraping investigations, use `uv run script.py` with inline `# /// script` dependency blocks — avoids venv setup entirely
