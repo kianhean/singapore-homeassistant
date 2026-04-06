@@ -150,6 +150,17 @@ def test_e2e_weather_forecast_api_fetch_and_parse():
     assert first_area.condition_text, "Parsed condition text is empty"
 
 
+def test_e2e_four_day_forecast_api_raw_shape(capsys):
+    """Dump the raw four-day-outlook payload so we can see the actual structure."""
+    import json
+
+    payload = _fetch_json(_FOUR_DAY_URL)
+    with capsys.disabled():
+        print("\n=== four-day-outlook raw payload ===")
+        print(json.dumps(payload, indent=2)[:4000])
+        print("=== end ===\n")
+
+
 def test_e2e_four_day_forecast_api_fetch_and_parse():
     """Fetch live 4-day outlook endpoint and assert plausible daily forecasts."""
     from custom_components.singapore.weather_coordinator import _parse_four_day
