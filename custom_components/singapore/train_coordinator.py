@@ -48,6 +48,16 @@ _LINE_ALIASES: Final[dict[str, tuple[str, ...]]] = {
     "Punggol LRT": ("punggol lrt", "pglrt"),
 }
 
+# Pre-compiled word-boundary patterns for each line's aliases so that short codes
+# like "nel" don't match substrings like "tunnel".
+_LINE_ALIAS_PATTERNS: Final[dict[str, re.Pattern[str]]] = {
+    line: re.compile(
+        "|".join(r"\b" + re.escape(alias) + r"\b" for alias in aliases),
+        re.IGNORECASE,
+    )
+    for line, aliases in _LINE_ALIASES.items()
+}
+
 
 @dataclass
 class TrainStatusData:
@@ -169,9 +179,9 @@ def _parse_train_status(data: dict) -> TrainStatusData:
 
     # Real-time disruptions from AffectedSegments
     for seg in affected_segments:
-        seg_text = (seg.get("Line", "") + " " + seg.get("Direction", "")).lower()
-        for line, aliases in _LINE_ALIASES.items():
-            if any(alias in seg_text for alias in aliases):
+        seg_text = seg.get("Line", "") + " " + seg.get("Direction", "")
+        for line, pattern in _LINE_ALIAS_PATTERNS.items():
+            if pattern.search(seg_text):
                 line_statuses[line] = "disruption"
 
     # Planned / informational notices from Message array
@@ -181,12 +191,11 @@ def _parse_train_status(data: dict) -> TrainStatusData:
         if not content:
             continue
         content_parts.append(content)
-        lowered = content.lower()
         msg_status = _classify_message_status(content)
         if msg_status is None:
             continue
-        for line, aliases in _LINE_ALIASES.items():
-            if any(alias in lowered for alias in aliases):
+        for line, pattern in _LINE_ALIAS_PATTERNS.items():
+            if pattern.search(content):
                 # Never downgrade a line already marked disrupted
                 if line_statuses[line] != "disruption":
                     line_statuses[line] = msg_status
