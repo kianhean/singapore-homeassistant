@@ -8,14 +8,22 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Final
 
-from bs4 import BeautifulSoup
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 _LOGGER = logging.getLogger(__name__)
 
-TRAIN_STATUS_URL = "https://www.mytransport.sg/trainstatus#"
+# AEM servlet that proxies to LTA DataMall TrainServiceAlerts.
+# Must be called via POST with form-encoded body; page renders via JS so plain
+# HTML scraping returns only a "Loading…" shell.
+TRAIN_STATUS_URL = (
+    "https://www.mytransport.sg"
+    "/content/ltagov/en/map/train/jcr:content/left-menu/ltaDatamallAPI"
+    ".ltaDatamallAPI.POST.html"
+)
+_TRAIN_STATUS_REFERER = "https://www.mytransport.sg/trainstatus#"
+
 UPDATE_INTERVAL = timedelta(minutes=5)
 TRAIN_LINES: Final[tuple[str, ...]] = (
     "North-South Line",
@@ -64,13 +72,23 @@ class TrainStatusCoordinator(DataUpdateCoordinator[TrainStatusData]):
     async def _async_update_data(self) -> TrainStatusData:
         session = async_get_clientsession(self.hass)
         try:
-            async with session.get(TRAIN_STATUS_URL, timeout=30) as response:
+            async with session.post(
+                TRAIN_STATUS_URL,
+                data={"serviceName": "LTAGOVTrainServiceAlerts", "param": ""},
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    "Accept": "application/json, text/javascript, */*; q=0.01",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Referer": _TRAIN_STATUS_REFERER,
+                },
+                timeout=30,
+            ) as response:
                 if response.status != 200:
                     raise UpdateFailed(
                         f"mytransport.sg train status returned HTTP {response.status}"
                     )
-                html = await response.text()
-            return _parse_train_status(html)
+                payload = await response.json(content_type=None)
+            return _parse_train_status(payload)
         except Exception as err:
             if self.data is not None:
                 _LOGGER.warning(
@@ -79,25 +97,6 @@ class TrainStatusCoordinator(DataUpdateCoordinator[TrainStatusData]):
                 )
                 return self.data
             raise UpdateFailed(f"Error fetching train status data: {err}") from err
-
-
-def _parse_train_status(html: str) -> TrainStatusData:
-    """Parse overall train status from the MRT/LRT status page text."""
-    soup = BeautifulSoup(html, "html.parser")
-    raw_text = soup.get_text("\n", strip=True)
-    text = soup.get_text(" ", strip=True)
-    lowered = text.lower()
-
-    if _looks_planned(lowered):
-        status = "planned"
-    elif _looks_disrupted(lowered):
-        status = "disruption"
-    else:
-        status = "normal"
-
-    details = _extract_detail(text, status)
-    line_statuses = _extract_line_statuses(raw_text, status)
-    return TrainStatusData(status=status, details=details, line_statuses=line_statuses)
 
 
 _DISRUPTION_PATTERNS = tuple(
@@ -135,63 +134,71 @@ def _looks_planned(text: str) -> bool:
     return any(pattern.search(text) for pattern in _PLANNED_PATTERNS)
 
 
-def _extract_detail(text: str, status: str) -> str:
-    """Extract a compact detail snippet for attributes/debugging."""
-    clean = re.sub(r"\s+", " ", text).strip()
-    if not clean:
-        return "No detail available from source page"
-    if status in {"planned", "disruption"}:
-        return clean
-    return clean[:240]
+def _classify_message_status(content: str) -> str | None:
+    """Map a message string to a canonical status."""
+    lowered = content.lower()
+    if _looks_planned(lowered):
+        return "planned"
+    if _looks_disrupted(lowered):
+        return "disruption"
+    return None
 
 
-def _extract_line_statuses(text: str, network_status: str) -> dict[str, str]:
-    """Extract per-line status from page text.
+def _parse_train_status(data: dict) -> TrainStatusData:
+    """Parse overall train status from the LTA DataMall TrainServiceAlerts JSON payload.
 
-    Lines not explicitly mentioned with a disruption/planned keyword are
-    assumed normal — the live page only shows status text for affected lines;
-    unaffected lines show only a green checkmark with no text.
+    Expected shape::
 
-    If no per-line sentences match but the network has a non-normal status,
-    it is treated as a full-network event and all lines are flagged.
+        {
+          "value": {
+            "Status": 1,
+            "AffectedSegments": [{"Line": "NSL", ...}, ...],
+            "Message": [{"Content": "21:00-CCL-Planned ...", "CreatedDate": "..."}, ...]
+          }
+        }
+
+    ``AffectedSegments`` carries real-time disruptions; ``Message`` carries planned
+    and informational notices.  Only messages that mention a known line code are
+    used for per-line classification.
     """
-    line_statuses = {line: "normal" for line in TRAIN_LINES}
-    sentences = [
-        chunk.strip()
-        for chunk in re.split(r"[\n.!?;]+", text)
-        if chunk and chunk.strip()
-    ]
+    value: dict = (data.get("value") or {}) if isinstance(data, dict) else {}
+    affected_segments: list[dict] = value.get("AffectedSegments") or []
+    messages: list[dict] = value.get("Message") or []
 
-    found_any = False
-    for sentence in sentences:
-        lowered = sentence.lower()
-        sentence_status = _classify_sentence_status(lowered)
-        if sentence_status is None:
+    line_statuses: dict[str, str] = {line: "normal" for line in TRAIN_LINES}
+
+    # Real-time disruptions from AffectedSegments
+    for seg in affected_segments:
+        seg_text = (seg.get("Line", "") + " " + seg.get("Direction", "")).lower()
+        for line, aliases in _LINE_ALIASES.items():
+            if any(alias in seg_text for alias in aliases):
+                line_statuses[line] = "disruption"
+
+    # Planned / informational notices from Message array
+    content_parts: list[str] = []
+    for msg in messages:
+        content = msg.get("Content", "")
+        if not content:
+            continue
+        content_parts.append(content)
+        lowered = content.lower()
+        msg_status = _classify_message_status(content)
+        if msg_status is None:
             continue
         for line, aliases in _LINE_ALIASES.items():
             if any(alias in lowered for alias in aliases):
-                line_statuses[line] = sentence_status
-                found_any = True
+                # Never downgrade a line already marked disrupted
+                if line_statuses[line] != "disruption":
+                    line_statuses[line] = msg_status
 
-    # No per-line sentences matched → full-network event; flag all lines.
-    if network_status != "normal" and not found_any:
-        for line in TRAIN_LINES:
-            line_statuses[line] = network_status
+    # Overall network status = worst per-line status
+    statuses = set(line_statuses.values())
+    if "disruption" in statuses:
+        status = "disruption"
+    elif "planned" in statuses:
+        status = "planned"
+    else:
+        status = "normal"
 
-    return line_statuses
-
-
-def _classify_sentence_status(text: str) -> str | None:
-    """Map a sentence to a canonical status."""
-    if _looks_planned(text):
-        return "planned"
-    if (
-        "normal" in text
-        or "operating normally" in text
-        or "no delays" in text
-        or "no disruption" in text
-    ):
-        return "normal"
-    if _looks_disrupted(text):
-        return "disruption"
-    return None
+    details = " | ".join(content_parts) if status != "normal" else ""
+    return TrainStatusData(status=status, details=details, line_statuses=line_statuses)
