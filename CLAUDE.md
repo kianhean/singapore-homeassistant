@@ -220,6 +220,23 @@ on weather entities with proper temperature, humidity, and wind ranges.
 The 24-hour forecast adds regional granularity for hourly forecasts beyond the current
 2-hour window, but provides no temperature/humidity data.
 
+#### four-day-outlook payload caveat (2026-04-06)
+
+The live `v2/real-time/api/four-day-outlook` payload may arrive in either shape:
+
+- Legacy-ish: `items[0].forecasts[]` with direct daily entries.
+- Current nested shape: `data.records[0].forecasts[]`, where each forecast row can include
+  `timestamp` and object-style forecast text:
+  - `forecast.text` (canonical short condition, e.g. `Thundery Showers`)
+  - `forecast.summary` (longer narrative)
+
+Parser guidance used in this repo:
+
+- Prefer per-row `date`; else derive from per-row `timestamp`; else fall back to parent
+  `record.date`.
+- Prefer `forecast.text` over `forecast.summary` for condition mapping consistency.
+- Support both `relative_humidity` and `relativeHumidity` field names.
+
 ## How the Train Status Scraper Works
 
 `train_coordinator.py` scrapes `https://www.mytransport.sg/trainstatus#` (via
