@@ -296,22 +296,28 @@ def _parse_four_day(payload: dict) -> list[FourDayForecastEntry]:
     - Shape A: {"items": [{"forecasts": [...]}]}
     - Shape B: {"data": {"records": [...]}}
     """
-    # Shape A
-    items = payload.get("items") or []
-    if items and isinstance(items[0], dict):
-        records_raw = items[0].get("forecasts") or []
-    else:
-        # Shape B
-        records_raw = payload.get("data", {}).get("records") or []
-
     entries: list[FourDayForecastEntry] = []
-    for rec in records_raw:
-        dt = _parse_date_sgt(rec.get("date"))
+
+    def _append_entry(rec: dict, default_date: str | None = None) -> None:
+        dt = _parse_date_sgt(rec.get("date") or default_date)
         if dt is None:
-            continue
-        condition_text = (rec.get("forecast") or "").strip()
+            ts_dt = _parse_iso_datetime(rec.get("timestamp"))
+            if ts_dt is not None:
+                dt = ts_dt.astimezone(_SGT).replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
+        if dt is None:
+            return
+
+        forecast = rec.get("forecast")
+        if isinstance(forecast, dict):
+            condition_text = str(
+                forecast.get("summary") or forecast.get("text") or ""
+            ).strip()
+        else:
+            condition_text = str(forecast or "").strip()
         if not condition_text:
-            continue
+            return
 
         temp = rec.get("temperature") or {}
         rh = rec.get("relative_humidity") or rec.get("relativeHumidity") or {}
@@ -332,6 +338,29 @@ def _parse_four_day(payload: dict) -> list[FourDayForecastEntry]:
                 wind_direction=wind_dir,
             )
         )
+
+    # Shape A: {"items":[{"forecasts":[{daily}, ...]}]}
+    items = payload.get("items") or []
+    if items and isinstance(items[0], dict):
+        for rec in items[0].get("forecasts") or []:
+            if isinstance(rec, dict):
+                _append_entry(rec)
+        return entries
+
+    # Shape B can be either:
+    # - {"data":{"records":[{daily}, ...]}}
+    # - {"data":{"records":[{"date":"...", "forecasts":[{daily}, ...]}]}}
+    for rec in payload.get("data", {}).get("records") or []:
+        if not isinstance(rec, dict):
+            continue
+        nested = rec.get("forecasts")
+        if isinstance(nested, list):
+            for day_row in nested:
+                if isinstance(day_row, dict):
+                    _append_entry(day_row, default_date=rec.get("date"))
+        else:
+            _append_entry(rec)
+
     return entries
 
 

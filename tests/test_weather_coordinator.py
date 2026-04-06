@@ -222,6 +222,40 @@ def test_parse_four_day_shape_b_camel_case():
     assert entries[0].wind_direction == "W"
 
 
+def test_parse_four_day_shape_b_records_with_nested_forecasts():
+    payload = {
+        "data": {
+            "records": [
+                {
+                    "date": "2026-04-06",
+                    "forecasts": [
+                        {
+                            "day": "Tuesday",
+                            "timestamp": "2026-04-07T00:00:00+08:00",
+                            "forecast": {
+                                "summary": "Afternoon thundery showers",
+                                "text": "Thundery Showers",
+                            },
+                            "temperature": {"low": 24, "high": 34},
+                            "relativeHumidity": {"low": 60, "high": 95},
+                            "wind": {
+                                "speed": {"low": 5, "high": 15},
+                                "direction": "VARIABLE",
+                            },
+                        }
+                    ],
+                }
+            ]
+        }
+    }
+    entries = _parse_four_day(payload)
+    assert len(entries) == 1
+    assert entries[0].condition_text == "Afternoon thundery showers"
+    assert entries[0].temp_low == 24
+    assert entries[0].temp_high == 34
+    assert entries[0].wind_direction == "VARIABLE"
+
+
 def test_parse_four_day_skips_invalid_date():
     payload = {
         "data": {
