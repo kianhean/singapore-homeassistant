@@ -250,7 +250,8 @@ def test_parse_four_day_shape_b_records_with_nested_forecasts():
     }
     entries = _parse_four_day(payload)
     assert len(entries) == 1
-    assert entries[0].condition_text == "Afternoon thundery showers"
+    assert entries[0].condition_text == "Thundery Showers"
+    assert entries[0].date.day == 7
     assert entries[0].temp_low == 24
     assert entries[0].temp_high == 34
     assert entries[0].wind_direction == "VARIABLE"

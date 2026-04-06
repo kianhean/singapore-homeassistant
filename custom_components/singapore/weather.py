@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import timedelta, timezone
-
 from homeassistant.components.weather import (
     Forecast,
     WeatherEntity,
@@ -65,9 +63,7 @@ class SingaporeAreaWeatherEntity(
     """One weather entity per Singapore forecast area."""
 
     _attr_has_entity_name = False
-    _attr_supported_features = (
-        WeatherEntityFeature.FORECAST_HOURLY | WeatherEntityFeature.FORECAST_DAILY
-    )
+    _attr_supported_features = WeatherEntityFeature.FORECAST_DAILY
     _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_native_wind_speed_unit = UnitOfSpeed.KILOMETERS_PER_HOUR
 
@@ -134,41 +130,8 @@ class SingaporeAreaWeatherEntity(
         }
 
     async def async_forecast_hourly(self) -> list[Forecast] | None:
-        area = (
-            self.coordinator.data.areas.get(self._area)
-            if self.coordinator.data
-            else None
-        )
-        if area is None:
-            return None
-
-        # Approximate 2-hour interval forecast to two hourly points.
-        start_utc = area.valid_start.astimezone(timezone.utc)
-        condition = _map_condition(area.condition_text)
-
-        readings = self.coordinator.data.readings
-
-        def _point(dt):
-            payload = {
-                "datetime": dt.isoformat(),
-                "condition": condition,
-            }
-            if readings.temperature is not None:
-                payload["native_temperature"] = readings.temperature
-            if readings.humidity is not None:
-                payload["humidity"] = readings.humidity
-            if readings.wind_speed is not None:
-                payload["native_wind_speed"] = readings.wind_speed
-            if readings.wind_bearing is not None:
-                payload["wind_bearing"] = readings.wind_bearing
-            if readings.precipitation is not None:
-                payload["precipitation"] = readings.precipitation
-            return Forecast(**payload)
-
-        return [
-            _point(start_utc),
-            _point(start_utc + timedelta(hours=1)),
-        ]
+        """Hourly forecasts are intentionally unsupported for this integration."""
+        return None
 
     async def async_forecast_daily(self) -> list[Forecast] | None:
         if self.coordinator.data is None:

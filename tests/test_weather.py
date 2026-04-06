@@ -50,7 +50,7 @@ def test_weather_condition_mapping_and_attrs():
     assert attrs["humidity"] == 74.0
 
 
-async def test_weather_hourly_forecast_approximation():
+async def test_weather_hourly_forecast_is_unsupported():
     data = WeatherData(
         areas={
             "Bedok": WeatherAreaData(
@@ -71,17 +71,7 @@ async def test_weather_hourly_forecast_approximation():
     )
     ent = SingaporeAreaWeatherEntity(_coordinator(data), "entry1", "Bedok")
 
-    hourly = await ent.async_forecast_hourly()
-
-    assert len(hourly) == 2
-    assert hourly[0]["condition"] == "partlycloudy"
-    assert hourly[0]["datetime"] == "2026-04-05T00:00:00+00:00"
-    assert hourly[1]["datetime"] == "2026-04-05T01:00:00+00:00"
-    assert hourly[0]["native_temperature"] == 30.0
-    assert hourly[0]["humidity"] == 80.0
-    assert hourly[0]["native_wind_speed"] == 10.0
-    assert hourly[0]["wind_bearing"] == 225.0
-    assert hourly[0]["precipitation"] == 1.2
+    assert await ent.async_forecast_hourly() is None
 
 
 # ---------------------------------------------------------------------------
@@ -226,7 +216,7 @@ async def test_weather_daily_forecast_none_when_no_data():
     assert await ent.async_forecast_daily() is None
 
 
-def test_weather_entity_supports_daily_and_hourly_features():
+def test_weather_entity_supports_daily_feature_only():
     from custom_components.singapore.weather import WeatherEntityFeature
 
     data = WeatherData(
@@ -243,4 +233,4 @@ def test_weather_entity_supports_daily_and_hourly_features():
     )
     ent = SingaporeAreaWeatherEntity(_coordinator(data), "entry1", "Bedok")
     assert ent._attr_supported_features & WeatherEntityFeature.FORECAST_DAILY
-    assert ent._attr_supported_features & WeatherEntityFeature.FORECAST_HOURLY
+    assert not (ent._attr_supported_features & WeatherEntityFeature.FORECAST_HOURLY)

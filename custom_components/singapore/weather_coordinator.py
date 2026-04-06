@@ -299,7 +299,7 @@ def _parse_four_day(payload: dict) -> list[FourDayForecastEntry]:
     entries: list[FourDayForecastEntry] = []
 
     def _append_entry(rec: dict, default_date: str | None = None) -> None:
-        dt = _parse_date_sgt(rec.get("date") or default_date)
+        dt = _parse_date_sgt(rec.get("date"))
         if dt is None:
             ts_dt = _parse_iso_datetime(rec.get("timestamp"))
             if ts_dt is not None:
@@ -307,12 +307,14 @@ def _parse_four_day(payload: dict) -> list[FourDayForecastEntry]:
                     hour=0, minute=0, second=0, microsecond=0
                 )
         if dt is None:
+            dt = _parse_date_sgt(default_date)
+        if dt is None:
             return
 
         forecast = rec.get("forecast")
         if isinstance(forecast, dict):
             condition_text = str(
-                forecast.get("summary") or forecast.get("text") or ""
+                forecast.get("text") or forecast.get("summary") or ""
             ).strip()
         else:
             condition_text = str(forecast or "").strip()
