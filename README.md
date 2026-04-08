@@ -7,6 +7,10 @@
 A [HACS](https://hacs.xyz) custom integration for Singapore-specific data: utility
 tariffs, COE bidding results, live weather, train status, and public holidays.
 
+### HACS installation
+
+[![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=kianhean&repository=singapore-homeassistant&category=integration)
+
 ## What you get
 
 ### SP Group utility tariffs
@@ -94,6 +98,10 @@ Tracks both an overall network status and a per-line status for each MRT/LRT lin
 Lines: North-South, East-West, North East, Circle, Downtown, Thomson-East Coast,
 Bukit Panjang LRT, Sengkang LRT, Punggol LRT.
 
+<p align="center">
+  <img src="images/train-status.jpeg" alt="Singapore MRT/LRT device page showing overall and per-line train status sensors" width="320">
+</p>
+
 ### Public holidays
 
 Updated every 24 hours from [MOM](https://www.mom.gov.sg/employment-practices/public-holidays).
@@ -178,3 +186,7 @@ See [CLAUDE.md](CLAUDE.md) for project structure, test instructions, and convent
 pip install -r requirements_test.txt
 pytest tests/ -v
 ```
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
