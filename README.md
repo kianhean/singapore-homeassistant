@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="image.png" alt="Singapore Data Home Assistant Integration" width="300">
+  <img src="custom_components/singapore/images/icon.png" alt="Singapore Home Assistant custom integration" width="300">
 </p>
 
-# Singapore Home Assistant integration
+# Singapore Home Assistant custom integration
 
 A [HACS](https://hacs.xyz) custom integration for Singapore-specific data: utility
 tariffs, COE bidding results, live weather, train status, and public holidays.
