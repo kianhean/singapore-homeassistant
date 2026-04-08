@@ -24,6 +24,10 @@ every 24 hours.
 Tariff sensors include `quarter` (e.g. `Q1`), `year`, and `source` as state attributes.
 The solar export price sensor also includes `network_cost` and `total_tariff`.
 
+<p align="center">
+  <img src="images/energy-sensors.jpeg" alt="Singapore Energy device page showing electricity, gas, solar export, and water tariff sensors" width="320">
+</p>
+
 ### COE bidding results
 
 Pulled from the [LTA dataset on data.gov.sg](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view)
@@ -40,6 +44,10 @@ daily at **19:30**, after each bidding exercise.
 Each sensor includes `category`, `description`, `month`, `bidding_no`, and `source` as
 state attributes.
 
+<p align="center">
+  <img src="images/coe-sensors.jpeg" alt="Singapore COE device page showing Category A to E certificate of entitlement sensors" width="320">
+</p>
+
 ### NEA realtime weather readings
 
 Updated every **10 minutes** from [data.gov.sg collection 1459](https://data.gov.sg/collections/1459/view).
@@ -53,6 +61,10 @@ Station readings are averaged across all available stations at fetch time.
 | `sensor.singapore_wind_bearing` | Singapore Wind Bearing | ° | Aggregated wind direction |
 | `sensor.singapore_rainfall` | Singapore Rainfall | mm | Aggregated rainfall |
 
+<p align="center">
+  <img src="images/weather-overview.jpeg" alt="Singapore Weather entity list showing area forecasts alongside humidity, rainfall, temperature, wind bearing, and wind speed sensors" width="320">
+</p>
+
 ### Weather entities (2-hour forecast, by area)
 
 One weather entity per forecast area from [data.gov.sg collection 1456](https://data.gov.sg/collections/1456/view),
@@ -64,6 +76,10 @@ Example entities: `weather.singapore_weather_bedok`, `weather.singapore_weather_
 
 Each entity has a mapped HA condition (`sunny`, `partlycloudy`, `rainy`, etc.), an hourly
 forecast list, and attributes like `raw_condition`, `valid_start`, and `valid_end`.
+
+<p align="center">
+  <img src="images/weather-forecast-bedok.jpeg" alt="Singapore Weather Bedok forecast card showing current condition and multi-day forecast" width="320">
+</p>
 
 ### MRT/LRT train status
 
@@ -86,6 +102,10 @@ Shows up as a Home Assistant calendar with all-day events from the current year 
 | Entity ID | Name |
 |-----------|------|
 | `calendar.singapore_public_holidays` | Singapore Public Holidays |
+
+<p align="center">
+  <img src="images/public-holidays-calendar.jpeg" alt="Singapore public holidays calendar showing Good Friday and Saturday as all-day events" width="320">
+</p>
 
 ## Example sensor states
 
