@@ -7,9 +7,19 @@
 A [HACS](https://hacs.xyz) custom integration for Singapore-specific data: utility
 tariffs, COE bidding results, live weather, train status, and public holidays.
 
-### HACS installation
+### HACS installation (manual, pre-merge)
 
-[![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=kianhean&repository=singapore-homeassistant&category=integration)
+This integration is **not merged into the default HACS store yet**, so install it as a
+custom repository first:
+
+1. Open **HACS** in Home Assistant.
+2. Go to **Integrations**.
+3. Open the three-dot menu (top-right) → **Custom repositories**.
+4. Repository: `https://github.com/kianhean/singapore-homeassistant`
+5. Category: **Integration**
+6. Click **Add**.
+7. Search for **Singapore** in HACS and install it.
+8. Restart Home Assistant.
 
 ## What you get
 
@@ -153,7 +163,7 @@ sensor.singapore_temperature:
     source: data.gov.sg / NEA (collection 1459)
 ```
 
-## Installation via HACS
+## Installation via HACS (manual custom repository)
 
 1. Open HACS in your Home Assistant instance.
 2. Go to **Integrations → Custom repositories** (three-dot menu).
