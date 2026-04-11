@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import re
 
-from homeassistant.components.sensor import SensorEntity, SensorStateClass
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import UnitOfEnergy, UnitOfVolume
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -19,6 +24,7 @@ from .coe_coordinator import (
     CoeCoordinator,
 )
 from .coordinator import UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER, SPGroupCoordinator
+from .sp_services_coordinator import SpServicesCoordinator
 from .train_coordinator import TRAIN_LINES, TrainStatusCoordinator
 from .weather_coordinator import SingaporeWeatherCoordinator
 
@@ -34,12 +40,15 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up SP Group tariff and COE sensors."""
+    """Set up SP Group tariff, COE, weather, train, and SP Services sensors."""
     entry_data = hass.data[DOMAIN][entry.entry_id]
     tariff_coordinator: SPGroupCoordinator = entry_data["tariff"]
     coe_coordinator: CoeCoordinator = entry_data["coe"]
     weather_coordinator: SingaporeWeatherCoordinator = entry_data["weather"]
     train_coordinator: TrainStatusCoordinator = entry_data["train"]
+    sp_services_coordinator: SpServicesCoordinator | None = entry_data.get(
+        "sp_services"
+    )
 
     entities: list[SensorEntity] = [
         SingaporeElectricityTariffSensor(tariff_coordinator, entry.entry_id),
@@ -63,6 +72,22 @@ async def async_setup_entry(
     for line in TRAIN_LINES:
         entities.append(
             SingaporeTrainLineStatusSensor(train_coordinator, entry.entry_id, line)
+        )
+
+    # SP Services household usage sensors — only present when credentials are
+    # configured (i.e. the coordinator is not None).
+    if sp_services_coordinator is not None:
+        entities.extend(
+            [
+                SpServicesElectricityTodaySensor(
+                    sp_services_coordinator, entry.entry_id
+                ),
+                SpServicesElectricityMonthSensor(
+                    sp_services_coordinator, entry.entry_id
+                ),
+                SpServicesWaterTodaySensor(sp_services_coordinator, entry.entry_id),
+                SpServicesWaterMonthSensor(sp_services_coordinator, entry.entry_id),
+            ]
         )
 
     async_add_entities(entities)
@@ -434,3 +459,114 @@ class SingaporeTrainLineStatusSensor(
             "manufacturer": "Singapore",
             "model": "MyTransport Train Status",
         }
+
+
+# ---------------------------------------------------------------------------
+# SP Services household usage sensors
+# ---------------------------------------------------------------------------
+
+
+class _BaseSpServicesSensor(CoordinatorEntity[SpServicesCoordinator], SensorEntity):
+    """Shared base for SP Services household usage sensors."""
+
+    _attr_has_entity_name = False
+    _attr_state_class = SensorStateClass.TOTAL
+
+    def __init__(self, coordinator: SpServicesCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._entry_id = entry_id
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        if self.coordinator.data is None:
+            return {}
+        attrs: dict = {"source": "SP Services"}
+        if self.coordinator.data.account_no:
+            attrs["account_no"] = self.coordinator.data.account_no
+        attrs["last_updated"] = self.coordinator.data.last_updated.isoformat()
+        return attrs
+
+    @property
+    def device_info(self) -> dict:
+        return {
+            "identifiers": {(DOMAIN, f"{self._entry_id}_sp_services")},
+            "name": "SP Services Account",
+            "manufacturer": "SP Group",
+            "model": "Household Usage",
+        }
+
+
+class SpServicesElectricityTodaySensor(_BaseSpServicesSensor):
+    """Today's household electricity consumption (kWh)."""
+
+    _attr_name = "SP Services Electricity Today"
+    _attr_icon = "mdi:lightning-bolt"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+
+    def __init__(self, coordinator: SpServicesCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_sp_electricity_today"
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.electricity_today_kwh
+
+
+class SpServicesElectricityMonthSensor(_BaseSpServicesSensor):
+    """This month's household electricity consumption (kWh)."""
+
+    _attr_name = "SP Services Electricity This Month"
+    _attr_icon = "mdi:lightning-bolt"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+
+    def __init__(self, coordinator: SpServicesCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_sp_electricity_month"
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.electricity_month_kwh
+
+
+class SpServicesWaterTodaySensor(_BaseSpServicesSensor):
+    """Today's household water consumption (m³)."""
+
+    _attr_name = "SP Services Water Today"
+    _attr_icon = "mdi:water"
+    _attr_device_class = SensorDeviceClass.WATER
+    _attr_native_unit_of_measurement = UnitOfVolume.CUBIC_METERS
+
+    def __init__(self, coordinator: SpServicesCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_sp_water_today"
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.water_today_m3
+
+
+class SpServicesWaterMonthSensor(_BaseSpServicesSensor):
+    """This month's household water consumption (m³)."""
+
+    _attr_name = "SP Services Water This Month"
+    _attr_icon = "mdi:water"
+    _attr_device_class = SensorDeviceClass.WATER
+    _attr_native_unit_of_measurement = UnitOfVolume.CUBIC_METERS
+
+    def __init__(self, coordinator: SpServicesCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_sp_water_month"
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.water_month_m3

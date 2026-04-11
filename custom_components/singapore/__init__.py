@@ -25,6 +25,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .coe_coordinator import CoeCoordinator
     from .coordinator import SPGroupCoordinator
     from .holiday_coordinator import PublicHolidayCoordinator
+    from .sp_services_coordinator import SpServicesCoordinator
     from .train_coordinator import TrainStatusCoordinator
     from .weather_coordinator import SingaporeWeatherCoordinator
 
@@ -63,12 +64,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         second=0,
     )
 
+    # SP Services household usage coordinator — only created when the entry
+    # has a valid auth token (i.e. the user completed the login + OTP flow).
+    sp_services_coordinator: SpServicesCoordinator | None = None
+    if entry.data.get("sp_token"):
+        sp_services_coordinator = SpServicesCoordinator(hass, entry)
+        # Don't block setup; the coordinator will fetch on its normal schedule.
+        # Auth failures surface through ConfigEntryAuthFailed → reauth flow.
+        hass.async_create_task(sp_services_coordinator.async_refresh())
+
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "tariff": tariff_coordinator,
         "coe": coe_coordinator,
         "weather": weather_coordinator,
         "holiday": holiday_coordinator,
         "train": train_coordinator,
+        "sp_services": sp_services_coordinator,
         "unsub_coe": unsub_coe,
     }
 
@@ -82,4 +93,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         entry_data = hass.data[DOMAIN].pop(entry.entry_id)
         entry_data["unsub_coe"]()
+        # Close the SP Services HTTP session if it was opened.
+        sp = entry_data.get("sp_services")
+        if sp is not None:
+            await sp.client.close()
     return unload_ok

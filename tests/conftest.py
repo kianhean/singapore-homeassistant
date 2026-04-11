@@ -21,6 +21,10 @@ class UpdateFailed(Exception):
     pass
 
 
+class ConfigEntryAuthFailed(Exception):
+    pass
+
+
 class DataUpdateCoordinator:
     """Minimal coordinator that drives _async_update_data."""
 
@@ -75,11 +79,14 @@ class SensorEntity:
 
 
 class SensorDeviceClass:
-    pass
+    ENERGY = "energy"
+    WATER = "water"
 
 
 class SensorStateClass:
     MEASUREMENT = "measurement"
+    TOTAL = "total"
+    TOTAL_INCREASING = "total_increasing"
 
 
 class Platform:
@@ -156,8 +163,12 @@ _HA_MODULES: dict[str, ModuleType] = {
         "homeassistant.const",
         Platform=Platform,
         CONF_NAME="name",
+        CONF_USERNAME="username",
+        CONF_PASSWORD="password",
         UnitOfTemperature=UnitOfTemperature,
         UnitOfSpeed=UnitOfSpeed,
+        UnitOfEnergy=type("UnitOfEnergy", (), {"KILO_WATT_HOUR": "kWh"})(),
+        UnitOfVolume=type("UnitOfVolume", (), {"CUBIC_METERS": "m³"})(),
     ),
     "homeassistant.helpers": _mod("homeassistant.helpers"),
     "homeassistant.helpers.update_coordinator": _mod(
@@ -165,6 +176,10 @@ _HA_MODULES: dict[str, ModuleType] = {
         DataUpdateCoordinator=DataUpdateCoordinator,
         CoordinatorEntity=CoordinatorEntity,
         UpdateFailed=UpdateFailed,
+    ),
+    "homeassistant.exceptions": _mod(
+        "homeassistant.exceptions",
+        ConfigEntryAuthFailed=ConfigEntryAuthFailed,
     ),
     "homeassistant.helpers.aiohttp_client": _mod(
         "homeassistant.helpers.aiohttp_client",
@@ -212,6 +227,7 @@ for _name, _mod_obj in _HA_MODULES.items():
 class _NiquestsResponse:
     status_code = 200
     headers: dict[str, str] = {}
+    ok = True
 
     def json(self):
         return {}
@@ -226,6 +242,12 @@ class _NiquestsAsyncSession:
 
     async def get(self, *args, **kwargs):
         return _NiquestsResponse()
+
+    async def post(self, *args, **kwargs):
+        return _NiquestsResponse()
+
+    async def close(self):
+        pass
 
 
 class _NiquestsSession:
@@ -263,7 +285,12 @@ except ImportError:
 
     sys.modules.setdefault(
         "voluptuous",
-        _mod("voluptuous", Schema=_Schema, Required=lambda k, **kw: k),
+        _mod(
+            "voluptuous",
+            Schema=_Schema,
+            Required=lambda k, **kw: k,
+            Optional=lambda k, **kw: k,
+        ),
     )
 
 

@@ -3,18 +3,46 @@
     "step": {
       "user": {
         "title": "Singapore",
-        "description": "Set up the Singapore integration.",
+        "description": "Set up the Singapore integration. Optionally enter your SP Services credentials to enable household electricity and water usage sensors. Leave both fields blank to skip.",
         "data": {
-          "name": "Integration Name"
+          "name": "Integration Name",
+          "username": "SP Services Username (optional)",
+          "password": "SP Services Password (optional)"
+        }
+      },
+      "otp": {
+        "title": "SP Services Two-Factor Authentication",
+        "description": "An OTP has been sent to the mobile number registered for {username}. Enter it below to complete login.",
+        "data": {
+          "otp": "One-Time Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate SP Services",
+        "description": "Your SP Services session has expired. Re-enter your password for {username} to request a new OTP.",
+        "data": {
+          "password": "SP Services Password"
+        }
+      },
+      "reauth_otp": {
+        "title": "SP Services Two-Factor Authentication",
+        "description": "Enter the OTP sent to your registered mobile number to complete re-authentication.",
+        "data": {
+          "otp": "One-Time Password"
         }
       }
     },
     "error": {
       "empty_name": "Name cannot be empty.",
-      "name_too_long": "Name must be 64 characters or fewer."
+      "name_too_long": "Name must be 64 characters or fewer.",
+      "credentials_incomplete": "Please provide both a username and a password, or leave both blank.",
+      "invalid_auth": "Invalid SP Services username or password.",
+      "invalid_otp": "Incorrect OTP. Please try again.",
+      "cannot_connect": "Could not connect to SP Services. Check your network and try again."
     },
     "abort": {
-      "already_configured": "This integration is already configured."
+      "already_configured": "This integration is already configured.",
+      "reauth_successful": "Re-authentication was successful."
     }
   }
 }
