@@ -12,23 +12,16 @@
       },
       "otp": {
         "title": "SP Services Two-Factor Authentication",
-        "description": "An OTP has been sent to the mobile number registered for {username}. Enter it below to complete login.",
+        "description": "An OTP has been sent to the mobile number registered for **{username}**. Enter it below to complete login.",
         "data": {
           "otp": "One-Time Password"
         }
       },
       "reauth_confirm": {
         "title": "Re-authenticate SP Services",
-        "description": "Your SP Services session has expired. Re-enter your password for {username} to request a new OTP.",
+        "description": "Your SP Services session for **{username}** has expired. Select **Yes** below to re-enter your credentials and receive a new OTP, or **No** to attempt a reload with the existing session.",
         "data": {
-          "password": "SP Services Password"
-        }
-      },
-      "reauth_otp": {
-        "title": "SP Services Two-Factor Authentication",
-        "description": "Enter the OTP sent to your registered mobile number to complete re-authentication.",
-        "data": {
-          "otp": "One-Time Password"
+          "reauth_confirm": "Yes, I want to re-enter my SP Services credentials"
         }
       }
     },

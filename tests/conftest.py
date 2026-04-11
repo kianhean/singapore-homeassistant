@@ -107,6 +107,16 @@ class ConfigFlow:
     def __init_subclass__(cls, domain=None, **kwargs):
         super().__init_subclass__(**kwargs)
 
+    @property
+    def source(self):
+        return getattr(self, "_source", "user")
+
+    def _get_reauth_entry(self):
+        return getattr(self, "_reauth_entry", None)
+
+    def async_update_reload_and_abort(self, entry, data=None, options=None):
+        return {"type": "abort", "reason": "reauth_successful"}
+
 
 class AddEntitiesCallback:
     pass
@@ -217,6 +227,7 @@ _HA_MODULES: dict[str, ModuleType] = {
         ConfigFlow=ConfigFlow,
         ConfigFlowResult=dict,
         SOURCE_USER="user",
+        SOURCE_REAUTH="reauth",
     ),
 }
 
