@@ -1,23 +1,28 @@
 """Config flow for the Singapore integration.
 
-Initial setup
--------------
-Step 1 (user): Enter an integration name plus optional SP Services credentials.
-  - If both username + password are provided the flow triggers an OTP SMS and
-    moves to step 2.
-  - If credentials are left blank the entry is created without SP Services
-    household-usage sensors.
+Initial setup (config flow)
+---------------------------
+Step 1 (user): Enter an integration name.  No credentials required.
+  All public data sources (tariffs, COE, weather, trains, holidays) are set up
+  immediately.  SP Services household-usage sensors are NOT created yet.
 
-Step 2 (otp): Enter the OTP to complete the SP Services login and store the token.
+Configuring SP Services later (options flow)
+--------------------------------------------
+After setup the user can open the integration's "Configure" dialog to add or
+update SP Services credentials.  The flow mirrors the SmartThinQ pattern:
+
+  Step 1 (init): Enter username + password.
+    • Both blank → remove SP Services credentials and reload.
+    • Both filled → trigger OTP SMS, continue to step 2.
+  Step 2 (otp): Enter the OTP to complete login and store the token.
+    → Updates entry.data with credentials + token, then reloads.
 
 Re-authentication (triggered automatically by HA when ConfigEntryAuthFailed is raised)
 ---------------------------------------------------------------------------------------
-Step 1 (reauth_confirm): Informs the user their session has expired and asks them to
-  confirm they want to re-enter credentials.  Choosing "Yes" routes back to the regular
-  user step which, when running in reauth context, updates the existing entry and reloads
-  rather than creating a new one.  Choosing "No" just reloads the entry as-is.
-
-This mirrors the pattern used by ha-smartthinq-sensors.
+Step 1 (reauth_confirm): Inform the user their session has expired.
+  • Yes → route back to async_step_user (which in reauth context updates the
+           existing entry via async_update_reload_and_abort).
+  • No  → attempt a reload with the existing token.
 """
 
 from __future__ import annotations
@@ -26,8 +31,15 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import SOURCE_REAUTH, ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import (
+    SOURCE_REAUTH,
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.const import CONF_NAME, CONF_PASSWORD, CONF_USERNAME
+from homeassistant.core import callback
 
 from . import DOMAIN
 from .sp_services_coordinator import SpServicesClient
@@ -39,6 +51,11 @@ CONF_REAUTH_CONFIRM = "reauth_confirm"
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_NAME, default="Singapore"): str,
+    }
+)
+
+STEP_CREDENTIALS_SCHEMA = vol.Schema(
+    {
         vol.Optional(CONF_USERNAME): str,
         vol.Optional(CONF_PASSWORD): str,
     }
@@ -51,6 +68,11 @@ STEP_OTP_SCHEMA = vol.Schema(
 )
 
 
+# ---------------------------------------------------------------------------
+# Config flow (initial setup)
+# ---------------------------------------------------------------------------
+
+
 class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle the config flow for the Singapore integration."""
 
@@ -60,10 +82,13 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
         self._user_name: str = ""
         self._sp_username: str = ""
         self._sp_password: str = ""
-        # Raw JSON body returned by the SP Services login endpoint; passed
-        # unchanged to verify_otp() so the server can match the OTP to the
-        # correct in-flight session.
         self._login_response: dict[str, Any] = {}
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> SingaporeOptionsFlow:
+        """Return the options flow handler."""
+        return SingaporeOptionsFlow(config_entry)
 
     # ------------------------------------------------------------------
     # Helpers
@@ -74,37 +99,37 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.source == SOURCE_REAUTH
 
     # ------------------------------------------------------------------
-    # Initial setup — step 1
+    # Step 1: name only
     # ------------------------------------------------------------------
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Collect integration name and optional SP Services credentials.
+        """Collect the integration name.
 
-        This step is also reached from the reauth flow when the user
-        chooses to re-enter their credentials.  In that case we skip the
-        unique-id check and update the existing entry instead of creating
-        a new one.
+        In reauth context (reached from reauth_confirm) this also handles
+        SP Services credential re-entry via the pre-filled credentials schema.
         """
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            name = user_input.get(CONF_NAME, "").strip()
-            username = user_input.get(CONF_USERNAME, "").strip()
-            password = user_input.get(CONF_PASSWORD, "").strip()
-
-            # In reauth context the name comes from the existing entry.
             if self._is_reauth:
+                # In reauth we re-enter SP credentials (name stays the same).
                 name = self._get_reauth_entry().title
+                username = user_input.get(CONF_USERNAME, "").strip()
+                password = user_input.get(CONF_PASSWORD, "").strip()
+            else:
+                name = user_input.get(CONF_NAME, "").strip()
+                username = ""
+                password = ""
 
             if not name:
                 errors["base"] = "empty_name"
             elif len(name) > 64:
                 errors["base"] = "name_too_long"
-            elif bool(username) != bool(password):
+            elif self._is_reauth and bool(username) != bool(password):
                 errors["base"] = "credentials_incomplete"
-            elif username and password:
+            elif self._is_reauth and username and password:
                 self._user_name = name
                 self._sp_username = username
                 self._sp_password = password
@@ -114,21 +139,18 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
                 except ValueError:
                     errors["base"] = "invalid_auth"
                 except Exception:
-                    _LOGGER.exception("SP Services login error")
+                    _LOGGER.exception("SP Services login error during reauth")
                     errors["base"] = "cannot_connect"
                 finally:
                     await client.close()
 
                 if not errors:
                     return await self.async_step_otp()
+            elif self._is_reauth:
+                # No credentials supplied during reauth — just reload as-is.
+                return self.async_update_reload_and_abort(self._get_reauth_entry())
             else:
-                # No credentials — create / update entry without SP Services.
-                if self._is_reauth:
-                    entry = self._get_reauth_entry()
-                    return self.async_update_reload_and_abort(
-                        entry,
-                        data={k: v for k, v in entry.data.items()},
-                    )
+                # Normal initial setup — create entry without SP Services.
                 await self.async_set_unique_id(name)
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(
@@ -136,7 +158,6 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
                     data={CONF_NAME: name},
                 )
 
-        # Pre-fill username from existing entry when reauthenticating.
         if self._is_reauth:
             entry = self._get_reauth_entry()
             stored_username = entry.data.get(CONF_USERNAME, "")
@@ -156,13 +177,13 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------
-    # Initial setup / reauth — step 2 (OTP)
+    # Step 2 (OTP) — reauth only
     # ------------------------------------------------------------------
 
     async def async_step_otp(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Enter the OTP to complete the SP Services login."""
+        """Enter the OTP to complete the SP Services login (reauth only)."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -172,30 +193,21 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
             except ValueError:
                 errors["base"] = "invalid_otp"
             except Exception:
-                _LOGGER.exception("SP Services OTP verify error")
+                _LOGGER.exception("SP Services OTP verify error during reauth")
                 errors["base"] = "cannot_connect"
             finally:
                 await client.close()
 
             if not errors:
-                new_data = {
-                    CONF_NAME: self._user_name,
-                    CONF_USERNAME: self._sp_username,
-                    CONF_PASSWORD: self._sp_password,
-                    "sp_token": token,
-                }
-                if self._is_reauth:
-                    # Merge with existing entry data and reload.
-                    entry = self._get_reauth_entry()
-                    return self.async_update_reload_and_abort(
-                        entry,
-                        data={**entry.data, **new_data},
-                    )
-                await self.async_set_unique_id(self._user_name)
-                self._abort_if_unique_id_configured()
-                return self.async_create_entry(
-                    title=self._user_name,
-                    data=new_data,
+                entry = self._get_reauth_entry()
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data={
+                        **entry.data,
+                        CONF_USERNAME: self._sp_username,
+                        CONF_PASSWORD: self._sp_password,
+                        "sp_token": token,
+                    },
                 )
 
         return self.async_show_form(
@@ -219,8 +231,8 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
         """Inform the user that their SP Services session has expired.
 
         Mirrors the SmartThinQ pattern:
-          - "Yes" → re-enter credentials (async_step_user)
-          - "No"  → reload the entry as-is (async_update_reload_and_abort)
+          Yes → re-enter credentials (async_step_user in reauth context)
+          No  → reload entry as-is
         """
         if user_input is None:
             return self.async_show_form(
@@ -234,8 +246,129 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
             )
 
         if user_input[CONF_REAUTH_CONFIRM]:
-            # User wants to re-enter credentials → go to user step.
             return await self.async_step_user()
 
-        # User wants to try reloading without changing credentials.
         return self.async_update_reload_and_abort(self._get_reauth_entry())
+
+
+# ---------------------------------------------------------------------------
+# Options flow (post-setup SP Services configuration)
+# ---------------------------------------------------------------------------
+
+
+class SingaporeOptionsFlow(OptionsFlow):
+    """Allow the user to add, update, or remove SP Services credentials.
+
+    Accessible via the integration card's "Configure" button.
+    Credentials are stored in entry.data (not entry.options) so they
+    remain available to the coordinator on reload.
+    """
+
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        self.config_entry = config_entry
+        self._sp_username: str = config_entry.data.get(CONF_USERNAME, "")
+        self._sp_password: str = ""
+        self._login_response: dict[str, Any] = {}
+
+    # ------------------------------------------------------------------
+    # Step 1: credentials
+    # ------------------------------------------------------------------
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show username + password form, pre-filled with existing username."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            username = user_input.get(CONF_USERNAME, "").strip()
+            password = user_input.get(CONF_PASSWORD, "").strip()
+
+            if bool(username) != bool(password):
+                errors["base"] = "credentials_incomplete"
+            elif username and password:
+                self._sp_username = username
+                self._sp_password = password
+                client = SpServicesClient()
+                try:
+                    self._login_response = await client.login(username, password)
+                except ValueError:
+                    errors["base"] = "invalid_auth"
+                except Exception:
+                    _LOGGER.exception("SP Services login error in options flow")
+                    errors["base"] = "cannot_connect"
+                finally:
+                    await client.close()
+
+                if not errors:
+                    return await self.async_step_otp()
+            else:
+                # Both blank — remove SP Services credentials and reload.
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry,
+                    data={
+                        k: v
+                        for k, v in self.config_entry.data.items()
+                        if k not in (CONF_USERNAME, CONF_PASSWORD, "sp_token")
+                    },
+                )
+                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+                return self.async_create_entry(title="", data={})
+
+        schema = vol.Schema(
+            {
+                vol.Optional(CONF_USERNAME, default=self._sp_username): str,
+                vol.Optional(CONF_PASSWORD): str,
+            }
+        )
+        return self.async_show_form(
+            step_id="init",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={
+                "configured": "yes" if self._sp_username else "no"
+            },
+        )
+
+    # ------------------------------------------------------------------
+    # Step 2: OTP
+    # ------------------------------------------------------------------
+
+    async def async_step_otp(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Enter the OTP to complete the SP Services login."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            client = SpServicesClient()
+            try:
+                token = await client.verify_otp(user_input["otp"], self._login_response)
+            except ValueError:
+                errors["base"] = "invalid_otp"
+            except Exception:
+                _LOGGER.exception("SP Services OTP verify error in options flow")
+                errors["base"] = "cannot_connect"
+            finally:
+                await client.close()
+
+            if not errors:
+                # Store credentials in entry.data and reload.
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry,
+                    data={
+                        **self.config_entry.data,
+                        CONF_USERNAME: self._sp_username,
+                        CONF_PASSWORD: self._sp_password,
+                        "sp_token": token,
+                    },
+                )
+                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+                return self.async_create_entry(title="", data={})
+
+        return self.async_show_form(
+            step_id="otp",
+            data_schema=STEP_OTP_SCHEMA,
+            errors=errors,
+            description_placeholders={"username": self._sp_username},
+        )

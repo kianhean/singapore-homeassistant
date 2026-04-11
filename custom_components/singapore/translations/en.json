@@ -3,11 +3,9 @@
     "step": {
       "user": {
         "title": "Singapore",
-        "description": "Set up the Singapore integration. Optionally enter your SP Services credentials to enable household electricity and water usage sensors. Leave both fields blank to skip.",
+        "description": "Set up the Singapore integration. Public data sources (tariffs, COE, weather, trains, holidays) are enabled immediately. To add household electricity and water usage, open the integration's **Configure** dialog after setup.",
         "data": {
-          "name": "Integration Name",
-          "username": "SP Services Username (optional)",
-          "password": "SP Services Password (optional)"
+          "name": "Integration Name"
         }
       },
       "otp": {
@@ -19,7 +17,7 @@
       },
       "reauth_confirm": {
         "title": "Re-authenticate SP Services",
-        "description": "Your SP Services session for **{username}** has expired. Select **Yes** below to re-enter your credentials and receive a new OTP, or **No** to attempt a reload with the existing session.",
+        "description": "Your SP Services session for **{username}** has expired. Select **Yes** to re-enter your credentials and receive a new OTP, or **No** to attempt a reload with the existing session.",
         "data": {
           "reauth_confirm": "Yes, I want to re-enter my SP Services credentials"
         }
@@ -36,6 +34,31 @@
     "abort": {
       "already_configured": "This integration is already configured.",
       "reauth_successful": "Re-authentication was successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "SP Services Household Usage",
+        "description": "Enter your SP Services credentials to enable household electricity and water usage sensors. Leave both fields blank to remove SP Services and disable those sensors.",
+        "data": {
+          "username": "SP Services Username",
+          "password": "SP Services Password"
+        }
+      },
+      "otp": {
+        "title": "SP Services Two-Factor Authentication",
+        "description": "An OTP has been sent to the mobile number registered for **{username}**. Enter it below to complete login.",
+        "data": {
+          "otp": "One-Time Password"
+        }
+      }
+    },
+    "error": {
+      "credentials_incomplete": "Please provide both a username and a password, or leave both blank.",
+      "invalid_auth": "Invalid SP Services username or password.",
+      "invalid_otp": "Incorrect OTP. Please try again.",
+      "cannot_connect": "Could not connect to SP Services. Check your network and try again."
     }
   }
 }

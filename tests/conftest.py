@@ -118,6 +118,13 @@ class ConfigFlow:
         return {"type": "abort", "reason": "reauth_successful"}
 
 
+class OptionsFlow:
+    """Minimal OptionsFlow stub."""
+
+    def __init__(self, config_entry=None):
+        self.config_entry = config_entry
+
+
 class AddEntitiesCallback:
     pass
 
@@ -167,7 +174,9 @@ def _mod(name: str, **attrs) -> ModuleType:
 _HA_MODULES: dict[str, ModuleType] = {
     "homeassistant": _mod("homeassistant"),
     "homeassistant.core": _mod(
-        "homeassistant.core", HomeAssistant=HomeAssistant, callback=lambda f: f
+        "homeassistant.core",
+        HomeAssistant=HomeAssistant,
+        callback=lambda f: f,
     ),
     "homeassistant.const": _mod(
         "homeassistant.const",
@@ -226,6 +235,7 @@ _HA_MODULES: dict[str, ModuleType] = {
         ConfigEntry=ConfigEntry,
         ConfigFlow=ConfigFlow,
         ConfigFlowResult=dict,
+        OptionsFlow=OptionsFlow,
         SOURCE_USER="user",
         SOURCE_REAUTH="reauth",
     ),
