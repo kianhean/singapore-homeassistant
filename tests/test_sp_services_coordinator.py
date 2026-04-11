@@ -13,214 +13,281 @@ from custom_components.singapore.sp_services_coordinator import (
     SpServicesClient,
     SpServicesCoordinator,
     SpServicesData,
-    _parse_usage,
+    _code_from_url,
+    _extract_csrf,
+    _extract_primary_account,
+    _parse_daily_csv,
+    _parse_daily_usage,
+    _parse_monthly_csv,
+    _parse_monthly_usage,
 )
 
-# ---------------------------------------------------------------------------
-# _parse_usage unit tests — no network required
-# ---------------------------------------------------------------------------
 
-
-def _electricity(records=None, month_total=None, account_no=None) -> dict:
-    payload: dict = {}
-    if records is not None:
-        payload["data"] = records
-    if month_total is not None:
-        payload["monthTotal"] = month_total
-    if account_no is not None:
-        payload["accountNo"] = account_no
-    return payload
-
-
-def _water(records=None, month_total=None) -> dict:
-    payload: dict = {}
-    if records is not None:
-        payload["data"] = records
-    if month_total is not None:
-        payload["monthTotal"] = month_total
-    return payload
-
-
-def test_parse_usage_full() -> None:
-    """All fields present → all values extracted."""
-    elec = _electricity(
-        records=[{"consumption": "10.5"}, {"consumption": "8.3"}],
-        month_total=250.0,
-        account_no="ACC-123",
-    )
-    water = _water(
-        records=[{"consumption": "0.4"}],
-        month_total=12.5,
-    )
-    result = _parse_usage(elec, water)
-    assert result.electricity_today_kwh == pytest.approx(8.3)
-    assert result.electricity_month_kwh == pytest.approx(250.0)
-    assert result.water_today_m3 == pytest.approx(0.4)
-    assert result.water_month_m3 == pytest.approx(12.5)
-    assert result.account_no == "ACC-123"
-    assert isinstance(result.last_updated, datetime)
-
-
-def test_parse_usage_no_records() -> None:
-    """Empty payload → today values are None, month values are None."""
-    result = _parse_usage({}, {})
-    assert result.electricity_today_kwh is None
-    assert result.electricity_month_kwh is None
-    assert result.water_today_m3 is None
-    assert result.water_month_m3 is None
-    assert result.account_no is None
-
-
-def test_parse_usage_alternative_field_names() -> None:
-    """Parser tries multiple field name variants."""
-    elec = {
-        "records": [{"value": "15.0"}],
-        "totalUsage": 300.0,
-        "accountNumber": "ACC-456",
-    }
-    water = {
-        "usageData": [{"usage": "0.6"}, {"usage": "0.9"}],
-        "monthlyUsage": 20.0,
-    }
-    result = _parse_usage(elec, water)
-    assert result.electricity_today_kwh == pytest.approx(15.0)
-    assert result.electricity_month_kwh == pytest.approx(300.0)
-    assert result.water_today_m3 == pytest.approx(0.9)
-    assert result.water_month_m3 == pytest.approx(20.0)
-    assert result.account_no == "ACC-456"
-
-
-def test_parse_usage_bad_float_ignored() -> None:
-    """Non-numeric consumption value → today returns None."""
-    elec = {"data": [{"consumption": "N/A"}], "monthTotal": 100.0}
-    result = _parse_usage(elec, {})
-    assert result.electricity_today_kwh is None
-    assert result.electricity_month_kwh == pytest.approx(100.0)
-
-
-# ---------------------------------------------------------------------------
-# SpServicesClient HTTP tests (mock niquests session)
-# ---------------------------------------------------------------------------
-
-
-def _make_response(status_code: int = 200, body: dict | None = None) -> MagicMock:
+def _make_response(
+    status_code: int = 200,
+    body: dict | None = None,
+    *,
+    text: str = "",
+    url: str = "https://services.spservices.sg/",
+    history: list | None = None,
+    headers: dict | None = None,
+) -> MagicMock:
     resp = MagicMock()
     resp.status_code = status_code
     resp.ok = status_code < 400
     resp.json.return_value = body or {}
+    resp.text = text
+    resp.url = url
+    resp.history = history or []
+    resp.headers = headers or {}
     return resp
 
 
+def test_extract_csrf_from_hidden_input() -> None:
+    html = '<input type="hidden" name="_csrf" value="csrf-123">'
+    assert _extract_csrf(html) == "csrf-123"
+
+
+def test_extract_csrf_from_inline_config() -> None:
+    html = '{"_csrf":"csrf-456"}'
+    assert _extract_csrf(html) == "csrf-456"
+
+
+def test_code_from_url_matches_state() -> None:
+    url = "https://services.spservices.sg/callback?code=abc123&state=state-1"
+    assert _code_from_url(url, "state-1") == "abc123"
+    assert _code_from_url(url, "other") is None
+
+
+def test_extract_primary_account() -> None:
+    payload = {
+        "status": 100,
+        "user:getAccounts": {
+            "data": {
+                "accounts": [
+                    {
+                        "accountNo": "8949049293",
+                        "premiseNo": "2001201124",
+                        "msslPremiseNo": "WATER-1",
+                    }
+                ]
+            }
+        },
+    }
+    account = _extract_primary_account(payload)
+    assert account == {
+        "accountNo": "8949049293",
+        "premiseNo": "2001201124",
+        "ebsPremiseNo": None,
+        "msslPremiseNo": "WATER-1",
+        "premises_id": None,
+    }
+
+
+def test_parse_monthly_usage_realistic_shape() -> None:
+    payload = {
+        "status": 100,
+        "charts:monthly": {
+            "data": [
+                {
+                    "month": "2026-04-01",
+                    "electricityTotal": "212.4",
+                    "waterTotal": "9.1",
+                }
+            ]
+        },
+    }
+    electricity, water = _parse_monthly_usage(payload, datetime(2026, 4, 11))
+    assert electricity == pytest.approx(212.4)
+    assert water == pytest.approx(9.1)
+
+
+def test_parse_daily_usage_realistic_shape() -> None:
+    payload = {
+        "status": 100,
+        "charts:hourly": {
+            "data": [
+                {
+                    "date": "2026-04-11",
+                    "electricityConsumption": "7.2",
+                    "waterConsumption": "0.41",
+                }
+            ]
+        },
+    }
+    electricity, water = _parse_daily_usage(payload, datetime(2026, 4, 11))
+    assert electricity == pytest.approx(7.2)
+    assert water == pytest.approx(0.41)
+
+
+def test_parse_daily_usage_status_150_returns_none() -> None:
+    electricity, water = _parse_daily_usage({"status": 150}, datetime(2026, 4, 11))
+    assert electricity is None
+    assert water is None
+
+
+def test_parse_monthly_csv() -> None:
+    csv_text = (
+        "month,electricity_total_kwh,water_total_m3\n"
+        "2026-04-01,205.1,8.7\n"
+    )
+    electricity, water = _parse_monthly_csv(csv_text, datetime(2026, 4, 11))
+    assert electricity == pytest.approx(205.1)
+    assert water == pytest.approx(8.7)
+
+
+def test_parse_daily_csv() -> None:
+    csv_text = (
+        "date,electricity_usage_kwh,water_usage_m3\n"
+        "2026-04-11,6.3,0.38\n"
+    )
+    electricity, water = _parse_daily_csv(csv_text, datetime(2026, 4, 11))
+    assert electricity == pytest.approx(6.3)
+    assert water == pytest.approx(0.38)
+
+
 async def test_client_login_success() -> None:
-    """Successful login returns the response body."""
     client = SpServicesClient()
-    login_body = {"sessionId": "sess-abc", "message": "OTP sent"}
-    client._session.post = AsyncMock(return_value=_make_response(200, login_body))
+    authorize_html = '<input type="hidden" name="_csrf" value="csrf-123">'
+    client._session.get = AsyncMock(return_value=_make_response(200, text=authorize_html))
+    client._session.post = AsyncMock(
+        side_effect=[
+            _make_response(200, {"required": False}),
+            _make_response(200, {}),
+            _make_response(201, {}),
+            _make_response(
+                200,
+                {
+                    "id": "txn_123",
+                    "state": "pending",
+                    "enrollment": {"phone_number": "XXXXXXX2081"},
+                },
+            ),
+            _make_response(200, {}),
+        ]
+    )
 
     result = await client.login("user@example.com", "secret")
-    assert result["sessionId"] == "sess-abc"
+
+    assert result["phone_number"] == "XXXXXXX2081"
+    assert result["transaction_id"] == "txn_123"
+    assert client._auth_context is not None
+    assert client._auth_context.csrf == "csrf-123"
 
 
 async def test_client_login_invalid_credentials() -> None:
-    """HTTP 401 from login endpoint → ValueError('invalid_auth')."""
     client = SpServicesClient()
-    client._session.post = AsyncMock(return_value=_make_response(401))
+    authorize_html = '<input type="hidden" name="_csrf" value="csrf-123">'
+    client._session.get = AsyncMock(return_value=_make_response(200, text=authorize_html))
+    client._session.post = AsyncMock(
+        side_effect=[
+            _make_response(200, {"required": False}),
+            _make_response(401),
+        ]
+    )
 
     with pytest.raises(ValueError, match="invalid_auth"):
         await client.login("user@example.com", "wrongpassword")
 
 
-async def test_client_login_server_error() -> None:
-    """HTTP 500 → UpdateFailed."""
-    client = SpServicesClient()
-    client._session.post = AsyncMock(return_value=_make_response(500))
-
-    with pytest.raises(UpdateFailed):
-        await client.login("user@example.com", "secret")
-
-
 async def test_client_verify_otp_success() -> None:
-    """Successful OTP verification returns the token."""
     client = SpServicesClient()
-    otp_body = {"token": "jwt.token.here"}
-    client._session.post = AsyncMock(return_value=_make_response(200, otp_body))
+    client._auth_context = MagicMock(
+        state="state-1",
+        code_verifier="verifier-1",
+        csrf="csrf-1",
+    )
+    redirect_resp = _make_response(
+        200,
+        {},
+        url="https://services.spservices.sg/callback?code=code-123&state=state-1",
+    )
+    token_resp = _make_response(200, {"access_token": "jwt.token.here"})
+    client._session.post = AsyncMock(side_effect=[redirect_resp, token_resp])
 
-    token = await client.verify_otp("123456", {"sessionId": "sess-abc"})
+    token = await client.verify_otp("123456", {"state": "state-1"})
     assert token == "jwt.token.here"
 
 
-async def test_client_verify_otp_alternative_token_fields() -> None:
-    """Parser also accepts accessToken, authToken, access_token."""
-    client = SpServicesClient()
-    for field in ("accessToken", "authToken", "access_token"):
-        client._session.post = AsyncMock(
-            return_value=_make_response(200, {field: f"tok-{field}"})
-        )
-        token = await client.verify_otp("000000", {})
-        assert token == f"tok-{field}"
-
-
 async def test_client_verify_otp_wrong_code() -> None:
-    """HTTP 401 from OTP endpoint → ValueError('invalid_otp')."""
     client = SpServicesClient()
+    client._auth_context = MagicMock(state="state-1", code_verifier="verifier-1", csrf="csrf-1")
     client._session.post = AsyncMock(return_value=_make_response(401))
 
     with pytest.raises(ValueError, match="invalid_otp"):
-        await client.verify_otp("999999", {})
-
-
-async def test_client_verify_otp_no_token_in_response() -> None:
-    """200 response but no token field → UpdateFailed."""
-    client = SpServicesClient()
-    client._session.post = AsyncMock(return_value=_make_response(200, {"foo": "bar"}))
-
-    with pytest.raises(UpdateFailed, match="no auth token"):
-        await client.verify_otp("123456", {})
+        await client.verify_otp("999999", {"state": "state-1"})
 
 
 async def test_client_fetch_usage_success() -> None:
-    """Successful fetch returns SpServicesData."""
     client = SpServicesClient()
-    elec_resp = _make_response(
-        200,
-        {"data": [{"consumption": "12.5"}], "monthTotal": 300.0, "accountNo": "A1"},
+    now = datetime.now()
+    client._session.post = AsyncMock(
+        side_effect=[
+            _make_response(
+                200,
+                {
+                    "status": 100,
+                    "user:getAccounts": {
+                        "data": {
+                            "accounts": [
+                                {
+                                    "accountNo": "8949049293",
+                                    "premiseNo": "2001201124",
+                                    "msslPremiseNo": "WATER-1",
+                                }
+                            ]
+                        }
+                    },
+                },
+            ),
+            _make_response(
+                200,
+                {
+                    "status": 100,
+                    "charts:monthly": {
+                        "data": [
+                            {
+                                "month": now.strftime("%Y-%m-01"),
+                                "electricityTotal": "212.4",
+                                "waterTotal": "9.1",
+                            }
+                        ]
+                    },
+                },
+            ),
+            _make_response(
+                200,
+                {
+                    "status": 100,
+                    "charts:hourly": {
+                        "data": [
+                            {
+                                "date": now.date().isoformat(),
+                                "electricityConsumption": "7.2",
+                                "waterConsumption": "0.41",
+                            }
+                        ]
+                    },
+                },
+            ),
+        ]
     )
-    water_resp = _make_response(
-        200,
-        {"data": [{"consumption": "0.5"}], "monthTotal": 15.0},
-    )
-    client._session.get = AsyncMock(side_effect=[elec_resp, water_resp])
 
     data = await client.fetch_usage("valid-token")
     assert isinstance(data, SpServicesData)
-    assert data.electricity_today_kwh == pytest.approx(12.5)
-    assert data.water_today_m3 == pytest.approx(0.5)
-    assert data.account_no == "A1"
+    assert data.account_no == "8949049293"
+    assert data.electricity_today_kwh == pytest.approx(7.2)
+    assert data.electricity_month_kwh == pytest.approx(212.4)
+    assert data.water_today_m3 == pytest.approx(0.41)
+    assert data.water_month_m3 == pytest.approx(9.1)
 
 
-async def test_client_fetch_usage_electricity_401() -> None:
-    """HTTP 401 from electricity endpoint → ConfigEntryAuthFailed."""
+async def test_client_fetch_usage_401() -> None:
     client = SpServicesClient()
-    client._session.get = AsyncMock(return_value=_make_response(401))
+    client._session.post = AsyncMock(return_value=_make_response(401))
 
     with pytest.raises(ConfigEntryAuthFailed):
         await client.fetch_usage("expired-token")
-
-
-async def test_client_fetch_usage_water_401() -> None:
-    """HTTP 401 from water endpoint → ConfigEntryAuthFailed."""
-    client = SpServicesClient()
-    elec_ok = _make_response(200, {"data": [], "monthTotal": 0})
-    water_unauth = _make_response(401)
-    client._session.get = AsyncMock(side_effect=[elec_ok, water_unauth])
-
-    with pytest.raises(ConfigEntryAuthFailed):
-        await client.fetch_usage("expired-token")
-
-
-# ---------------------------------------------------------------------------
-# SpServicesCoordinator tests
-# ---------------------------------------------------------------------------
 
 
 def _make_entry(token: str | None = "tok") -> MagicMock:
@@ -230,7 +297,6 @@ def _make_entry(token: str | None = "tok") -> MagicMock:
 
 
 async def test_coordinator_no_token_raises_auth_failed() -> None:
-    """Coordinator with no token immediately raises ConfigEntryAuthFailed."""
     hass = MagicMock()
     entry = _make_entry(token=None)
     coord = SpServicesCoordinator(hass, entry)
@@ -240,7 +306,6 @@ async def test_coordinator_no_token_raises_auth_failed() -> None:
 
 
 async def test_coordinator_delegates_to_client() -> None:
-    """Coordinator calls client.fetch_usage with the stored token."""
     hass = MagicMock()
     entry = _make_entry(token="my-token")
     coord = SpServicesCoordinator(hass, entry)

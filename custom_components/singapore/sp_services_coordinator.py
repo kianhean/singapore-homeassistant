@@ -1,40 +1,18 @@
-"""Coordinator for SP Services household energy and water usage data.
-
-Authentication flow
--------------------
-1. ``SpServicesClient.login(username, password)``
-   POSTs credentials to the portal.  On success the server sends an OTP to
-   the user's registered mobile number and returns a session payload.
-
-2. ``SpServicesClient.verify_otp(otp, login_response)``
-   POSTs the OTP together with the session identifier from step 1.
-   On success the server returns an auth token.
-
-3. ``SpServicesClient.fetch_usage(token)``
-   GETs electricity and water usage with the token in the Authorization
-   header.  Raises ``ConfigEntryAuthFailed`` on HTTP 401 so Home Assistant
-   can trigger the reauth flow.
-
-IMPORTANT – endpoint paths
---------------------------
-The SP Services portal (https://services.spservices.sg) is a JavaScript
-single-page application.  The REST API paths below are *unverified
-placeholders* derived from common Angular SPA conventions.
-
-To find the real paths:
-1. Open https://services.spservices.sg in Chrome.
-2. Open DevTools → Network → filter by "Fetch/XHR".
-3. Log in, complete the OTP step, navigate to the usage page.
-4. Update the ``_LOGIN_URL``, ``_OTP_VERIFY_URL``, and usage URL constants
-   to match the real network requests.
-"""
+"""Coordinator for SP Services household energy and water usage data."""
 
 from __future__ import annotations
 
+import base64
+import csv
+import hashlib
+import io
 import logging
+import re
+import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
+from urllib.parse import parse_qs, urlencode, urlparse
 
 import niquests
 from homeassistant.config_entries import ConfigEntry
@@ -46,26 +24,30 @@ _LOGGER = logging.getLogger(__name__)
 
 _UPDATE_INTERVAL = timedelta(hours=1)
 
-# ---------------------------------------------------------------------------
-# Endpoint constants — update these once real paths are confirmed
-# ---------------------------------------------------------------------------
 _BASE_URL = "https://services.spservices.sg"
+_AUTH0_BASE_URL = "https://identity.spdigital.auth0.com"
+_SKALBOX_BASE_URL = "https://c-api-gateway.tkg.spdigital.io/skalbox"
 
-# POST {userId, password} → triggers OTP SMS; returns session payload
-_LOGIN_URL = f"{_BASE_URL}/api/account/login"
+_AUTH0_AUTHORIZE_URL = f"{_AUTH0_BASE_URL}/authorize"
+_AUTH0_CHALLENGE_URL = f"{_AUTH0_BASE_URL}/usernamepassword/challenge"
+_AUTH0_LOGIN_URL = f"{_AUTH0_BASE_URL}/usernamepassword/login"
+_AUTH0_MFA_START_URL = f"{_AUTH0_BASE_URL}/appliance-mfa/api/start-flow"
+_AUTH0_MFA_STATE_URL = f"{_AUTH0_BASE_URL}/appliance-mfa/api/transaction-state"
+_AUTH0_MFA_SEND_SMS_URL = f"{_AUTH0_BASE_URL}/appliance-mfa/api/send-sms"
+_AUTH0_MFA_VERIFY_URL = f"{_AUTH0_BASE_URL}/appliance-mfa/api/verify-otp"
+_AUTH0_TOKEN_URL = f"{_AUTH0_BASE_URL}/oauth/token"
 
-# POST {otp, sessionId} → returns {"token": "..."} (or similar field)
-_OTP_VERIFY_URL = f"{_BASE_URL}/api/account/otp/verify"
+_SKALBOX_API_URL = f"{_SKALBOX_BASE_URL}/api"
+_SKALBOX_DAILY_CSV_URL = f"{_SKALBOX_BASE_URL}/private/charts/csv/dailyHourly"
+_SKALBOX_MONTHLY_CSV_URL = f"{_SKALBOX_BASE_URL}/private/charts/csv/monthly"
 
-# GET → daily electricity usage records
-_ELECTRICITY_USAGE_URL = f"{_BASE_URL}/api/usage/electricity"
+_AUTH0_CLIENT_ID = "0I6XpXThehIU3SgaSbzraCgekkHg2rJH"
+_AUTH0_REDIRECT_URI = f"{_BASE_URL}/callback?fromLogin=true"
+_AUTH0_SCOPE = "openid profile email offline_access"
+_AUTH0_AUDIENCE = "https://profile.up.spdigital.sg/"
+_AUTH0_CONNECTION = "Username-Password-Authentication"
+_AUTH0_TENANT = "identity"
 
-# GET → daily water usage records
-_WATER_USAGE_URL = f"{_BASE_URL}/api/usage/water"
-
-# ---------------------------------------------------------------------------
-# HTTP headers mimicking the Angular SPA's own requests
-# ---------------------------------------------------------------------------
 _HEADERS: dict[str, str] = {
     "User-Agent": (
         "Mozilla/5.0 (X11; Linux x86_64) "
@@ -77,6 +59,11 @@ _HEADERS: dict[str, str] = {
     "Origin": _BASE_URL,
     "Referer": f"{_BASE_URL}/",
 }
+
+_AUTH_HEADERS = {**_HEADERS, "Content-Type": "application/json"}
+
+_CSRF_RE = re.compile(r'name=["\']_csrf["\'][^>]*value=["\']([^"\']+)["\']')
+_INLINE_CSRF_RE = re.compile(r'"_csrf"\s*:\s*"([^"]+)"')
 
 
 @dataclass
@@ -91,72 +78,100 @@ class SpServicesData:
     last_updated: datetime
 
 
-class SpServicesClient:
-    """Low-level HTTP client for the SP Services portal.
+@dataclass
+class _AuthContext:
+    """Ephemeral Auth0 state carried across the login + OTP steps."""
 
-    Each instance owns a private ``niquests.AsyncSession`` so that
-    authentication cookies are completely isolated from other integrations
-    or the shared HA aiohttp session.
-    """
+    state: str
+    nonce: str
+    code_verifier: str
+    csrf: str
+    phone_number: str | None = None
+    transaction_id: str | None = None
+
+
+class SpServicesClient:
+    """Low-level HTTP client for the SP Services portal."""
 
     def __init__(self) -> None:
         self._session: niquests.AsyncSession = niquests.AsyncSession()
-
-    # ------------------------------------------------------------------
-    # Authentication helpers
-    # ------------------------------------------------------------------
+        self._auth_context: _AuthContext | None = None
 
     async def login(self, username: str, password: str) -> dict[str, Any]:
-        """Step 1 — submit credentials and trigger OTP delivery.
+        """Submit credentials and trigger the SMS OTP flow."""
+        context = await self._bootstrap_auth()
+        await self._post_json(_AUTH0_CHALLENGE_URL, {"state": context.state})
 
-        Returns the raw JSON response body; pass it unchanged to
-        ``verify_otp()`` so the session identifier travels with it.
-
-        Raises:
-            ValueError: key ``"invalid_auth"`` when HTTP 401 (bad password).
-            UpdateFailed: on any other non-2xx response.
-        """
-        payload = {"userId": username, "password": password}
         resp = await self._session.post(
-            _LOGIN_URL,
-            json=payload,
-            headers={**_HEADERS, "Content-Type": "application/json"},
+            _AUTH0_LOGIN_URL,
+            json={
+                "client_id": _AUTH0_CLIENT_ID,
+                "redirect_uri": _AUTH0_REDIRECT_URI,
+                "tenant": _AUTH0_TENANT,
+                "response_type": "code",
+                "scope": _AUTH0_SCOPE,
+                "audience": _AUTH0_AUDIENCE,
+                "_csrf": context.csrf,
+                "state": context.state,
+                "_intstate": "deprecated",
+                "nonce": context.nonce,
+                "username": username,
+                "password": password,
+                "force_mfa": False,
+                "connection": _AUTH0_CONNECTION,
+            },
+            headers=_AUTH_HEADERS,
             timeout=30,
         )
         if resp.status_code == 401:
             raise ValueError("invalid_auth")
         if not resp.ok:
             raise UpdateFailed(f"SP Services login returned HTTP {resp.status_code}")
-        return resp.json()
 
-    async def verify_otp(self, otp: str, login_response: dict[str, Any]) -> str:
-        """Step 2 — submit OTP and retrieve the auth token.
+        await self._post_json(_AUTH0_MFA_START_URL, {"state_transport": "polling"})
+        txn = await self._post_json(_AUTH0_MFA_STATE_URL, {})
+        context.transaction_id = txn.get("id")
+        enrollment = txn.get("enrollment", {})
+        context.phone_number = enrollment.get("phone_number")
 
-        Args:
-            otp: The one-time password typed by the user.
-            login_response: The dict returned by ``login()``.
-
-        Returns:
-            The auth token string to store in the config entry.
-
-        Raises:
-            ValueError: key ``"invalid_otp"`` on HTTP 401 (wrong OTP).
-            UpdateFailed: on any other non-2xx response or missing token.
-        """
-        # The server uses the sessionId returned in the login response to
-        # tie the OTP to the correct in-flight login attempt.
-        session_id = (
-            login_response.get("sessionId")
-            or login_response.get("session_id")
-            or login_response.get("requestId")
-            or ""
-        )
-        payload = {"otp": otp.strip(), "sessionId": session_id}
-        resp = await self._session.post(
-            _OTP_VERIFY_URL,
-            json=payload,
-            headers={**_HEADERS, "Content-Type": "application/json"},
+        send_sms_resp = await self._session.post(
+            _AUTH0_MFA_SEND_SMS_URL,
+            headers=_AUTH_HEADERS,
             timeout=30,
+        )
+        if not send_sms_resp.ok:
+            raise UpdateFailed(
+                f"SP Services SMS OTP trigger returned HTTP {send_sms_resp.status_code}"
+            )
+
+        self._auth_context = context
+        return {
+            "state": context.state,
+            "phone_number": context.phone_number,
+            "transaction_id": context.transaction_id,
+        }
+
+    async def verify_otp(self, otp: str, login_response: dict[str, Any] | None) -> str:
+        """Submit OTP and exchange the resulting authorization code for a token."""
+        context = self._auth_context
+        if context is None and login_response:
+            context = _AuthContext(
+                state=str(login_response.get("state", "")),
+                nonce="",
+                code_verifier=str(login_response.get("code_verifier", "")),
+                csrf=str(login_response.get("csrf", "")),
+                phone_number=login_response.get("phone_number"),
+                transaction_id=login_response.get("transaction_id"),
+            )
+        if context is None or not context.state or not context.code_verifier:
+            raise UpdateFailed("SP Services login session is missing; restart login")
+
+        resp = await self._session.post(
+            _AUTH0_MFA_VERIFY_URL,
+            json={"type": "manual_input", "code": otp.strip()},
+            headers=_AUTH_HEADERS,
+            timeout=30,
+            allow_redirects=True,
         )
         if resp.status_code == 401:
             raise ValueError("invalid_otp")
@@ -164,121 +179,446 @@ class SpServicesClient:
             raise UpdateFailed(
                 f"SP Services OTP verify returned HTTP {resp.status_code}"
             )
-        body = resp.json()
-        token = (
-            body.get("token")
-            or body.get("access_token")
-            or body.get("accessToken")
-            or body.get("authToken")
-        )
-        if not token:
-            raise UpdateFailed("SP Services OTP response contained no auth token")
-        return token
 
-    # ------------------------------------------------------------------
-    # Data fetching
-    # ------------------------------------------------------------------
+        code = self._extract_authorization_code(resp, context.state)
+        if not code:
+            raise UpdateFailed("SP Services OTP flow returned no authorization code")
+
+        token_body = await self._post_json(
+            _AUTH0_TOKEN_URL,
+            {
+                "client_id": _AUTH0_CLIENT_ID,
+                "code_verifier": context.code_verifier,
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": _AUTH0_REDIRECT_URI,
+            },
+        )
+        token = token_body.get("access_token")
+        if not token:
+            raise UpdateFailed("SP Services token exchange returned no access token")
+        return str(token)
 
     async def fetch_usage(self, token: str) -> SpServicesData:
-        """Fetch today's and this month's electricity and water usage.
-
-        Raises:
-            ConfigEntryAuthFailed: on HTTP 401 (token expired).
-            UpdateFailed: on other HTTP errors.
-        """
-        auth_headers = {**_HEADERS, "Authorization": f"Bearer {token}"}
-
-        elec_resp = await self._session.get(
-            _ELECTRICITY_USAGE_URL,
-            headers=auth_headers,
-            params={"type": "daily"},
-            timeout=30,
+        """Fetch today's and this month's electricity and water usage."""
+        accounts_payload = await self._skalbox_call(
+            {"user:getAccounts": {"token": token}},
+            token=token,
         )
-        if elec_resp.status_code == 401:
-            raise ConfigEntryAuthFailed("SP Services token expired")
-        if not elec_resp.ok:
-            raise UpdateFailed(
-                f"SP Services electricity usage returned HTTP {elec_resp.status_code}"
-            )
+        account = _extract_primary_account(accounts_payload)
+        if account is None:
+            raise UpdateFailed("SP Services returned no linked utility accounts")
 
-        water_resp = await self._session.get(
-            _WATER_USAGE_URL,
-            headers=auth_headers,
-            params={"type": "daily"},
-            timeout=30,
+        account_no = str(account.get("accountNo") or "")
+        ebs_premise_no = str(
+            account.get("premiseNo")
+            or account.get("ebsPremiseNo")
+            or account.get("premises_id")
+            or ""
         )
-        if water_resp.status_code == 401:
-            raise ConfigEntryAuthFailed("SP Services token expired")
-        if not water_resp.ok:
-            raise UpdateFailed(
-                f"SP Services water usage returned HTTP {water_resp.status_code}"
-            )
+        mssl_premise_no = str(account.get("msslPremiseNo") or "")
+        if not account_no or not ebs_premise_no:
+            raise UpdateFailed("SP Services account payload is missing premise details")
 
-        return _parse_usage(elec_resp.json(), water_resp.json())
+        now = datetime.now()
+        monthly_payload = await self._skalbox_call(
+            {
+                "charts:monthly": {
+                    "ebsPremiseNo": ebs_premise_no,
+                    "msslPremiseNo": mssl_premise_no,
+                    "consumptionValue": str(now.year),
+                }
+            },
+            token=token,
+        )
+        hourly_payload = await self._skalbox_call(
+            {
+                "charts:hourly": {
+                    "accountNos": [account_no],
+                    "date": now.date().isoformat(),
+                }
+            },
+            token=token,
+            allow_business_no_data=True,
+        )
+
+        electricity_month, water_month = _parse_monthly_usage(monthly_payload, now)
+        electricity_today, water_today = _parse_daily_usage(hourly_payload, now)
+
+        if electricity_month is None or water_month is None:
+            monthly_csv = await self._post_text(
+                _SKALBOX_MONTHLY_CSV_URL,
+                {
+                    "ebsPremiseNo": ebs_premise_no,
+                    "msslPremiseNo": mssl_premise_no,
+                    "accountNo": account_no,
+                },
+                token=token,
+            )
+            csv_elec_month, csv_water_month = _parse_monthly_csv(monthly_csv, now)
+            electricity_month = electricity_month if electricity_month is not None else csv_elec_month
+            water_month = water_month if water_month is not None else csv_water_month
+
+        if electricity_today is None or water_today is None:
+            daily_csv = await self._post_text(
+                _SKALBOX_DAILY_CSV_URL,
+                {"accountNos": [account_no], "consumptionBy": "hourCSV"},
+                token=token,
+            )
+            csv_elec_today, csv_water_today = _parse_daily_csv(daily_csv, now)
+            electricity_today = electricity_today if electricity_today is not None else csv_elec_today
+            water_today = water_today if water_today is not None else csv_water_today
+
+        return SpServicesData(
+            electricity_today_kwh=electricity_today,
+            electricity_month_kwh=electricity_month,
+            water_today_m3=water_today,
+            water_month_m3=water_month,
+            account_no=account_no,
+            last_updated=now,
+        )
 
     async def close(self) -> None:
         """Release the underlying HTTP session."""
         await self._session.close()
 
+    async def _bootstrap_auth(self) -> _AuthContext:
+        state = _random_token(32)
+        nonce = _random_token(32)
+        code_verifier = _random_token(48)
+        challenge = _pkce_challenge(code_verifier)
 
-def _parse_usage(elec_data: dict, water_data: dict) -> SpServicesData:
-    """Parse electricity and water API payloads into ``SpServicesData``.
-
-    The field names are educated guesses; update them once real API
-    responses are available (see module docstring for how to capture them).
-    """
-
-    def _today(payload: dict) -> float | None:
-        records: list = (
-            payload.get("data")
-            or payload.get("records")
-            or payload.get("usageData")
-            or []
+        resp = await self._session.get(
+            f"{_AUTH0_AUTHORIZE_URL}?{urlencode({
+                'client_id': _AUTH0_CLIENT_ID,
+                'redirect_uri': _AUTH0_REDIRECT_URI,
+                'response_type': 'code',
+                'scope': _AUTH0_SCOPE,
+                'audience': _AUTH0_AUDIENCE,
+                'code_challenge': challenge,
+                'code_challenge_method': 'S256',
+                'nonce': nonce,
+                'state': state,
+            })}",
+            headers=_HEADERS,
+            timeout=30,
         )
-        if records:
-            last = records[-1]
-            for key in ("consumption", "value", "usage", "amount"):
-                raw = last.get(key)
-                if raw is not None:
-                    try:
-                        return float(raw)
-                    except (TypeError, ValueError):
-                        pass
-        return None
+        if not resp.ok:
+            raise UpdateFailed(
+                f"SP Services authorize bootstrap returned HTTP {resp.status_code}"
+            )
 
-    def _month(payload: dict) -> float | None:
-        for key in (
-            "monthTotal",
-            "totalUsage",
-            "monthlyUsage",
-            "monthlyTotal",
-            "total",
+        html = getattr(resp, "text", "") or ""
+        csrf = _extract_csrf(html)
+        if not csrf:
+            raise UpdateFailed("SP Services authorize page did not expose a CSRF token")
+
+        return _AuthContext(
+            state=state,
+            nonce=nonce,
+            code_verifier=code_verifier,
+            csrf=csrf,
+        )
+
+    async def _post_json(
+        self, url: str, payload: dict[str, Any], token: str | None = None
+    ) -> dict[str, Any]:
+        resp = await self._session.post(
+            url,
+            json=payload,
+            headers=self._api_headers(token),
+            timeout=30,
+        )
+        if resp.status_code == 401:
+            raise ConfigEntryAuthFailed("SP Services token expired")
+        if not resp.ok:
+            raise UpdateFailed(f"SP Services request returned HTTP {resp.status_code}")
+        body = resp.json()
+        if isinstance(body, dict):
+            return body
+        raise UpdateFailed("SP Services returned a non-JSON response")
+
+    async def _skalbox_call(
+        self,
+        payload: dict[str, Any],
+        token: str,
+        allow_business_no_data: bool = False,
+    ) -> dict[str, Any]:
+        body = await self._post_json(_SKALBOX_API_URL, payload, token=token)
+        status = body.get("status")
+        if status == 100 or status is None:
+            return body
+        if allow_business_no_data and status == 150:
+            return body
+        raise UpdateFailed(f"SP Services API returned unexpected status {status}")
+
+    async def _post_text(
+        self, url: str, payload: dict[str, Any], token: str | None = None
+    ) -> str:
+        resp = await self._session.post(
+            url,
+            json=payload,
+            headers=self._api_headers(token),
+            timeout=30,
+        )
+        if resp.status_code == 401:
+            raise ConfigEntryAuthFailed("SP Services token expired")
+        if not resp.ok:
+            raise UpdateFailed(f"SP Services request returned HTTP {resp.status_code}")
+        return str(getattr(resp, "text", "") or "")
+
+    def _api_headers(self, token: str | None) -> dict[str, str]:
+        headers = dict(_AUTH_HEADERS)
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        return headers
+
+    @staticmethod
+    def _extract_authorization_code(resp: Any, state: str) -> str | None:
+        urls = [str(getattr(resp, "url", ""))]
+        for prev in getattr(resp, "history", []) or []:
+            urls.append(str(getattr(prev, "url", "")))
+            headers = getattr(prev, "headers", {}) or {}
+            location = headers.get("location") or headers.get("Location")
+            if location:
+                urls.append(str(location))
+
+        body = getattr(resp, "text", "") or ""
+        for candidate in urls:
+            code = _code_from_url(candidate, state)
+            if code:
+                return code
+
+        match = re.search(r"[?&]code=([^&\"' >]+)", body)
+        return match.group(1) if match else None
+
+
+def _random_token(length: int) -> str:
+    return secrets.token_urlsafe(length)
+
+
+def _pkce_challenge(code_verifier: str) -> str:
+    digest = hashlib.sha256(code_verifier.encode("utf-8")).digest()
+    return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+
+
+def _extract_csrf(html: str) -> str | None:
+    match = _CSRF_RE.search(html) or _INLINE_CSRF_RE.search(html)
+    return match.group(1) if match else None
+
+
+def _code_from_url(url: str, expected_state: str) -> str | None:
+    if not url:
+        return None
+    query = parse_qs(urlparse(url).query)
+    code = query.get("code", [None])[0]
+    state = query.get("state", [None])[0]
+    if code and (not state or state == expected_state):
+        return code
+    return None
+
+
+def _extract_primary_account(payload: dict[str, Any]) -> dict[str, Any] | None:
+    for item in _walk_nodes(payload):
+        if isinstance(item, dict) and (
+            item.get("accountNo") or item.get("accountNumber")
         ):
-            raw = payload.get(key)
-            if raw is not None:
-                try:
-                    return float(raw)
-                except (TypeError, ValueError):
-                    pass
+            return {
+                "accountNo": item.get("accountNo") or item.get("accountNumber"),
+                "premiseNo": item.get("premiseNo") or item.get("premiseNumber"),
+                "ebsPremiseNo": item.get("ebsPremiseNo"),
+                "msslPremiseNo": item.get("msslPremiseNo"),
+                "premises_id": item.get("premises_id"),
+            }
+    return None
+
+
+def _parse_monthly_usage(payload: dict[str, Any], now: datetime) -> tuple[float | None, float | None]:
+    month_keys = {
+        now.strftime("%Y-%m"),
+        now.strftime("%Y-%m-01"),
+        now.strftime("%b").lower(),
+        now.strftime("%B").lower(),
+        str(now.month),
+    }
+    electricity: float | None = None
+    water: float | None = None
+
+    for path, item in _walk_with_paths(payload):
+        if not isinstance(item, dict):
+            continue
+        marker = " ".join(str(item.get(k, "")).lower() for k in ("month", "label", "date", "period"))
+        if month_keys and marker and not any(key in marker for key in month_keys):
+            continue
+        electricity = electricity if electricity is not None else _extract_metric_value(item, path, "electricity")
+        water = water if water is not None else _extract_metric_value(item, path, "water")
+        if electricity is not None and water is not None:
+            break
+
+    return electricity, water
+
+
+def _parse_daily_usage(payload: dict[str, Any], now: datetime) -> tuple[float | None, float | None]:
+    if payload.get("status") == 150:
+        return None, None
+
+    day_keys = {
+        now.date().isoformat(),
+        now.strftime("%d/%m/%Y"),
+        now.strftime("%d-%m-%Y"),
+        str(now.day),
+    }
+    electricity: float | None = None
+    water: float | None = None
+
+    for path, item in _walk_with_paths(payload):
+        if not isinstance(item, dict):
+            continue
+        marker = " ".join(str(item.get(k, "")).lower() for k in ("date", "day", "label", "period"))
+        if marker and not any(key.lower() in marker for key in day_keys):
+            continue
+        electricity = electricity if electricity is not None else _extract_metric_value(item, path, "electricity")
+        water = water if water is not None else _extract_metric_value(item, path, "water")
+        if electricity is not None and water is not None:
+            break
+
+    return electricity, water
+
+
+def _extract_metric_value(
+    item: dict[str, Any], path: list[str], utility: str
+) -> float | None:
+    utility_tokens = (
+        ("electric", "energy", "kwh", "ebs")
+        if utility == "electricity"
+        else ("water", "m3", "mssl")
+    )
+    metric_tokens = ("total", "usage", "consumption", "value", "amount")
+
+    for key, value in item.items():
+        if not isinstance(value, (str, int, float)):
+            continue
+        normalized_key = key.lower()
+        if any(token in normalized_key for token in utility_tokens) and any(
+            token in normalized_key for token in metric_tokens
+        ):
+            return _coerce_float(value)
+
+    joined_path = " ".join(path).lower()
+    if any(token in joined_path for token in utility_tokens):
+        for key in ("total", "usage", "consumption", "value", "amount"):
+            if key in item:
+                return _coerce_float(item[key])
+
+    return None
+
+
+def _parse_monthly_csv(csv_text: str, now: datetime) -> tuple[float | None, float | None]:
+    rows = list(_csv_rows(csv_text))
+    if not rows:
+        return None, None
+
+    month_markers = {
+        now.strftime("%Y-%m"),
+        now.strftime("%Y-%m-01"),
+        now.strftime("%b").lower(),
+        now.strftime("%B").lower(),
+    }
+    electricity: float | None = None
+    water: float | None = None
+
+    for row in rows:
+        haystack = " ".join(str(v).lower() for v in row.values())
+        if not any(marker in haystack for marker in month_markers):
+            continue
+        electricity = electricity if electricity is not None else _csv_metric(row, "electricity")
+        water = water if water is not None else _csv_metric(row, "water")
+        if electricity is not None and water is not None:
+            break
+
+    return electricity, water
+
+
+def _parse_daily_csv(csv_text: str, now: datetime) -> tuple[float | None, float | None]:
+    rows = list(_csv_rows(csv_text))
+    if not rows:
+        return None, None
+
+    day_markers = {
+        now.date().isoformat(),
+        now.strftime("%d/%m/%Y"),
+        now.strftime("%d-%m-%Y"),
+    }
+    electricity: float | None = None
+    water: float | None = None
+
+    for row in rows:
+        haystack = " ".join(str(v).lower() for v in row.values())
+        if day_markers and not any(marker.lower() in haystack for marker in day_markers):
+            continue
+        electricity = electricity if electricity is not None else _csv_metric(row, "electricity")
+        water = water if water is not None else _csv_metric(row, "water")
+        if electricity is not None and water is not None:
+            break
+
+    return electricity, water
+
+
+def _csv_rows(csv_text: str) -> list[dict[str, str]]:
+    if not csv_text.strip():
+        return []
+    return list(csv.DictReader(io.StringIO(csv_text)))
+
+
+def _csv_metric(row: dict[str, str], utility: str) -> float | None:
+    utility_tokens = ("electric", "energy", "kwh") if utility == "electricity" else ("water", "m3")
+    metric_tokens = ("total", "usage", "consumption", "value", "amount")
+    for key, value in row.items():
+        normalized_key = key.lower()
+        if any(token in normalized_key for token in utility_tokens) and any(
+            token in normalized_key for token in metric_tokens
+        ):
+            return _coerce_float(value)
+    return None
+
+
+def _coerce_float(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        return float(str(value).replace(",", ""))
+    except (TypeError, ValueError):
         return None
 
-    return SpServicesData(
-        electricity_today_kwh=_today(elec_data),
-        electricity_month_kwh=_month(elec_data),
-        water_today_m3=_today(water_data),
-        water_month_m3=_month(water_data),
-        account_no=(elec_data.get("accountNo") or elec_data.get("accountNumber")),
-        last_updated=datetime.now(),
-    )
+
+def _walk_nodes(node: Any) -> list[Any]:
+    if isinstance(node, dict):
+        values: list[Any] = [node]
+        for value in node.values():
+            values.extend(_walk_nodes(value))
+        return values
+    if isinstance(node, list):
+        values: list[Any] = []
+        for item in node:
+            values.extend(_walk_nodes(item))
+        return values
+    return []
+
+
+def _walk_with_paths(node: Any, path: list[str] | None = None) -> list[tuple[list[str], Any]]:
+    path = path or []
+    results = [(path, node)]
+    if isinstance(node, dict):
+        for key, value in node.items():
+            results.extend(_walk_with_paths(value, [*path, str(key)]))
+    elif isinstance(node, list):
+        for idx, value in enumerate(node):
+            results.extend(_walk_with_paths(value, [*path, str(idx)]))
+    return results
 
 
 class SpServicesCoordinator(DataUpdateCoordinator[SpServicesData]):
-    """Polls SP Services for household electricity and water usage.
-
-    Update interval: every hour (usage data is updated at most daily, but
-    polling hourly ensures the dashboard reflects the latest reading shortly
-    after SP Services posts it).
-    """
+    """Polls SP Services for household electricity and water usage."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         super().__init__(

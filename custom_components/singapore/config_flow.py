@@ -83,6 +83,7 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
         self._sp_username: str = ""
         self._sp_password: str = ""
         self._login_response: dict[str, Any] = {}
+        self._sp_client: SpServicesClient | None = None
 
     @staticmethod
     @callback
@@ -133,19 +134,19 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._user_name = name
                 self._sp_username = username
                 self._sp_password = password
-                client = SpServicesClient()
+                await self._close_client()
+                self._sp_client = SpServicesClient()
                 try:
-                    self._login_response = await client.login(username, password)
+                    self._login_response = await self._sp_client.login(username, password)
                 except ValueError:
                     errors["base"] = "invalid_auth"
                 except Exception:
                     _LOGGER.exception("SP Services login error during reauth")
                     errors["base"] = "cannot_connect"
-                finally:
-                    await client.close()
 
                 if not errors:
                     return await self.async_step_otp()
+                await self._close_client()
             elif self._is_reauth:
                 # No credentials supplied during reauth — just reload as-is.
                 return self.async_update_reload_and_abort(self._get_reauth_entry())
@@ -187,19 +188,21 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            client = SpServicesClient()
             try:
-                token = await client.verify_otp(user_input["otp"], self._login_response)
+                if self._sp_client is None:
+                    raise RuntimeError("SP Services login session missing during OTP step")
+                token = await self._sp_client.verify_otp(
+                    user_input["otp"], self._login_response
+                )
             except ValueError:
                 errors["base"] = "invalid_otp"
             except Exception:
                 _LOGGER.exception("SP Services OTP verify error during reauth")
                 errors["base"] = "cannot_connect"
-            finally:
-                await client.close()
 
             if not errors:
                 entry = self._get_reauth_entry()
+                await self._close_client()
                 return self.async_update_reload_and_abort(
                     entry,
                     data={
@@ -209,6 +212,7 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
                         "sp_token": token,
                     },
                 )
+            await self._close_client()
 
         return self.async_show_form(
             step_id="otp",
@@ -216,6 +220,11 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
             description_placeholders={"username": self._sp_username},
         )
+
+    async def _close_client(self) -> None:
+        if self._sp_client is not None:
+            await self._sp_client.close()
+            self._sp_client = None
 
     # ------------------------------------------------------------------
     # Re-authentication entry point
@@ -269,6 +278,7 @@ class SingaporeOptionsFlow(OptionsFlow):
         self._sp_username: str = config_entry.data.get(CONF_USERNAME, "")
         self._sp_password: str = ""
         self._login_response: dict[str, Any] = {}
+        self._sp_client: SpServicesClient | None = None
 
     # ------------------------------------------------------------------
     # Step 1: credentials
@@ -289,19 +299,21 @@ class SingaporeOptionsFlow(OptionsFlow):
             elif username and password:
                 self._sp_username = username
                 self._sp_password = password
-                client = SpServicesClient()
+                await self._close_client()
+                self._sp_client = SpServicesClient()
                 try:
-                    self._login_response = await client.login(username, password)
+                    self._login_response = await self._sp_client.login(
+                        username, password
+                    )
                 except ValueError:
                     errors["base"] = "invalid_auth"
                 except Exception:
                     _LOGGER.exception("SP Services login error in options flow")
                     errors["base"] = "cannot_connect"
-                finally:
-                    await client.close()
 
                 if not errors:
                     return await self.async_step_otp()
+                await self._close_client()
             else:
                 # Both blank — remove SP Services credentials and reload.
                 self.hass.config_entries.async_update_entry(
@@ -341,16 +353,17 @@ class SingaporeOptionsFlow(OptionsFlow):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            client = SpServicesClient()
             try:
-                token = await client.verify_otp(user_input["otp"], self._login_response)
+                if self._sp_client is None:
+                    raise RuntimeError("SP Services login session missing during OTP step")
+                token = await self._sp_client.verify_otp(
+                    user_input["otp"], self._login_response
+                )
             except ValueError:
                 errors["base"] = "invalid_otp"
             except Exception:
                 _LOGGER.exception("SP Services OTP verify error in options flow")
                 errors["base"] = "cannot_connect"
-            finally:
-                await client.close()
 
             if not errors:
                 # Store credentials in entry.data and reload.
@@ -363,8 +376,10 @@ class SingaporeOptionsFlow(OptionsFlow):
                         "sp_token": token,
                     },
                 )
+                await self._close_client()
                 await self.hass.config_entries.async_reload(self.config_entry.entry_id)
                 return self.async_create_entry(title="", data={})
+            await self._close_client()
 
         return self.async_show_form(
             step_id="otp",
@@ -372,3 +387,8 @@ class SingaporeOptionsFlow(OptionsFlow):
             errors=errors,
             description_placeholders={"username": self._sp_username},
         )
+
+    async def _close_client(self) -> None:
+        if self._sp_client is not None:
+            await self._sp_client.close()
+            self._sp_client = None

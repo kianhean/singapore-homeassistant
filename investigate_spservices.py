@@ -26,6 +26,7 @@ Share spservices_findings.json so the coordinator endpoints can be updated.
 
 import asyncio
 import json
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -43,6 +44,24 @@ _CONFIG_KEY_RE = re.compile(
     r"""(?:baseUrl|apiUrl|apiBase|endpointUrl|serviceUrl|BASE_URL|API_URL)\s*[:=]\s*["'`]([^"'`\s]+)["'`]""",
     re.IGNORECASE,
 )
+
+_DEFAULT_CHROME_PATHS = (
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+)
+
+
+def _find_browser_executable() -> str | None:
+    """Prefer an existing local browser over Playwright-managed downloads."""
+    env_path = os.environ.get("PLAYWRIGHT_BROWSER_PATH")
+    if env_path and Path(env_path).exists():
+        return env_path
+
+    for candidate in _DEFAULT_CHROME_PATHS:
+        if Path(candidate).exists():
+            return candidate
+
+    return None
 
 
 def _redact(obj: object) -> object:
@@ -114,7 +133,17 @@ async def main() -> None:  # noqa: C901
     }
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False, slow_mo=30)
+        browser_path = _find_browser_executable()
+        launch_kwargs = {"headless": False, "slow_mo": 30}
+        if browser_path:
+            print(f"Launching browser from: {browser_path}")
+            launch_kwargs["executable_path"] = browser_path
+        else:
+            print(
+                "No system Chrome/Chromium found; falling back to Playwright-managed Chromium."
+            )
+
+        browser = await p.chromium.launch(**launch_kwargs)
         context = await browser.new_context(
             user_agent=(
                 "Mozilla/5.0 (X11; Linux x86_64) "
