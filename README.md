@@ -5,7 +5,8 @@
 # Singapore Home Assistant custom integration
 
 A [HACS](https://hacs.xyz) custom integration for Singapore-specific data: utility
-tariffs, COE bidding results, live weather, train status, and public holidays.
+tariffs, COE bidding results, live weather, train status, public holidays, and
+optionally your household electricity and water usage via SP Services.
 
 ### HACS installation (manual, pre-merge)
 
@@ -112,6 +113,34 @@ Bukit Panjang LRT, Sengkang LRT, Punggol LRT.
   <img src="images/train-status.jpeg" alt="Singapore MRT/LRT device page showing overall and per-line train status sensors" width="320">
 </p>
 
+### SP Services household usage (optional)
+
+> **Disclaimer:** This integration is an independent, community-built project and is
+> **not affiliated with, endorsed by, or officially supported by SP Group or SP Services.**
+> All authentication — your username, password, OTP, and session token — is handled
+> entirely on your own Home Assistant device and is never transmitted to any third-party
+> server. Credentials are stored in your local HA config entry only.
+
+When configured (see [Setup](#setup) below), four additional sensors track your household
+consumption as reported by [SP Services](https://services.spservices.sg):
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.singapore_sp_electricity_today` | Singapore SP Electricity Today | kWh | Electricity consumed today |
+| `sensor.singapore_sp_electricity_month` | Singapore SP Electricity This Month | kWh | Electricity consumed this month |
+| `sensor.singapore_sp_water_today` | Singapore SP Water Today | m³ | Water consumed today |
+| `sensor.singapore_sp_water_month` | Singapore SP Water This Month | m³ | Water consumed this month |
+
+These sensors use `SensorDeviceClass.ENERGY` / `SensorDeviceClass.WATER` and
+`SensorStateClass.TOTAL` so they integrate with the Home Assistant **Energy Dashboard**.
+
+SP Services requires two-factor authentication (OTP via SMS). Credentials are entered
+through the integration's **Configure** dialog after setup — see [Setup](#setup).
+
+If your SP Services session expires, Home Assistant will show a **Re-authenticate**
+repair notification. Follow the prompt to re-enter your credentials and receive a
+new OTP.
+
 ### Public holidays
 
 Updated every 24 hours from [MOM](https://www.mom.gov.sg/employment-practices/public-holidays).
@@ -173,9 +202,29 @@ sensor.singapore_temperature:
 
 ## Setup
 
+### Basic setup
+
 1. Go to **Settings → Devices & Services → Add Integration**.
 2. Search for **Singapore**.
 3. Enter a name and click **Submit**.
+
+All public data sources (tariffs, COE, weather, trains, holidays) are enabled immediately.
+
+### Adding SP Services household usage
+
+SP Services credentials are configured separately after the integration is set up:
+
+1. Go to **Settings → Devices & Services**.
+2. Find the **Singapore** integration and click **Configure**.
+3. Enter your SP Services username and password.
+4. Enter the OTP sent to your registered mobile number.
+
+Leave both fields blank and submit to remove SP Services credentials and disable
+the household usage sensors.
+
+> **Privacy note:** Your SP Services credentials and session token are stored only in
+> your local Home Assistant configuration. They are never sent to any server other than
+> `services.spservices.sg` directly from your device.
 
 ## Data sources
 
@@ -187,6 +236,7 @@ sensor.singapore_temperature:
 | [data.gov.sg / NEA (collection 1459)](https://data.gov.sg/collections/1459/view) | Realtime weather readings | Every 10 min |
 | [MOM](https://www.mom.gov.sg/employment-practices/public-holidays) | Public holidays | Every 24 h |
 | [mytransport.sg](https://www.mytransport.sg/trainstatus) | MRT/LRT train status | Every 5 min |
+| [SP Services](https://services.spservices.sg) | Household electricity & water usage | Every 30 min (optional) |
 
 ## Development
 
