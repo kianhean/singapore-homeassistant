@@ -6,6 +6,7 @@ import base64
 import csv
 import hashlib
 import io
+import json
 import logging
 import re
 import secrets
@@ -64,6 +65,8 @@ _AUTH_HEADERS = {**_HEADERS, "Content-Type": "application/json"}
 
 _CSRF_RE = re.compile(r'name=["\']_csrf["\'][^>]*value=["\']([^"\']+)["\']')
 _INLINE_CSRF_RE = re.compile(r'"_csrf"\s*:\s*"([^"]+)"')
+_CSRF_TOKEN_RE = re.compile(r'"csrf(?:_token|Token)?"\s*:\s*"([^"]+)"')
+_CONFIG_BLOB_RE = re.compile(r"@@config@@([^\"'<\s]+)")
 
 
 @dataclass
@@ -84,7 +87,8 @@ class SpServicesData:
 class _AuthContext:
     """Ephemeral Auth0 state carried across the login + OTP steps."""
 
-    state: str
+    oauth_state: str
+    login_state: str
     nonce: str
     code_verifier: str
     csrf: str
@@ -102,7 +106,7 @@ class SpServicesClient:
     async def login(self, username: str, password: str) -> dict[str, Any]:
         """Submit credentials and trigger the SMS OTP flow."""
         context = await self._bootstrap_auth()
-        await self._post_json(_AUTH0_CHALLENGE_URL, {"state": context.state})
+        await self._post_json(_AUTH0_CHALLENGE_URL, {"state": context.login_state})
 
         resp = await self._session.post(
             _AUTH0_LOGIN_URL,
@@ -114,7 +118,7 @@ class SpServicesClient:
                 "scope": _AUTH0_SCOPE,
                 "audience": _AUTH0_AUDIENCE,
                 "_csrf": context.csrf,
-                "state": context.state,
+                "state": context.login_state,
                 "_intstate": "deprecated",
                 "nonce": context.nonce,
                 "username": username,
@@ -148,7 +152,8 @@ class SpServicesClient:
 
         self._auth_context = context
         return {
-            "state": context.state,
+            "oauth_state": context.oauth_state,
+            "login_state": context.login_state,
             "phone_number": context.phone_number,
             "transaction_id": context.transaction_id,
         }
@@ -158,14 +163,18 @@ class SpServicesClient:
         context = self._auth_context
         if context is None and login_response:
             context = _AuthContext(
-                state=str(login_response.get("state", "")),
+                oauth_state=str(login_response.get("oauth_state", "")),
+                login_state=str(
+                    login_response.get("login_state")
+                    or login_response.get("state", "")
+                ),
                 nonce="",
                 code_verifier=str(login_response.get("code_verifier", "")),
                 csrf=str(login_response.get("csrf", "")),
                 phone_number=login_response.get("phone_number"),
                 transaction_id=login_response.get("transaction_id"),
             )
-        if context is None or not context.state or not context.code_verifier:
+        if context is None or not context.oauth_state or not context.code_verifier:
             raise UpdateFailed("SP Services login session is missing; restart login")
 
         resp = await self._session.post(
@@ -182,7 +191,7 @@ class SpServicesClient:
                 f"SP Services OTP verify returned HTTP {resp.status_code}"
             )
 
-        code = self._extract_authorization_code(resp, context.state)
+        code = self._extract_authorization_code(resp, context.oauth_state)
         if not code:
             raise UpdateFailed("SP Services OTP flow returned no authorization code")
 
@@ -298,7 +307,7 @@ class SpServicesClient:
         await self._session.close()
 
     async def _bootstrap_auth(self) -> _AuthContext:
-        state = _random_token(32)
+        oauth_state = _random_token(32)
         nonce = _random_token(32)
         code_verifier = _random_token(48)
         challenge = _pkce_challenge(code_verifier)
@@ -315,7 +324,7 @@ class SpServicesClient:
                         'code_challenge': challenge,
                         'code_challenge_method': 'S256',
                         'nonce': nonce,
-                        'state': state,
+                        'state': oauth_state,
                     }
                 )
             }",
@@ -331,9 +340,11 @@ class SpServicesClient:
         csrf = _extract_csrf(html)
         if not csrf:
             raise UpdateFailed("SP Services authorize page did not expose a CSRF token")
+        login_state = _extract_login_state(str(getattr(resp, "url", ""))) or oauth_state
 
         return _AuthContext(
-            state=state,
+            oauth_state=oauth_state,
+            login_state=login_state,
             nonce=nonce,
             code_verifier=code_verifier,
             csrf=csrf,
@@ -422,8 +433,35 @@ def _pkce_challenge(code_verifier: str) -> str:
 
 
 def _extract_csrf(html: str) -> str | None:
-    match = _CSRF_RE.search(html) or _INLINE_CSRF_RE.search(html)
-    return match.group(1) if match else None
+    match = (
+        _CSRF_RE.search(html)
+        or _INLINE_CSRF_RE.search(html)
+        or _CSRF_TOKEN_RE.search(html)
+    )
+    if match:
+        return match.group(1)
+
+    config_blob = _CONFIG_BLOB_RE.search(html)
+    if not config_blob:
+        return None
+
+    try:
+        decoded = base64.b64decode(config_blob.group(1)).decode("utf-8")
+        config = json.loads(decoded)
+    except (ValueError, json.JSONDecodeError):
+        return None
+
+    for key in ("_csrf", "csrf", "csrfToken", "csrf_token"):
+        value = config.get(key)
+        if value:
+            return str(value)
+    return None
+
+
+def _extract_login_state(url: str) -> str | None:
+    if not url:
+        return None
+    return parse_qs(urlparse(url).query).get("state", [None])[0]
 
 
 def _code_from_url(url: str, expected_state: str) -> str | None:

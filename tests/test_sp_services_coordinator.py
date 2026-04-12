@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
@@ -14,6 +15,7 @@ from custom_components.singapore.sp_services_coordinator import (
     SpServicesData,
     _code_from_url,
     _extract_csrf,
+    _extract_login_state,
     _extract_primary_account,
     _parse_daily_csv,
     _parse_daily_usage,
@@ -51,6 +53,17 @@ def test_extract_csrf_from_hidden_input() -> None:
 def test_extract_csrf_from_inline_config() -> None:
     html = '{"_csrf":"csrf-456"}'
     assert _extract_csrf(html) == "csrf-456"
+
+
+def test_extract_csrf_from_auth0_config_blob() -> None:
+    config = base64.b64encode(b'{"csrfToken":"csrf-789"}').decode("ascii")
+    html = f'<script>var config = "@@config@@{config}";</script>'
+    assert _extract_csrf(html) == "csrf-789"
+
+
+def test_extract_login_state() -> None:
+    url = "https://identity.spdigital.auth0.com/u/login/password?state=txn-state-1"
+    assert _extract_login_state(url) == "txn-state-1"
 
 
 def test_code_from_url_matches_state() -> None:
@@ -248,7 +261,8 @@ async def test_client_login_invalid_credentials() -> None:
 async def test_client_verify_otp_success() -> None:
     client = SpServicesClient()
     client._auth_context = MagicMock(
-        state="state-1",
+        oauth_state="state-1",
+        login_state="txn-state-1",
         code_verifier="verifier-1",
         csrf="csrf-1",
     )
@@ -260,19 +274,26 @@ async def test_client_verify_otp_success() -> None:
     token_resp = _make_response(200, {"access_token": "jwt.token.here"})
     client._session.post = AsyncMock(side_effect=[redirect_resp, token_resp])
 
-    token = await client.verify_otp("123456", {"state": "state-1"})
+    token = await client.verify_otp(
+        "123456", {"oauth_state": "state-1", "login_state": "txn-state-1"}
+    )
     assert token == "jwt.token.here"
 
 
 async def test_client_verify_otp_wrong_code() -> None:
     client = SpServicesClient()
     client._auth_context = MagicMock(
-        state="state-1", code_verifier="verifier-1", csrf="csrf-1"
+        oauth_state="state-1",
+        login_state="txn-state-1",
+        code_verifier="verifier-1",
+        csrf="csrf-1",
     )
     client._session.post = AsyncMock(return_value=_make_response(401))
 
     with pytest.raises(ValueError, match="invalid_otp"):
-        await client.verify_otp("999999", {"state": "state-1"})
+        await client.verify_otp(
+            "999999", {"oauth_state": "state-1", "login_state": "txn-state-1"}
+        )
 
 
 async def test_client_fetch_usage_success() -> None:
