@@ -8,6 +8,6 @@
   "documentation": "https://github.com/kianhean/singapore-homeassistant",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/kianhean/singapore-homeassistant/issues",
-  "requirements": ["beautifulsoup4==4.12.3", "niquests>=3.0", "sp-services>=0.1"],
-  "version": "0.2.6"
+  "requirements": ["beautifulsoup4==4.12.3", "niquests>=3.0", "sp-services @ git+https://github.com/kianhean/sp_api.git"],
+  "version": "0.2.7"
 }
