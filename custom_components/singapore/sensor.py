@@ -85,7 +85,6 @@ async def async_setup_entry(
                 SpServicesElectricityMonthSensor(
                     sp_services_coordinator, entry.entry_id
                 ),
-                SpServicesWaterTodaySensor(sp_services_coordinator, entry.entry_id),
                 SpServicesWaterMonthSensor(sp_services_coordinator, entry.entry_id),
                 SpServicesElectricityLastMonthSensor(
                     sp_services_coordinator, entry.entry_id
@@ -538,25 +537,6 @@ class SpServicesElectricityMonthSensor(_BaseSpServicesSensor):
         if self.coordinator.data is None:
             return None
         return self.coordinator.data.electricity_month_kwh
-
-
-class SpServicesWaterTodaySensor(_BaseSpServicesSensor):
-    """Today's household water consumption (m³)."""
-
-    _attr_name = "SP Services Water Today"
-    _attr_icon = "mdi:water"
-    _attr_device_class = SensorDeviceClass.WATER
-    _attr_native_unit_of_measurement = UnitOfVolume.CUBIC_METERS
-
-    def __init__(self, coordinator: SpServicesCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator, entry_id)
-        self._attr_unique_id = f"{entry_id}_sp_water_today"
-
-    @property
-    def native_value(self) -> float | None:
-        if self.coordinator.data is None:
-            return None
-        return self.coordinator.data.water_today_m3
 
 
 class SpServicesWaterMonthSensor(_BaseSpServicesSensor):

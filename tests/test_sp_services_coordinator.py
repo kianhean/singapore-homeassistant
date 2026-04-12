@@ -118,7 +118,7 @@ def test_parse_daily_usage_realistic_shape() -> None:
     }
     electricity, water = _parse_daily_usage(payload, datetime(2026, 4, 11))
     assert electricity == pytest.approx(7.2)
-    assert water == pytest.approx(0.41)
+    assert water is None
 
 
 def test_parse_daily_usage_status_150_returns_none() -> None:
@@ -346,7 +346,7 @@ async def test_client_fetch_usage_success() -> None:
     assert data.electricity_today_kwh == pytest.approx(7.2)
     assert data.electricity_month_kwh == pytest.approx(212.4)
     assert data.electricity_last_month_kwh == pytest.approx(199.9)
-    assert data.water_today_m3 == pytest.approx(0.41)
+    assert data.water_today_m3 is None
     assert data.water_month_m3 == pytest.approx(9.1)
     assert data.water_last_month_m3 == pytest.approx(8.8)
 
@@ -382,7 +382,7 @@ async def test_coordinator_delegates_to_client() -> None:
     expected = SpServicesData(
         electricity_today_kwh=10.0,
         electricity_month_kwh=200.0,
-        water_today_m3=0.3,
+        water_today_m3=None,
         water_month_m3=8.0,
         account_no="ACC-001",
         last_updated=datetime.now(),

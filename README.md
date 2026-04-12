@@ -129,7 +129,6 @@ consumption as reported by [SP Services](https://services.spservices.sg):
 | `sensor.singapore_sp_electricity_today` | Singapore SP Electricity Today | kWh | Electricity consumed today |
 | `sensor.singapore_sp_electricity_month` | Singapore SP Electricity This Month | kWh | Electricity consumed this month |
 | `sensor.singapore_sp_electricity_last_month` | Singapore SP Electricity Last Month | kWh | Electricity consumed last month |
-| `sensor.singapore_sp_water_today` | Singapore SP Water Today | m³ | Water consumed today |
 | `sensor.singapore_sp_water_month` | Singapore SP Water This Month | m³ | Water consumed this month |
 | `sensor.singapore_sp_water_last_month` | Singapore SP Water Last Month | m³ | Water consumed last month |
 

@@ -22,7 +22,6 @@ from custom_components.singapore.sensor import (
     SpServicesElectricityTodaySensor,
     SpServicesWaterLastMonthSensor,
     SpServicesWaterMonthSensor,
-    SpServicesWaterTodaySensor,
     SingaporeCoeResultSensor,
     SingaporeElectricityTariffSensor,
     SingaporeGasTariffSensor,
@@ -430,12 +429,6 @@ def test_sp_services_electricity_last_month_sensor() -> None:
     sensor = SpServicesElectricityLastMonthSensor(_sp_services_coordinator(), "entry1")
     assert sensor.native_value == 199.9
     assert sensor.unique_id == "entry1_sp_electricity_last_month"
-
-
-def test_sp_services_water_today_sensor() -> None:
-    sensor = SpServicesWaterTodaySensor(_sp_services_coordinator(), "entry1")
-    assert sensor.native_value is None
-    assert sensor.unique_id == "entry1_sp_water_today"
 
 
 def test_sp_services_water_month_sensor() -> None:

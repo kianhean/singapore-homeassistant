@@ -245,7 +245,8 @@ class SpServicesClient:
         )
 
         electricity_month, water_month = _parse_monthly_usage(monthly_payload, now)
-        electricity_today, water_today = _parse_daily_usage(hourly_payload, now)
+        electricity_today, _ = _parse_daily_usage(hourly_payload, now)
+        water_today: float | None = None
         electricity_last_month_kwh: float | None = None
         water_last_month_m3: float | None = None
 
@@ -268,15 +269,14 @@ class SpServicesClient:
             electricity_month = electricity_month if electricity_month is not None else csv_elec_month
             water_month = water_month if water_month is not None else csv_water_month
 
-        if electricity_today is None or water_today is None:
+        if electricity_today is None:
             daily_csv = await self._post_text(
                 _SKALBOX_DAILY_CSV_URL,
                 {"accountNos": [account_no], "consumptionBy": "hourCSV"},
                 token=token,
             )
-            csv_elec_today, csv_water_today = _parse_daily_csv(daily_csv, now)
+            csv_elec_today, _ = _parse_daily_csv(daily_csv, now)
             electricity_today = electricity_today if electricity_today is not None else csv_elec_today
-            water_today = water_today if water_today is not None else csv_water_today
 
         return SpServicesData(
             electricity_today_kwh=electricity_today,
@@ -480,7 +480,6 @@ def _parse_daily_usage(payload: dict[str, Any], now: datetime) -> tuple[float | 
         str(now.day),
     }
     electricity: float | None = None
-    water: float | None = None
 
     for path, item in _walk_with_paths(payload):
         if not isinstance(item, dict):
@@ -489,11 +488,10 @@ def _parse_daily_usage(payload: dict[str, Any], now: datetime) -> tuple[float | 
         if marker and not any(key.lower() in marker for key in day_keys):
             continue
         electricity = electricity if electricity is not None else _extract_metric_value(item, path, "electricity")
-        water = water if water is not None else _extract_metric_value(item, path, "water")
-        if electricity is not None and water is not None:
+        if electricity is not None:
             break
 
-    return electricity, water
+    return electricity, None
 
 
 def _extract_metric_value(
