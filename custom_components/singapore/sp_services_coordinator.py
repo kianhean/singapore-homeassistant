@@ -76,6 +76,8 @@ class SpServicesData:
     water_month_m3: float | None
     account_no: str | None
     last_updated: datetime
+    electricity_last_month_kwh: float | None = None
+    water_last_month_m3: float | None = None
 
 
 @dataclass
@@ -244,18 +246,25 @@ class SpServicesClient:
 
         electricity_month, water_month = _parse_monthly_usage(monthly_payload, now)
         electricity_today, water_today = _parse_daily_usage(hourly_payload, now)
+        electricity_last_month_kwh: float | None = None
+        water_last_month_m3: float | None = None
 
+        monthly_csv = await self._post_text(
+            _SKALBOX_MONTHLY_CSV_URL,
+            {
+                "ebsPremiseNo": ebs_premise_no,
+                "msslPremiseNo": mssl_premise_no,
+                "accountNo": account_no,
+            },
+            token=token,
+        )
+        (
+            csv_elec_month,
+            csv_water_month,
+            electricity_last_month_kwh,
+            water_last_month_m3,
+        ) = _parse_monthly_csv(monthly_csv, now)
         if electricity_month is None or water_month is None:
-            monthly_csv = await self._post_text(
-                _SKALBOX_MONTHLY_CSV_URL,
-                {
-                    "ebsPremiseNo": ebs_premise_no,
-                    "msslPremiseNo": mssl_premise_no,
-                    "accountNo": account_no,
-                },
-                token=token,
-            )
-            csv_elec_month, csv_water_month = _parse_monthly_csv(monthly_csv, now)
             electricity_month = electricity_month if electricity_month is not None else csv_elec_month
             water_month = water_month if water_month is not None else csv_water_month
 
@@ -276,6 +285,8 @@ class SpServicesClient:
             water_month_m3=water_month,
             account_no=account_no,
             last_updated=now,
+            electricity_last_month_kwh=electricity_last_month_kwh,
+            water_last_month_m3=water_last_month_m3,
         )
 
     async def close(self) -> None:
@@ -513,55 +524,43 @@ def _extract_metric_value(
     return None
 
 
-def _parse_monthly_csv(csv_text: str, now: datetime) -> tuple[float | None, float | None]:
-    rows = list(_csv_rows(csv_text))
-    if not rows:
-        return None, None
+def _parse_monthly_csv(
+    csv_text: str, now: datetime
+) -> tuple[float | None, float | None, float | None, float | None]:
+    sections = _parse_titled_csv_sections(csv_text)
+    target_month = now.replace(day=1).date().isoformat()
+    previous_month = (now.replace(day=1) - timedelta(days=1)).replace(day=1)
+    previous_month_period = previous_month.date().isoformat()
 
-    month_markers = {
-        now.strftime("%Y-%m"),
-        now.strftime("%Y-%m-01"),
-        now.strftime("%b").lower(),
-        now.strftime("%B").lower(),
-    }
-    electricity: float | None = None
-    water: float | None = None
-
-    for row in rows:
-        haystack = " ".join(str(v).lower() for v in row.values())
-        if not any(marker in haystack for marker in month_markers):
-            continue
-        electricity = electricity if electricity is not None else _csv_metric(row, "electricity")
-        water = water if water is not None else _csv_metric(row, "water")
-        if electricity is not None and water is not None:
-            break
-
-    return electricity, water
+    electricity = _section_value_for_period(
+        sections.get("electricity", []), target_month
+    )
+    water = _section_value_for_period(sections.get("water", []), target_month)
+    electricity_last_month = _section_value_for_period(
+        sections.get("electricity", []), previous_month_period
+    )
+    water_last_month = _section_value_for_period(
+        sections.get("water", []), previous_month_period
+    )
+    return electricity, water, electricity_last_month, water_last_month
 
 
 def _parse_daily_csv(csv_text: str, now: datetime) -> tuple[float | None, float | None]:
-    rows = list(_csv_rows(csv_text))
+    rows = _csv_rows(csv_text)
     if not rows:
         return None, None
 
-    day_markers = {
-        now.date().isoformat(),
-        now.strftime("%d/%m/%Y"),
-        now.strftime("%d-%m-%Y"),
-    }
-    electricity: float | None = None
-    water: float | None = None
-
+    target_day = now.date().isoformat()
+    electricity_values: list[float] = []
     for row in rows:
-        haystack = " ".join(str(v).lower() for v in row.values())
-        if day_markers and not any(marker.lower() in haystack for marker in day_markers):
+        period = str(row.get("Period", "")).strip().strip('"')
+        if not period.startswith(target_day):
             continue
-        electricity = electricity if electricity is not None else _csv_metric(row, "electricity")
-        water = water if water is not None else _csv_metric(row, "water")
-        if electricity is not None and water is not None:
-            break
+        value = _coerce_float(row.get("Current"))
+        if value is not None:
+            electricity_values.append(value)
 
-    return electricity, water
+    return (sum(electricity_values) if electricity_values else None), None
 
 
 def _csv_rows(csv_text: str) -> list[dict[str, str]]:
@@ -570,15 +569,45 @@ def _csv_rows(csv_text: str) -> list[dict[str, str]]:
     return list(csv.DictReader(io.StringIO(csv_text)))
 
 
-def _csv_metric(row: dict[str, str], utility: str) -> float | None:
-    utility_tokens = ("electric", "energy", "kwh") if utility == "electricity" else ("water", "m3")
-    metric_tokens = ("total", "usage", "consumption", "value", "amount")
-    for key, value in row.items():
-        normalized_key = key.lower()
-        if any(token in normalized_key for token in utility_tokens) and any(
-            token in normalized_key for token in metric_tokens
-        ):
-            return _coerce_float(value)
+def _parse_titled_csv_sections(csv_text: str) -> dict[str, list[dict[str, str]]]:
+    sections: dict[str, list[dict[str, str]]] = {}
+    current_section: str | None = None
+    current_headers: list[str] | None = None
+
+    for raw_line in csv_text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            current_headers = None
+            continue
+
+        parsed = next(csv.reader([line]))
+        if len(parsed) == 1:
+            title = parsed[0].strip()
+            if title.lower() in {"electricity", "water", "gas"}:
+                current_section = title.lower()
+                sections.setdefault(current_section, [])
+                current_headers = None
+            continue
+
+        if current_section is None:
+            continue
+
+        if current_headers is None:
+            current_headers = [header.strip() for header in parsed]
+            continue
+
+        if len(parsed) != len(current_headers):
+            continue
+        sections[current_section].append(dict(zip(current_headers, parsed, strict=False)))
+
+    return sections
+
+
+def _section_value_for_period(rows: list[dict[str, str]], period: str) -> float | None:
+    for row in rows:
+        row_period = str(row.get("Period", "")).strip().strip('"')
+        if row_period == period:
+            return _coerce_float(row.get("Current"))
     return None
 
 

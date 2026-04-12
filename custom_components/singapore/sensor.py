@@ -87,6 +87,12 @@ async def async_setup_entry(
                 ),
                 SpServicesWaterTodaySensor(sp_services_coordinator, entry.entry_id),
                 SpServicesWaterMonthSensor(sp_services_coordinator, entry.entry_id),
+                SpServicesElectricityLastMonthSensor(
+                    sp_services_coordinator, entry.entry_id
+                ),
+                SpServicesWaterLastMonthSensor(
+                    sp_services_coordinator, entry.entry_id
+                ),
             ]
         )
 
@@ -570,3 +576,41 @@ class SpServicesWaterMonthSensor(_BaseSpServicesSensor):
         if self.coordinator.data is None:
             return None
         return self.coordinator.data.water_month_m3
+
+
+class SpServicesElectricityLastMonthSensor(_BaseSpServicesSensor):
+    """Previous month's household electricity consumption (kWh)."""
+
+    _attr_name = "SP Services Electricity Last Month"
+    _attr_icon = "mdi:lightning-bolt"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+
+    def __init__(self, coordinator: SpServicesCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_sp_electricity_last_month"
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.electricity_last_month_kwh
+
+
+class SpServicesWaterLastMonthSensor(_BaseSpServicesSensor):
+    """Previous month's household water consumption (m³)."""
+
+    _attr_name = "SP Services Water Last Month"
+    _attr_icon = "mdi:water"
+    _attr_device_class = SensorDeviceClass.WATER
+    _attr_native_unit_of_measurement = UnitOfVolume.CUBIC_METERS
+
+    def __init__(self, coordinator: SpServicesCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_sp_water_last_month"
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.water_last_month_m3

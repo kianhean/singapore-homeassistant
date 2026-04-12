@@ -1,5 +1,6 @@
 """Tests for Singapore SP Group tariff sensor entities."""
 
+from datetime import datetime
 from unittest.mock import MagicMock
 
 from custom_components.singapore.coe_coordinator import UNIT_COE, CoeData
@@ -9,12 +10,19 @@ from custom_components.singapore.coordinator import (
     UNIT_WATER,
     TariffData,
 )
+from custom_components.singapore.sp_services_coordinator import SpServicesData
 from custom_components.singapore.sensor import (
     UNIT_HUMIDITY,
     UNIT_RAINFALL,
     UNIT_TEMP,
     UNIT_WIND_BEARING,
     UNIT_WIND_SPEED,
+    SpServicesElectricityLastMonthSensor,
+    SpServicesElectricityMonthSensor,
+    SpServicesElectricityTodaySensor,
+    SpServicesWaterLastMonthSensor,
+    SpServicesWaterMonthSensor,
+    SpServicesWaterTodaySensor,
     SingaporeCoeResultSensor,
     SingaporeElectricityTariffSensor,
     SingaporeGasTariffSensor,
@@ -387,3 +395,64 @@ def test_train_line_status_sensor_unknown_when_line_missing():
         "East-West Line",
     )
     assert sensor.native_value == "unknown"
+
+
+def _sp_services_coordinator(
+    data=SpServicesData(
+        electricity_today_kwh=7.2,
+        electricity_month_kwh=212.4,
+        water_today_m3=None,
+        water_month_m3=9.1,
+        account_no="8949049293",
+        last_updated=datetime(2026, 4, 12, 10, 0, 0),
+        electricity_last_month_kwh=199.9,
+        water_last_month_m3=8.8,
+    ),
+):
+    coordinator = MagicMock()
+    coordinator.data = data
+    return coordinator
+
+
+def test_sp_services_electricity_today_sensor() -> None:
+    sensor = SpServicesElectricityTodaySensor(_sp_services_coordinator(), "entry1")
+    assert sensor.native_value == 7.2
+    assert sensor.unique_id == "entry1_sp_electricity_today"
+
+
+def test_sp_services_electricity_month_sensor() -> None:
+    sensor = SpServicesElectricityMonthSensor(_sp_services_coordinator(), "entry1")
+    assert sensor.native_value == 212.4
+    assert sensor.unique_id == "entry1_sp_electricity_month"
+
+
+def test_sp_services_electricity_last_month_sensor() -> None:
+    sensor = SpServicesElectricityLastMonthSensor(_sp_services_coordinator(), "entry1")
+    assert sensor.native_value == 199.9
+    assert sensor.unique_id == "entry1_sp_electricity_last_month"
+
+
+def test_sp_services_water_today_sensor() -> None:
+    sensor = SpServicesWaterTodaySensor(_sp_services_coordinator(), "entry1")
+    assert sensor.native_value is None
+    assert sensor.unique_id == "entry1_sp_water_today"
+
+
+def test_sp_services_water_month_sensor() -> None:
+    sensor = SpServicesWaterMonthSensor(_sp_services_coordinator(), "entry1")
+    assert sensor.native_value == 9.1
+    assert sensor.unique_id == "entry1_sp_water_month"
+
+
+def test_sp_services_water_last_month_sensor() -> None:
+    sensor = SpServicesWaterLastMonthSensor(_sp_services_coordinator(), "entry1")
+    assert sensor.native_value == 8.8
+    assert sensor.unique_id == "entry1_sp_water_last_month"
+
+
+def test_sp_services_sensor_attributes() -> None:
+    sensor = SpServicesElectricityMonthSensor(_sp_services_coordinator(), "entry1")
+    attrs = sensor.extra_state_attributes
+    assert attrs["source"] == "SP Services"
+    assert attrs["account_no"] == "8949049293"
+    assert attrs["last_updated"] == "2026-04-12T10:00:00"

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -20,6 +20,7 @@ from custom_components.singapore.sp_services_coordinator import (
     _parse_daily_usage,
     _parse_monthly_csv,
     _parse_monthly_usage,
+    _parse_titled_csv_sections,
 )
 
 
@@ -128,22 +129,73 @@ def test_parse_daily_usage_status_150_returns_none() -> None:
 
 def test_parse_monthly_csv() -> None:
     csv_text = (
-        "month,electricity_total_kwh,water_total_m3\n"
-        "2026-04-01,205.1,8.7\n"
+        '"Electricity"\n'
+        '"Period","Status","Current"\n'
+        '"2026-04-01","Actual","205.1"\n'
+        "\n"
+        '"Gas"\n'
+        '"No data available"\n'
+        "\n"
+        '"Water"\n'
+        '"Period","Status","Current"\n'
+        '"2026-04-01","Estimated","8.7"\n'
     )
-    electricity, water = _parse_monthly_csv(csv_text, datetime(2026, 4, 11))
+    electricity, water, electricity_last_month, water_last_month = _parse_monthly_csv(
+        csv_text, datetime(2026, 4, 11)
+    )
     assert electricity == pytest.approx(205.1)
     assert water == pytest.approx(8.7)
+    assert electricity_last_month is None
+    assert water_last_month is None
+
+
+def test_parse_monthly_csv_with_current_and_last_month() -> None:
+    csv_text = (
+        '"Electricity"\n'
+        '"Period","Status","Current"\n'
+        '"2026-03-01","Actual","205.1"\n'
+        '"2026-04-01","Actual","99.9"\n'
+        "\n"
+        '"Water"\n'
+        '"Period","Status","Current"\n'
+        '"2026-03-01","Estimated","8.7"\n'
+        '"2026-04-01","Actual","4.2"\n'
+    )
+    electricity, water, electricity_last_month, water_last_month = _parse_monthly_csv(
+        csv_text, datetime(2026, 4, 11)
+    )
+    assert electricity == pytest.approx(99.9)
+    assert water == pytest.approx(4.2)
+    assert electricity_last_month == pytest.approx(205.1)
+    assert water_last_month == pytest.approx(8.7)
 
 
 def test_parse_daily_csv() -> None:
     csv_text = (
-        "date,electricity_usage_kwh,water_usage_m3\n"
-        "2026-04-11,6.3,0.38\n"
+        '"Period","Current"\n'
+        '"2026-04-11 00:00:00","1.2"\n'
+        '"2026-04-11 00:30:00","-0.2"\n'
+        '"2026-04-11 01:00:00","2.0"\n'
+        '"2026-04-10 23:30:00","5.0"\n'
     )
     electricity, water = _parse_daily_csv(csv_text, datetime(2026, 4, 11))
-    assert electricity == pytest.approx(6.3)
-    assert water == pytest.approx(0.38)
+    assert electricity == pytest.approx(3.0)
+    assert water is None
+
+
+def test_parse_titled_csv_sections() -> None:
+    csv_text = (
+        '"Electricity"\n'
+        '"Period","Status","Current"\n'
+        '"2026-04-01","Actual","205.1"\n'
+        "\n"
+        '"Water"\n'
+        '"Period","Status","Current"\n'
+        '"2026-04-01","Estimated","8.7"\n'
+    )
+    sections = _parse_titled_csv_sections(csv_text)
+    assert sections["electricity"][0]["Current"] == "205.1"
+    assert sections["water"][0]["Status"] == "Estimated"
 
 
 async def test_client_login_success() -> None:
@@ -221,6 +273,7 @@ async def test_client_verify_otp_wrong_code() -> None:
 async def test_client_fetch_usage_success() -> None:
     client = SpServicesClient()
     now = datetime.now()
+    previous_month = (now.replace(day=1) - timedelta(days=1)).replace(day=1)
     client._session.post = AsyncMock(
         side_effect=[
             _make_response(
@@ -270,6 +323,20 @@ async def test_client_fetch_usage_success() -> None:
                     },
                 },
             ),
+            _make_response(
+                200,
+                text=(
+                    '"Electricity"\n'
+                    '"Period","Status","Current"\n'
+                    f'"{previous_month.date().isoformat()}","Actual","199.9"\n'
+                    f'"{now.replace(day=1).date().isoformat()}","Actual","212.4"\n'
+                    "\n"
+                    '"Water"\n'
+                    '"Period","Status","Current"\n'
+                    f'"{previous_month.date().isoformat()}","Actual","8.8"\n'
+                    f'"{now.replace(day=1).date().isoformat()}","Actual","9.1"\n'
+                ),
+            ),
         ]
     )
 
@@ -278,8 +345,10 @@ async def test_client_fetch_usage_success() -> None:
     assert data.account_no == "8949049293"
     assert data.electricity_today_kwh == pytest.approx(7.2)
     assert data.electricity_month_kwh == pytest.approx(212.4)
+    assert data.electricity_last_month_kwh == pytest.approx(199.9)
     assert data.water_today_m3 == pytest.approx(0.41)
     assert data.water_month_m3 == pytest.approx(9.1)
+    assert data.water_last_month_m3 == pytest.approx(8.8)
 
 
 async def test_client_fetch_usage_401() -> None:
@@ -317,6 +386,8 @@ async def test_coordinator_delegates_to_client() -> None:
         water_month_m3=8.0,
         account_no="ACC-001",
         last_updated=datetime.now(),
+        electricity_last_month_kwh=180.0,
+        water_last_month_m3=7.4,
     )
     coord.client.fetch_usage = AsyncMock(return_value=expected)
 
