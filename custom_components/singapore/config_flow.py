@@ -6,7 +6,7 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-from homeassistant.const import CONF_NAME, CONF_PASSWORD, CONF_USERNAME
+from homeassistant.const import CONF_NAME
 
 from . import DOMAIN
 from .sp_services_coordinator import CONF_SP_TOKEN
@@ -17,16 +17,10 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
     }
 )
 
-STEP_SP_CREDENTIALS_SCHEMA = vol.Schema(
+# callback_url is optional — leaving it empty skips SP Services login.
+STEP_SP_BROWSER_AUTH_SCHEMA = vol.Schema(
     {
-        vol.Optional(CONF_USERNAME, default=""): str,
-        vol.Optional(CONF_PASSWORD, default=""): str,
-    }
-)
-
-STEP_SP_OTP_SCHEMA = vol.Schema(
-    {
-        vol.Required("otp"): str,
+        vol.Optional("callback_url", default=""): str,
     }
 )
 
@@ -38,10 +32,8 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._name: str = ""
-        self._sp_username: str = ""
-        self._sp_password: str = ""
         self._sp_client = None
-        self._login_challenge = None
+        self._browser_auth_url: str | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -57,7 +49,7 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "name_too_long"
             else:
                 self._name = name
-                return await self.async_step_sp_credentials()
+                return await self.async_step_sp_browser_auth()
 
         return self.async_show_form(
             step_id="user",
@@ -65,87 +57,60 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_sp_credentials(
+    async def async_step_sp_browser_auth(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Optionally collect SP Services credentials. Leave blank to skip."""
+        """Show Auth0 browser-login URL; accept the resulting callback URL.
+
+        The user opens ``auth_url`` in a browser, completes the SP Services
+        login (including MFA), then copies the full redirect URL from the
+        browser address bar and pastes it here.  Leave the field empty to
+        skip SP Services and set up the integration without usage sensors.
+        """
         errors: dict[str, str] = {}
 
-        if user_input is not None:
-            username = user_input.get(CONF_USERNAME, "").strip()
-            password = user_input.get(CONF_PASSWORD, "").strip()
+        # Start the browser auth session exactly once.
+        if self._browser_auth_url is None:
+            try:
+                from sp_services import SpServicesClient
 
-            if not username and not password:
-                # User skipped SP login
+                self._sp_client = SpServicesClient()
+                self._browser_auth_url = await self._sp_client.begin_browser_login()
+            except Exception:  # noqa: BLE001
+                errors["base"] = "sp_cannot_connect"
+
+        if user_input is not None and not errors:
+            callback_url = user_input.get("callback_url", "").strip()
+
+            if not callback_url:
+                # User chose to skip SP Services login.
+                await self._close_sp_client()
                 return await self._create_entry()
 
-            if not username or not password:
-                errors["base"] = "sp_credentials_incomplete"
-            else:
-                try:
-                    from sp_services import AuthenticationError, SpServicesClient
-
-                    self._sp_client = SpServicesClient()
-                    self._login_challenge = await self._sp_client.login(
-                        username, password
-                    )
-                    self._sp_username = username
-                    self._sp_password = password
-                    return await self.async_step_sp_otp()
-                except AuthenticationError:
-                    errors["base"] = "sp_invalid_auth"
-                    if self._sp_client:
-                        await self._sp_client.close()
-                        self._sp_client = None
-                except Exception:  # noqa: BLE001
-                    errors["base"] = "sp_cannot_connect"
-                    if self._sp_client:
-                        await self._sp_client.close()
-                        self._sp_client = None
-
-        return self.async_show_form(
-            step_id="sp_credentials",
-            data_schema=STEP_SP_CREDENTIALS_SCHEMA,
-            errors=errors,
-        )
-
-    async def async_step_sp_otp(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Handle OTP verification for SP Services login."""
-        errors: dict[str, str] = {}
-
-        phone = (
-            self._login_challenge.phone_number
-            if self._login_challenge and self._login_challenge.phone_number
-            else "your registered phone"
-        )
-
-        if user_input is not None:
             try:
-                token = await self._sp_client.verify_otp(
-                    user_input["otp"].strip(), self._login_challenge
-                )
-                await self._sp_client.close()
-                self._sp_client = None
+                token = await self._sp_client.exchange_callback_url(callback_url)
+                await self._close_sp_client()
                 return await self._create_entry(sp_token=token)
             except Exception:  # noqa: BLE001
-                errors["base"] = "sp_invalid_otp"
+                errors["base"] = "sp_invalid_callback"
 
         return self.async_show_form(
-            step_id="sp_otp",
-            data_schema=STEP_SP_OTP_SCHEMA,
+            step_id="sp_browser_auth",
+            data_schema=STEP_SP_BROWSER_AUTH_SCHEMA,
             errors=errors,
-            description_placeholders={"phone": phone},
+            description_placeholders={"auth_url": self._browser_auth_url or ""},
         )
+
+    async def _close_sp_client(self) -> None:
+        if self._sp_client is not None:
+            await self._sp_client.close()
+            self._sp_client = None
 
     async def _create_entry(self, sp_token: str | None = None) -> ConfigFlowResult:
         """Finalise and create the config entry."""
         data: dict[str, Any] = {CONF_NAME: self._name}
         if sp_token:
             data[CONF_SP_TOKEN] = sp_token
-            data[CONF_USERNAME] = self._sp_username
-            data[CONF_PASSWORD] = self._sp_password
 
         await self.async_set_unique_id(self._name)
         self._abort_if_unique_id_configured()
@@ -157,84 +122,39 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:
         """Start re-auth flow after token expiry."""
-        return await self.async_step_reauth_confirm()
+        return await self.async_step_reauth_browser_auth()
 
-    async def async_step_reauth_confirm(
+    async def async_step_reauth_browser_auth(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Collect fresh SP credentials for re-authentication."""
+        """Re-authenticate via browser callback URL."""
         errors: dict[str, str] = {}
-        reauth_entry = self._get_reauth_entry()
 
-        if user_input is not None:
-            username = user_input[CONF_USERNAME].strip()
-            password = user_input[CONF_PASSWORD].strip()
+        if self._browser_auth_url is None:
             try:
-                from sp_services import AuthenticationError, SpServicesClient
+                from sp_services import SpServicesClient
 
                 self._sp_client = SpServicesClient()
-                self._login_challenge = await self._sp_client.login(username, password)
-                self._sp_username = username
-                self._sp_password = password
-                return await self.async_step_reauth_otp()
-            except AuthenticationError:
-                errors["base"] = "sp_invalid_auth"
-                if self._sp_client:
-                    await self._sp_client.close()
-                    self._sp_client = None
+                self._browser_auth_url = await self._sp_client.begin_browser_login()
             except Exception:  # noqa: BLE001
                 errors["base"] = "sp_cannot_connect"
-                if self._sp_client:
-                    await self._sp_client.close()
-                    self._sp_client = None
 
-        return self.async_show_form(
-            step_id="reauth_confirm",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_USERNAME,
-                        default=reauth_entry.data.get(CONF_USERNAME, ""),
-                    ): str,
-                    vol.Required(CONF_PASSWORD): str,
-                }
-            ),
-            errors=errors,
-        )
-
-    async def async_step_reauth_otp(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Verify OTP during re-authentication and update entry token."""
-        errors: dict[str, str] = {}
-
-        phone = (
-            self._login_challenge.phone_number
-            if self._login_challenge and self._login_challenge.phone_number
-            else "your registered phone"
-        )
-
-        if user_input is not None:
+        if user_input is not None and not errors:
             try:
-                token = await self._sp_client.verify_otp(
-                    user_input["otp"].strip(), self._login_challenge
+                token = await self._sp_client.exchange_callback_url(
+                    user_input["callback_url"].strip()
                 )
-                await self._sp_client.close()
-                self._sp_client = None
+                await self._close_sp_client()
                 return self.async_update_reload_and_abort(
                     self._get_reauth_entry(),
-                    data_updates={
-                        CONF_SP_TOKEN: token,
-                        CONF_USERNAME: self._sp_username,
-                        CONF_PASSWORD: self._sp_password,
-                    },
+                    data_updates={CONF_SP_TOKEN: token},
                 )
             except Exception:  # noqa: BLE001
-                errors["base"] = "sp_invalid_otp"
+                errors["base"] = "sp_invalid_callback"
 
         return self.async_show_form(
-            step_id="reauth_otp",
-            data_schema=STEP_SP_OTP_SCHEMA,
+            step_id="reauth_browser_auth",
+            data_schema=vol.Schema({vol.Required("callback_url"): str}),
             errors=errors,
-            description_placeholders={"phone": phone},
+            description_placeholders={"auth_url": self._browser_auth_url or ""},
         )

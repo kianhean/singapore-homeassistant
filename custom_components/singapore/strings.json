@@ -8,44 +8,26 @@
           "name": "Integration Name"
         }
       },
-      "sp_credentials": {
+      "sp_browser_auth": {
         "title": "SP Services Login (Optional)",
-        "description": "Enter your SP Services account credentials to enable household electricity and water usage sensors. Leave both fields empty to skip.",
+        "description": "To enable household electricity and water usage sensors, log in to SP Services:\n\n1. Open this URL in your browser: `{auth_url}`\n2. Complete the login and any MFA steps.\n3. After the page loads (it may show an error — that's fine), copy the **full URL** from the browser address bar.\n4. Paste it in the field below.\n\nLeave the field empty to skip SP Services login.",
         "data": {
-          "username": "SP Services Username (Email)",
-          "password": "Password"
+          "callback_url": "Callback URL (from browser address bar)"
         }
       },
-      "sp_otp": {
-        "title": "SP Services OTP",
-        "description": "An SMS one-time password has been sent to {phone}. Enter it below.",
-        "data": {
-          "otp": "One-Time Password"
-        }
-      },
-      "reauth_confirm": {
+      "reauth_browser_auth": {
         "title": "Re-authenticate SP Services",
-        "description": "Your SP Services session has expired. Please log in again.",
+        "description": "Your SP Services session has expired. Log in again:\n\n1. Open this URL in your browser: `{auth_url}`\n2. Complete the login and any MFA steps.\n3. Copy the **full URL** from the browser address bar after login.\n4. Paste it below.",
         "data": {
-          "username": "SP Services Username (Email)",
-          "password": "Password"
-        }
-      },
-      "reauth_otp": {
-        "title": "SP Services OTP",
-        "description": "An SMS one-time password has been sent to {phone}. Enter it below.",
-        "data": {
-          "otp": "One-Time Password"
+          "callback_url": "Callback URL (from browser address bar)"
         }
       }
     },
     "error": {
       "empty_name": "Name cannot be empty.",
       "name_too_long": "Name must be 64 characters or fewer.",
-      "sp_credentials_incomplete": "Please provide both username and password, or leave both empty to skip.",
-      "sp_invalid_auth": "Invalid SP Services credentials.",
       "sp_cannot_connect": "Could not connect to SP Services. Check your network and try again.",
-      "sp_invalid_otp": "Invalid or expired OTP. Please try again."
+      "sp_invalid_callback": "Could not exchange the callback URL for a token. Make sure you copied the full URL from the browser address bar after logging in."
     },
     "abort": {
       "already_configured": "This integration is already configured.",

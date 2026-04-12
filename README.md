@@ -23,6 +23,22 @@ custom repository first:
 
 ## What you get
 
+### SP Services household usage (optional)
+
+Real-time electricity and water consumption from your SP Services account,
+fetched every hour. These sensors only appear if you complete the optional
+SP Services login during setup (see [Setup](#setup) below).
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.sp_electricity_today` | SP Electricity Today | kWh | Today's electricity usage |
+| `sensor.sp_electricity_this_month` | SP Electricity This Month | kWh | Current month's electricity usage |
+| `sensor.sp_water_today` | SP Water Today | m³ | Today's water usage |
+| `sensor.sp_water_this_month` | SP Water This Month | m³ | Current month's water usage |
+
+The monthly sensors also expose a `last_month_kwh` / `last_month_m3` state attribute.
+All four sensors include `account_no` and `source` attributes.
+
 ### SP Group utility tariffs
 
 Scraped from the [SP Group tariff page](https://www.spgroup.com.sg/our-services/utilities/tariff-information)
@@ -177,10 +193,32 @@ sensor.singapore_temperature:
 2. Search for **Singapore**.
 3. Enter a name and click **Submit**.
 
+The integration will immediately start providing all public sensors (tariffs, COE, weather, train status, holidays).
+
+### Optional: SP Services usage sensors
+
+On the next screen the config flow shows a browser login URL. To enable the household usage sensors:
+
+1. **Open the URL** shown on screen in a desktop browser.
+2. Log in to your SP Services / SP Digital account (email + password + SMS OTP).
+3. After login the browser will redirect to a page that may look like an error — **that's expected**. What matters is the URL in the address bar, which will look something like:
+   ```
+   https://services.spservices.sg/callback?fromLogin=true&code=…&state=…
+   ```
+4. **Copy the full URL** from the address bar.
+5. Paste it into the **Callback URL** field in Home Assistant and click **Submit**.
+
+Leave the field empty and click **Submit** to skip SP Services login. You can always re-add it later by removing and re-adding the integration.
+
+### Re-authentication
+
+When the SP Services token expires, Home Assistant will show a re-authentication notification. Follow the same browser login steps above to obtain a new callback URL.
+
 ## Data sources
 
 | Source | Data | Refresh |
 |--------|------|---------|
+| [SP Services](https://services.spservices.sg) | Household electricity & water usage (optional, requires login) | Every 1 h |
 | [SP Group](https://www.spgroup.com.sg/our-services/utilities/tariff-information) | Electricity, gas, water tariffs | Every 24 h |
 | [data.gov.sg / LTA](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view) | COE bidding results | Daily at 19:30 |
 | [data.gov.sg / NEA (collection 1456)](https://data.gov.sg/collections/1456/view) | 2-hour area weather forecasts | Every 10 min |
