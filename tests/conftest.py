@@ -224,6 +224,19 @@ _HA_MODULES: dict[str, ModuleType] = {
         "homeassistant.exceptions",
         ConfigEntryAuthFailed=ConfigEntryAuthFailed,
     ),
+    "homeassistant.components.recorder": _mod(
+        "homeassistant.components.recorder",
+        get_instance=MagicMock(return_value=MagicMock()),
+    ),
+    "homeassistant.components.recorder.models": _mod(
+        "homeassistant.components.recorder.models",
+        StatisticData=MagicMock(side_effect=lambda **kw: kw),
+        StatisticMetaData=MagicMock(side_effect=lambda **kw: kw),
+    ),
+    "homeassistant.components.recorder.statistics": _mod(
+        "homeassistant.components.recorder.statistics",
+        async_add_external_statistics=MagicMock(),
+    ),
 }
 
 for _name, _mod_obj in _HA_MODULES.items():
