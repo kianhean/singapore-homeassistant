@@ -126,8 +126,11 @@ class SpServicesCoordinator(DataUpdateCoordinator[UsageData]):
 
         now = datetime.now(tz=timezone.utc)
         if _stats_slot(now) != _stats_slot(self._last_stats_push):
-            self._push_statistics(data)
-            self._last_stats_push = now
+            try:
+                self._push_statistics(data)
+                self._last_stats_push = now
+            except Exception:  # noqa: BLE001
+                _LOGGER.warning("Failed to push SP Services statistics", exc_info=True)
 
         return data
 
