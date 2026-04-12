@@ -98,7 +98,10 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="sp_browser_auth",
             data_schema=STEP_SP_BROWSER_AUTH_SCHEMA,
             errors=errors,
-            description_placeholders={"auth_url": self._browser_auth_url or ""},
+            description_placeholders={
+                "auth_url": self._browser_auth_url or "",
+                "callback_url_prefix": "https://services.spservices.sg/callback?fromLogin=true",
+            },
         )
 
     async def _close_sp_client(self) -> None:
@@ -156,5 +159,8 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="reauth_browser_auth",
             data_schema=vol.Schema({vol.Required("callback_url"): str}),
             errors=errors,
-            description_placeholders={"auth_url": self._browser_auth_url or ""},
+            description_placeholders={
+                "auth_url": self._browser_auth_url or "",
+                "callback_url_prefix": "https://services.spservices.sg/callback?fromLogin=true",
+            },
         )

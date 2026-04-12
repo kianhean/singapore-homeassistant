@@ -3,6 +3,7 @@
   "name": "Singapore",
   "codeowners": ["@kianhean"],
   "config_flow": true,
+  "after_dependencies": ["recorder"],
   "dependencies": [],
   "documentation": "https://github.com/kianhean/singapore-homeassistant",
   "iot_class": "cloud_polling",
