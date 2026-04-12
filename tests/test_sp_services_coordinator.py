@@ -149,6 +149,7 @@ def test_stats_slot_same_slot_does_not_push(monkeypatch):
     fixed_now = datetime(2026, 4, 12, 0, 30, tzinfo=timezone.utc)
 
     import asyncio
+
     with (
         patch(
             "custom_components.singapore.sp_services_coordinator.SpServicesClient",
@@ -189,6 +190,7 @@ def test_stats_slot_new_slot_pushes(monkeypatch):
     fixed_now = datetime(2026, 4, 12, 8, 5, tzinfo=timezone.utc)
 
     import asyncio
+
     with (
         patch(
             "custom_components.singapore.sp_services_coordinator.SpServicesClient",
