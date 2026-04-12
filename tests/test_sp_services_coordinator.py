@@ -13,6 +13,7 @@ from custom_components.singapore.sp_services_coordinator import (
     _account_slug,
     _build_statistics,
     _parse_period,
+    _stats_slot,
 )
 
 
@@ -85,6 +86,122 @@ def test_parse_period_monthly():
 
 def test_parse_period_unknown_returns_none():
     assert _parse_period("not a date") is None
+
+
+# ---------------------------------------------------------------------------
+# _stats_slot
+# ---------------------------------------------------------------------------
+
+
+def test_stats_slot_none_input():
+    assert _stats_slot(None) is None
+
+
+def test_stats_slot_midnight_sgt():
+    # 2026-04-12 00:00 SGT = 2026-04-11 16:00 UTC
+    from datetime import timezone
+
+    dt = datetime(2026, 4, 11, 16, 0, tzinfo=timezone.utc)
+    date, slot = _stats_slot(dt)
+    assert slot == 0  # midnight slot
+
+
+def test_stats_slot_8am_sgt():
+    # 2026-04-12 08:00 SGT = 2026-04-12 00:00 UTC
+    from datetime import timezone
+
+    dt = datetime(2026, 4, 12, 0, 0, tzinfo=timezone.utc)
+    date, slot = _stats_slot(dt)
+    assert slot == 1  # 08:00 slot
+
+
+def test_stats_slot_4pm_sgt():
+    # 2026-04-12 16:00 SGT = 2026-04-12 08:00 UTC
+    from datetime import timezone
+
+    dt = datetime(2026, 4, 12, 8, 0, tzinfo=timezone.utc)
+    date, slot = _stats_slot(dt)
+    assert slot == 2  # 16:00 slot
+
+
+def test_stats_slot_same_slot_does_not_push(monkeypatch):
+    """_push_statistics is NOT called when still within the same 8-hour slot."""
+    from datetime import timezone
+    from unittest.mock import patch
+
+    hass = MagicMock()
+    entry = _make_entry()
+    coordinator = SpServicesCoordinator(hass, entry)
+
+    # Seed last push at 08:01 SGT (slot 1)
+    coordinator._last_stats_push = datetime(2026, 4, 12, 0, 1, tzinfo=timezone.utc)
+
+    push_mock = MagicMock()
+    monkeypatch.setattr(coordinator, "_push_statistics", push_mock)
+
+    usage = _make_usage_data()
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.fetch_usage = AsyncMock(return_value=usage)
+
+    # "Now" is 08:30 SGT (still slot 1) = 00:30 UTC
+    fixed_now = datetime(2026, 4, 12, 0, 30, tzinfo=timezone.utc)
+
+    import asyncio
+    with (
+        patch(
+            "custom_components.singapore.sp_services_coordinator.SpServicesClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "custom_components.singapore.sp_services_coordinator.datetime"
+        ) as mock_dt,
+    ):
+        mock_dt.now.return_value = fixed_now
+        asyncio.run(coordinator._async_update_data())
+
+    push_mock.assert_not_called()
+
+
+def test_stats_slot_new_slot_pushes(monkeypatch):
+    """_push_statistics IS called when the 8-hour slot changes."""
+    from datetime import timezone
+    from unittest.mock import patch
+
+    hass = MagicMock()
+    entry = _make_entry()
+    coordinator = SpServicesCoordinator(hass, entry)
+
+    # Last push was in slot 1 (08:xx SGT)
+    coordinator._last_stats_push = datetime(2026, 4, 12, 0, 30, tzinfo=timezone.utc)
+
+    push_mock = MagicMock()
+    monkeypatch.setattr(coordinator, "_push_statistics", push_mock)
+
+    usage = _make_usage_data()
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.fetch_usage = AsyncMock(return_value=usage)
+
+    # "Now" is 16:05 SGT (slot 2) = 08:05 UTC
+    fixed_now = datetime(2026, 4, 12, 8, 5, tzinfo=timezone.utc)
+
+    import asyncio
+    with (
+        patch(
+            "custom_components.singapore.sp_services_coordinator.SpServicesClient",
+            return_value=mock_client,
+        ),
+        patch(
+            "custom_components.singapore.sp_services_coordinator.datetime"
+        ) as mock_dt,
+    ):
+        mock_dt.now.return_value = fixed_now
+        asyncio.run(coordinator._async_update_data())
+
+    push_mock.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

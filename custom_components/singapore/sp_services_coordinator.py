@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from homeassistant.config_entries import ConfigEntry
@@ -77,6 +77,20 @@ def _build_statistics(points: list[UsagePoint]) -> list:
     return stats
 
 
+def _stats_slot(dt: datetime | None) -> tuple | None:
+    """Return (SGT date, 8-hour slot index) for a UTC datetime, or None.
+
+    Slots correspond to midnight, 08:00, and 16:00 SGT so statistics are
+    refreshed three times a day — early enough to catch SP's data updates.
+    Returns None when dt is None so an uninitialised coordinator always pushes
+    on its first successful fetch.
+    """
+    if dt is None:
+        return None
+    sgt = dt.astimezone(_SGT)
+    return (sgt.date(), sgt.hour // 8)
+
+
 def _account_slug(usage_data: UsageData, entry_id: str) -> str:
     raw = usage_data.account_no or entry_id
     return re.sub(r"[^a-z0-9]", "_", raw.lower()).strip("_")
@@ -87,6 +101,7 @@ class SpServicesCoordinator(DataUpdateCoordinator[UsageData]):
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self._entry = entry
+        self._last_stats_push: datetime | None = None
         super().__init__(
             hass,
             _LOGGER,
@@ -109,7 +124,11 @@ class SpServicesCoordinator(DataUpdateCoordinator[UsageData]):
         except (ApiError, SpServicesError) as err:
             raise UpdateFailed(f"SP Services error: {err}") from err
 
-        self._push_statistics(data)
+        now = datetime.now(tz=timezone.utc)
+        if _stats_slot(now) != _stats_slot(self._last_stats_push):
+            self._push_statistics(data)
+            self._last_stats_push = now
+
         return data
 
     def _push_statistics(self, usage_data: UsageData) -> None:
