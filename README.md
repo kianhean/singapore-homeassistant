@@ -66,7 +66,13 @@ The SP Services portal uses Auth0 with SMS MFA, so you need to complete the logi
 
 > **Tip:** The login URL is time-limited. Try to complete steps 2–6 without long interruptions. If it fails, restart the flow to get a fresh URL.
 
-> **Skipping:** Leave the Callback URL field empty and click Submit to skip. All other sensors will still work; you can add SP login later by removing and re-adding the integration.
+> **Skipping:** Leave the Callback URL field empty and click Submit to skip. All other sensors will still work; you can add SP login later using the **Configure** button (see below).
+
+#### Adding SP Services to an existing installation
+
+Already have the integration running without SP Services? No need to remove it. Go to
+**Settings → Devices & Services → Singapore → Configure** and follow the same browser
+login steps above. The integration will reload automatically with your usage sensors enabled.
 
 #### Re-authentication
 
@@ -223,7 +229,7 @@ sensor.singapore_coe_category_a:
 3. Enter a name and click **Submit**.
 4. On the next screen, follow the [SP Services browser login steps](#step-by-step-getting-the-callback-url) to enable usage sensors — or leave the field empty to skip.
 
-All public sensors (tariffs, COE, weather, train status, holidays) start working immediately regardless of whether you complete the SP login.
+All public sensors (tariffs, COE, weather, train status, holidays) start working immediately regardless of whether you complete the SP login. You can always add it later via **Configure** on the integration card.
 
 ## Data sources
 

@@ -5,7 +5,12 @@ from __future__ import annotations
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.const import CONF_NAME
 
 from . import DOMAIN
@@ -25,10 +30,75 @@ STEP_SP_BROWSER_AUTH_SCHEMA = vol.Schema(
 )
 
 
+class SingaporeOptionsFlow(OptionsFlow):
+    """Options flow — lets existing users add or refresh their SP Services login."""
+
+    def __init__(self, config_entry) -> None:
+        self._entry = config_entry
+        self._sp_client = None
+        self._browser_auth_url: str | None = None
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        return await self.async_step_sp_browser_auth(user_input)
+
+    async def async_step_sp_browser_auth(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show browser login URL; accept resulting callback URL."""
+        errors: dict[str, str] = {}
+
+        if self._browser_auth_url is None:
+            try:
+                from sp_services import SpServicesClient
+
+                self._sp_client = SpServicesClient()
+                self._browser_auth_url = await self._sp_client.begin_browser_login()
+            except Exception:  # noqa: BLE001
+                errors["base"] = "sp_cannot_connect"
+
+        if user_input is not None and not errors:
+            callback_url = user_input.get("callback_url", "").strip()
+
+            if not callback_url:
+                await self._close_sp_client()
+                return self.async_abort(reason="no_sp_token")
+
+            try:
+                token = await self._sp_client.exchange_callback_url(callback_url)
+                await self._close_sp_client()
+                return self.async_update_reload_and_abort(
+                    self._entry,
+                    data={**self._entry.data, CONF_SP_TOKEN: token},
+                )
+            except Exception:  # noqa: BLE001
+                errors["base"] = "sp_invalid_callback"
+
+        return self.async_show_form(
+            step_id="sp_browser_auth",
+            data_schema=STEP_SP_BROWSER_AUTH_SCHEMA,
+            errors=errors,
+            description_placeholders={
+                "auth_url": self._browser_auth_url or "",
+                "callback_url_prefix": "https://services.spservices.sg/callback?fromLogin=true",
+            },
+        )
+
+    async def _close_sp_client(self) -> None:
+        if self._sp_client is not None:
+            await self._sp_client.close()
+            self._sp_client = None
+
+
 class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Singapore integration."""
 
     VERSION = 1
+
+    @staticmethod
+    def async_get_options_flow(config_entry: ConfigEntry) -> SingaporeOptionsFlow:
+        return SingaporeOptionsFlow(config_entry)
 
     def __init__(self) -> None:
         self._name: str = ""

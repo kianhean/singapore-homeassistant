@@ -84,7 +84,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     "Initial SP Services refresh failed; continuing setup and retrying later"
                 )
 
-        hass.async_create_task(_initial_refresh_sp())
+        await _initial_refresh_sp()
         entry_data["sp_services"] = sp_coordinator
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = entry_data
