@@ -12,16 +12,6 @@ from custom_components.singapore.coordinator import (
 )
 from custom_components.singapore.sp_services_coordinator import SpServicesData
 from custom_components.singapore.sensor import (
-    UNIT_HUMIDITY,
-    UNIT_RAINFALL,
-    UNIT_TEMP,
-    UNIT_WIND_BEARING,
-    UNIT_WIND_SPEED,
-    SpServicesElectricityLastMonthSensor,
-    SpServicesElectricityMonthSensor,
-    SpServicesElectricityTodaySensor,
-    SpServicesWaterLastMonthSensor,
-    SpServicesWaterMonthSensor,
     SingaporeCoeResultSensor,
     SingaporeElectricityTariffSensor,
     SingaporeGasTariffSensor,
@@ -34,6 +24,16 @@ from custom_components.singapore.sensor import (
     SingaporeWaterTariffSensor,
     SingaporeWindBearingSensor,
     SingaporeWindSpeedSensor,
+    UNIT_HUMIDITY,
+    UNIT_RAINFALL,
+    UNIT_TEMP,
+    UNIT_WIND_BEARING,
+    UNIT_WIND_SPEED,
+    SpServicesElectricityLastMonthSensor,
+    SpServicesElectricityMonthSensor,
+    SpServicesElectricityTodaySensor,
+    SpServicesWaterLastMonthSensor,
+    SpServicesWaterMonthSensor,
 )
 from custom_components.singapore.train_coordinator import TrainStatusData
 from custom_components.singapore.weather_coordinator import WeatherData, WeatherReadings

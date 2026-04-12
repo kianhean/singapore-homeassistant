@@ -121,7 +121,7 @@ Bukit Panjang LRT, Sengkang LRT, Punggol LRT.
 > entirely on your own Home Assistant device and is never transmitted to any third-party
 > server. Credentials are stored in your local HA config entry only.
 
-When configured (see [Setup](#setup) below), four additional sensors track your household
+When configured (see [Setup](#setup) below), five additional sensors track your household
 consumption as reported by [SP Services](https://services.spservices.sg):
 
 | Entity ID | Name | Unit | Description |
@@ -132,8 +132,10 @@ consumption as reported by [SP Services](https://services.spservices.sg):
 | `sensor.singapore_sp_water_month` | Singapore SP Water This Month | m³ | Water consumed this month |
 | `sensor.singapore_sp_water_last_month` | Singapore SP Water Last Month | m³ | Water consumed last month |
 
-These sensors use `SensorDeviceClass.ENERGY` / `SensorDeviceClass.WATER` and
-`SensorStateClass.TOTAL` so they integrate with the Home Assistant **Energy Dashboard**.
+The electricity and water month-based sensors use `SensorDeviceClass.ENERGY` /
+`SensorDeviceClass.WATER` with `SensorStateClass.TOTAL`, so they can be used in the
+Home Assistant **Energy Dashboard**. Water data is only available monthly from the
+observed SP Services exports, so there is no daily water sensor.
 
 SP Services requires two-factor authentication (OTP via SMS). Credentials are entered
 through the integration's **Configure** dialog after setup — see [Setup](#setup).

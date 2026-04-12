@@ -13,10 +13,11 @@ custom_components/singapore/
 ├── holiday_coordinator.py  # PublicHolidayCoordinator: fetches + parses MOM holidays
 ├── weather_coordinator.py  # SingaporeWeatherCoordinator: 2-hour forecasts + collection 1459 readings
 ├── train_coordinator.py    # TrainStatusCoordinator: scrapes mytransport.sg MRT/LRT status
+├── sp_services_coordinator.py # SpServicesCoordinator: Auth0 login + OTP + SP Services usage fetches
 ├── calendar.py             # Calendar entity (Singapore public holidays)
 ├── weather.py              # Weather entities (one per Singapore forecast area)
-├── config_flow.py          # UI config flow (name input)
-├── sensor.py               # Sensor entities (tariff + COE + weather readings + train status)
+├── config_flow.py          # UI config flow + options flow for SP Services credentials / OTP
+├── sensor.py               # Sensor entities (tariff + COE + weather readings + train status + SP Services)
 ├── manifest.json           # Integration metadata; declares beautifulsoup4 + niquests deps
 ├── strings.json            # Config flow UI strings
 └── translations/
@@ -47,6 +48,7 @@ hass.data[DOMAIN][entry_id] = {
     "weather": SingaporeWeatherCoordinator,
     "holiday": PublicHolidayCoordinator,
     "train": TrainStatusCoordinator,
+    "sp_services": SpServicesCoordinator | None,
     "unsub_coe": <unsubscribe callable>,
 }
 ```
@@ -97,6 +99,20 @@ from NEA's 2-hour periods.
 
 Train status data is fetched every **5 minutes** via a POST to the LTA DataMall AEM servlet
 (the page itself is JS-rendered and returns only a "Loading…" shell when scraped as HTML).
+
+### SP Services Household Usage
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.singapore_sp_electricity_today` | Singapore SP Electricity Today | kWh | Electricity consumed today |
+| `sensor.singapore_sp_electricity_month` | Singapore SP Electricity This Month | kWh | Electricity consumed this month |
+| `sensor.singapore_sp_electricity_last_month` | Singapore SP Electricity Last Month | kWh | Electricity consumed last month |
+| `sensor.singapore_sp_water_month` | Singapore SP Water This Month | m³ | Water consumed this month |
+| `sensor.singapore_sp_water_last_month` | Singapore SP Water Last Month | m³ | Water consumed last month |
+
+SP Services credentials are configured after setup through the integration's options flow.
+The login flow uses Auth0 username/password plus SMS OTP. Electricity supports daily and
+monthly totals. Water currently supports monthly totals only.
 
 ## Development Setup
 
