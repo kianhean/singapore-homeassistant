@@ -4,8 +4,7 @@
 
 # Singapore Home Assistant custom integration
 
-A [HACS](https://hacs.xyz) custom integration for Singapore-specific data: utility
-tariffs, COE bidding results, live weather, train status, and public holidays.
+A [HACS](https://hacs.xyz) custom integration that brings your **SP Services household electricity and water usage** directly into Home Assistant — plus utility tariffs, COE results, live weather, train status, and public holidays.
 
 ### HACS installation (manual, pre-merge)
 
@@ -21,23 +20,61 @@ custom repository first:
 7. Search for **Singapore** in HACS and install it.
 8. Restart Home Assistant.
 
-## What you get
+---
 
-### SP Services household usage (optional)
+## Headline feature: SP Services household usage
 
-Real-time electricity and water consumption from your SP Services account,
-fetched every hour. These sensors only appear if you complete the optional
-SP Services login during setup (see [Setup](#setup) below).
+Track your actual electricity and water consumption — not just tariff rates — directly from your SP Services account. Sensors update every hour.
 
-| Entity ID | Name | Unit | Description |
-|-----------|------|------|-------------|
-| `sensor.sp_electricity_today` | SP Electricity Today | kWh | Today's electricity usage |
-| `sensor.sp_electricity_this_month` | SP Electricity This Month | kWh | Current month's electricity usage |
-| `sensor.sp_water_today` | SP Water Today | m³ | Today's water usage |
-| `sensor.sp_water_this_month` | SP Water This Month | m³ | Current month's water usage |
+| Entity | Name | Unit | What it shows |
+|--------|------|------|---------------|
+| `sensor.sp_electricity_today` | SP Electricity Today | kWh | Today's electricity consumption so far |
+| `sensor.sp_electricity_this_month` | SP Electricity This Month | kWh | Running total for the current billing month |
+| `sensor.sp_water_today` | SP Water Today | m³ | Today's water consumption so far |
+| `sensor.sp_water_this_month` | SP Water This Month | m³ | Running total for the current billing month |
 
-The monthly sensors also expose a `last_month_kwh` / `last_month_m3` state attribute.
-All four sensors include `account_no` and `source` attributes.
+The monthly sensors expose a `last_month_kwh` / `last_month_m3` attribute for quick comparison.
+All sensors include `account_no`, `source`, and `last_updated` attributes.
+
+### How to connect your SP Services account
+
+The SP Services portal uses Auth0 with SMS MFA, so you need to complete the login in a real browser and hand the resulting token to Home Assistant via a **callback URL**. The integration guides you through this during setup — here is exactly what to expect.
+
+#### Step-by-step: getting the callback URL
+
+1. **Start the integration setup** (Settings → Devices & Services → Add Integration → Singapore). After entering a name, the config flow shows a long login URL beginning with `https://identity.spdigital.auth0.com/authorize?...`.
+
+2. **Open that URL in a browser** — any browser on your phone or computer works. You will land on the SP Digital login page.
+
+3. **Log in** with your SP Services / SP Digital account:
+   - Enter your email address and password.
+   - Enter the 6-digit SMS OTP sent to your registered mobile number.
+
+4. **After the OTP is accepted**, the browser will redirect to a URL that starts with:
+   ```
+   https://services.spservices.sg/callback?fromLogin=true&code=...&state=...
+   ```
+   The page itself may be **blank or show an error** — that is completely normal and expected. The data you need is in the URL, not the page content.
+
+5. **Copy the full URL** from the browser address bar. It will look like:
+   ```
+   https://services.spservices.sg/callback?fromLogin=true&code=wH4xK2...&state=eyJub25j...
+   ```
+   Make sure you copy everything — the `code=` and `state=` parameters are what the integration uses to obtain your access token.
+
+6. **Paste the full URL** into the "Callback URL" field in the Home Assistant config flow and click **Submit**.
+
+> **Tip:** The login URL is time-limited. Try to complete steps 2–6 without long interruptions. If it fails, restart the flow to get a fresh URL.
+
+> **Skipping:** Leave the Callback URL field empty and click Submit to skip. All other sensors will still work; you can add SP login later by removing and re-adding the integration.
+
+#### Re-authentication
+
+The SP Services access token expires periodically. When it does, Home Assistant shows a **re-authentication required** notification. Click it and follow the same browser login steps above to get a fresh callback URL.
+
+---
+
+## What else you get
 
 ### SP Group utility tariffs
 
@@ -144,6 +181,22 @@ Shows up as a Home Assistant calendar with all-day events from the current year 
 ## Example sensor states
 
 ```yaml
+sensor.sp_electricity_today:
+  state: 4.2
+  unit_of_measurement: kWh
+  attributes:
+    account_no: "1234567890"
+    source: SP Services
+    last_updated: "2026-04-12T10:00:00"
+
+sensor.sp_electricity_this_month:
+  state: 187.5
+  unit_of_measurement: kWh
+  attributes:
+    last_month_kwh: 312.1
+    account_no: "1234567890"
+    source: SP Services
+
 sensor.singapore_electricity_tariff:
   state: 29.72
   unit_of_measurement: ¢/kWh
@@ -151,16 +204,6 @@ sensor.singapore_electricity_tariff:
     quarter: Q2
     year: 2026
     source: SP Group
-
-sensor.singapore_solar_export_price:
-  state: 23.47
-  unit_of_measurement: ¢/kWh
-  attributes:
-    quarter: Q2
-    year: 2026
-    source: SP Group
-    network_cost: 6.25
-    total_tariff: 29.72
 
 sensor.singapore_coe_category_a:
   state: 95501
@@ -171,54 +214,22 @@ sensor.singapore_coe_category_a:
     month: "2026-03"
     bidding_no: 1
     source: data.gov.sg / LTA
-
-sensor.singapore_temperature:
-  state: 31.2
-  unit_of_measurement: °C
-  attributes:
-    source: data.gov.sg / NEA (collection 1459)
 ```
-
-## Installation via HACS (manual custom repository)
-
-1. Open HACS in your Home Assistant instance.
-2. Go to **Integrations → Custom repositories** (three-dot menu).
-3. Add `https://github.com/kianhean/singapore-homeassistant` with category **Integration**.
-4. Search for **Singapore** and install it.
-5. Restart Home Assistant.
 
 ## Setup
 
 1. Go to **Settings → Devices & Services → Add Integration**.
 2. Search for **Singapore**.
 3. Enter a name and click **Submit**.
+4. On the next screen, follow the [SP Services browser login steps](#step-by-step-getting-the-callback-url) to enable usage sensors — or leave the field empty to skip.
 
-The integration will immediately start providing all public sensors (tariffs, COE, weather, train status, holidays).
-
-### Optional: SP Services usage sensors
-
-On the next screen the config flow shows a browser login URL. To enable the household usage sensors:
-
-1. **Open the URL** shown on screen in a desktop browser.
-2. Log in to your SP Services / SP Digital account (email + password + SMS OTP).
-3. After login the browser will redirect to a page that may look like an error — **that's expected**. What matters is the URL in the address bar, which will look something like:
-   ```
-   https://services.spservices.sg/callback?fromLogin=true&code=…&state=…
-   ```
-4. **Copy the full URL** from the address bar.
-5. Paste it into the **Callback URL** field in Home Assistant and click **Submit**.
-
-Leave the field empty and click **Submit** to skip SP Services login. You can always re-add it later by removing and re-adding the integration.
-
-### Re-authentication
-
-When the SP Services token expires, Home Assistant will show a re-authentication notification. Follow the same browser login steps above to obtain a new callback URL.
+All public sensors (tariffs, COE, weather, train status, holidays) start working immediately regardless of whether you complete the SP login.
 
 ## Data sources
 
 | Source | Data | Refresh |
 |--------|------|---------|
-| [SP Services](https://services.spservices.sg) | Household electricity & water usage (optional, requires login) | Every 1 h |
+| [SP Services](https://services.spservices.sg) | Household electricity & water usage (requires login) | Every 1 h |
 | [SP Group](https://www.spgroup.com.sg/our-services/utilities/tariff-information) | Electricity, gas, water tariffs | Every 24 h |
 | [data.gov.sg / LTA](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view) | COE bidding results | Daily at 19:30 |
 | [data.gov.sg / NEA (collection 1456)](https://data.gov.sg/collections/1456/view) | 2-hour area weather forecasts | Every 10 min |
