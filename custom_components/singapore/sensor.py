@@ -92,9 +92,7 @@ async def async_setup_entry(
                 SpServicesElectricityEstimatedBillSensor(
                     sp_services_coordinator, tariff_coordinator, entry.entry_id
                 ),
-                SpServicesWaterLastMonthSensor(
-                    sp_services_coordinator, entry.entry_id
-                ),
+                SpServicesWaterLastMonthSensor(sp_services_coordinator, entry.entry_id),
             ]
         )
 

@@ -137,7 +137,9 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
                 await self._close_client()
                 self._sp_client = SpServicesClient()
                 try:
-                    self._login_response = await self._sp_client.login(username, password)
+                    self._login_response = await self._sp_client.login(
+                        username, password
+                    )
                 except ValueError:
                     errors["base"] = "invalid_auth"
                 except Exception:
@@ -190,7 +192,9 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 if self._sp_client is None:
-                    raise RuntimeError("SP Services login session missing during OTP step")
+                    raise RuntimeError(
+                        "SP Services login session missing during OTP step"
+                    )
                 token = await self._sp_client.verify_otp(
                     user_input["otp"], self._login_response
                 )
@@ -355,7 +359,9 @@ class SingaporeOptionsFlow(OptionsFlow):
         if user_input is not None:
             try:
                 if self._sp_client is None:
-                    raise RuntimeError("SP Services login session missing during OTP step")
+                    raise RuntimeError(
+                        "SP Services login session missing during OTP step"
+                    )
                 token = await self._sp_client.verify_otp(
                     user_input["otp"], self._login_response
                 )

@@ -266,7 +266,9 @@ class SpServicesClient:
             water_last_month_m3,
         ) = _parse_monthly_csv(monthly_csv, now)
         if electricity_month is None or water_month is None:
-            electricity_month = electricity_month if electricity_month is not None else csv_elec_month
+            electricity_month = (
+                electricity_month if electricity_month is not None else csv_elec_month
+            )
             water_month = water_month if water_month is not None else csv_water_month
 
         if electricity_today is None:
@@ -276,7 +278,9 @@ class SpServicesClient:
                 token=token,
             )
             csv_elec_today, _ = _parse_daily_csv(daily_csv, now)
-            electricity_today = electricity_today if electricity_today is not None else csv_elec_today
+            electricity_today = (
+                electricity_today if electricity_today is not None else csv_elec_today
+            )
 
         return SpServicesData(
             electricity_today_kwh=electricity_today,
@@ -300,17 +304,21 @@ class SpServicesClient:
         challenge = _pkce_challenge(code_verifier)
 
         resp = await self._session.get(
-            f"{_AUTH0_AUTHORIZE_URL}?{urlencode({
-                'client_id': _AUTH0_CLIENT_ID,
-                'redirect_uri': _AUTH0_REDIRECT_URI,
-                'response_type': 'code',
-                'scope': _AUTH0_SCOPE,
-                'audience': _AUTH0_AUDIENCE,
-                'code_challenge': challenge,
-                'code_challenge_method': 'S256',
-                'nonce': nonce,
-                'state': state,
-            })}",
+            f"{_AUTH0_AUTHORIZE_URL}?{
+                urlencode(
+                    {
+                        'client_id': _AUTH0_CLIENT_ID,
+                        'redirect_uri': _AUTH0_REDIRECT_URI,
+                        'response_type': 'code',
+                        'scope': _AUTH0_SCOPE,
+                        'audience': _AUTH0_AUDIENCE,
+                        'code_challenge': challenge,
+                        'code_challenge_method': 'S256',
+                        'nonce': nonce,
+                        'state': state,
+                    }
+                )
+            }",
             headers=_HEADERS,
             timeout=30,
         )
@@ -444,7 +452,9 @@ def _extract_primary_account(payload: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
-def _parse_monthly_usage(payload: dict[str, Any], now: datetime) -> tuple[float | None, float | None]:
+def _parse_monthly_usage(
+    payload: dict[str, Any], now: datetime
+) -> tuple[float | None, float | None]:
     month_keys = {
         now.strftime("%Y-%m"),
         now.strftime("%Y-%m-01"),
@@ -458,18 +468,28 @@ def _parse_monthly_usage(payload: dict[str, Any], now: datetime) -> tuple[float 
     for path, item in _walk_with_paths(payload):
         if not isinstance(item, dict):
             continue
-        marker = " ".join(str(item.get(k, "")).lower() for k in ("month", "label", "date", "period"))
+        marker = " ".join(
+            str(item.get(k, "")).lower() for k in ("month", "label", "date", "period")
+        )
         if month_keys and marker and not any(key in marker for key in month_keys):
             continue
-        electricity = electricity if electricity is not None else _extract_metric_value(item, path, "electricity")
-        water = water if water is not None else _extract_metric_value(item, path, "water")
+        electricity = (
+            electricity
+            if electricity is not None
+            else _extract_metric_value(item, path, "electricity")
+        )
+        water = (
+            water if water is not None else _extract_metric_value(item, path, "water")
+        )
         if electricity is not None and water is not None:
             break
 
     return electricity, water
 
 
-def _parse_daily_usage(payload: dict[str, Any], now: datetime) -> tuple[float | None, float | None]:
+def _parse_daily_usage(
+    payload: dict[str, Any], now: datetime
+) -> tuple[float | None, float | None]:
     if payload.get("status") == 150:
         return None, None
 
@@ -484,10 +504,16 @@ def _parse_daily_usage(payload: dict[str, Any], now: datetime) -> tuple[float | 
     for path, item in _walk_with_paths(payload):
         if not isinstance(item, dict):
             continue
-        marker = " ".join(str(item.get(k, "")).lower() for k in ("date", "day", "label", "period"))
+        marker = " ".join(
+            str(item.get(k, "")).lower() for k in ("date", "day", "label", "period")
+        )
         if marker and not any(key.lower() in marker for key in day_keys):
             continue
-        electricity = electricity if electricity is not None else _extract_metric_value(item, path, "electricity")
+        electricity = (
+            electricity
+            if electricity is not None
+            else _extract_metric_value(item, path, "electricity")
+        )
         if electricity is not None:
             break
 
@@ -596,7 +622,9 @@ def _parse_titled_csv_sections(csv_text: str) -> dict[str, list[dict[str, str]]]
 
         if len(parsed) != len(current_headers):
             continue
-        sections[current_section].append(dict(zip(current_headers, parsed, strict=False)))
+        sections[current_section].append(
+            dict(zip(current_headers, parsed, strict=False))
+        )
 
     return sections
 
@@ -632,7 +660,9 @@ def _walk_nodes(node: Any) -> list[Any]:
     return []
 
 
-def _walk_with_paths(node: Any, path: list[str] | None = None) -> list[tuple[list[str], Any]]:
+def _walk_with_paths(
+    node: Any, path: list[str] | None = None
+) -> list[tuple[list[str], Any]]:
     path = path or []
     results = [(path, node)]
     if isinstance(node, dict):

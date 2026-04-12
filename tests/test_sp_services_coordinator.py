@@ -200,7 +200,9 @@ def test_parse_titled_csv_sections() -> None:
 async def test_client_login_success() -> None:
     client = SpServicesClient()
     authorize_html = '<input type="hidden" name="_csrf" value="csrf-123">'
-    client._session.get = AsyncMock(return_value=_make_response(200, text=authorize_html))
+    client._session.get = AsyncMock(
+        return_value=_make_response(200, text=authorize_html)
+    )
     client._session.post = AsyncMock(
         side_effect=[
             _make_response(200, {"required": False}),
@@ -229,7 +231,9 @@ async def test_client_login_success() -> None:
 async def test_client_login_invalid_credentials() -> None:
     client = SpServicesClient()
     authorize_html = '<input type="hidden" name="_csrf" value="csrf-123">'
-    client._session.get = AsyncMock(return_value=_make_response(200, text=authorize_html))
+    client._session.get = AsyncMock(
+        return_value=_make_response(200, text=authorize_html)
+    )
     client._session.post = AsyncMock(
         side_effect=[
             _make_response(200, {"required": False}),
@@ -262,7 +266,9 @@ async def test_client_verify_otp_success() -> None:
 
 async def test_client_verify_otp_wrong_code() -> None:
     client = SpServicesClient()
-    client._auth_context = MagicMock(state="state-1", code_verifier="verifier-1", csrf="csrf-1")
+    client._auth_context = MagicMock(
+        state="state-1", code_verifier="verifier-1", csrf="csrf-1"
+    )
     client._session.post = AsyncMock(return_value=_make_response(401))
 
     with pytest.raises(ValueError, match="invalid_otp"):
