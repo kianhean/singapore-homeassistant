@@ -28,6 +28,7 @@ from custom_components.singapore.sensor import (
     SingaporeWaterTariffSensor,
     SingaporeWindBearingSensor,
     SingaporeWindSpeedSensor,
+    SpServicesElectricityEstimatedBillSensor,
     SpServicesElectricityLastMonthSensor,
     SpServicesElectricityMonthSensor,
     SpServicesElectricityTodaySensor,
@@ -429,6 +430,32 @@ def test_sp_services_electricity_last_month_sensor() -> None:
     sensor = SpServicesElectricityLastMonthSensor(_sp_services_coordinator(), "entry1")
     assert sensor.native_value == 199.9
     assert sensor.unique_id == "entry1_sp_electricity_last_month"
+
+
+def test_sp_services_electricity_bill_estimate_sensor() -> None:
+    sensor = SpServicesElectricityEstimatedBillSensor(
+        _sp_services_coordinator(), _coordinator(), "entry1"
+    )
+    assert sensor.native_value == 62.21
+    assert sensor.unique_id == "entry1_sp_electricity_bill_estimate"
+
+
+def test_sp_services_electricity_bill_estimate_attributes() -> None:
+    sensor = SpServicesElectricityEstimatedBillSensor(
+        _sp_services_coordinator(), _coordinator(), "entry1"
+    )
+    attrs = sensor.extra_state_attributes
+    assert attrs["estimated_from_month_kwh"] == 212.4
+    assert attrs["tariff_cents_per_kwh"] == 29.29
+    assert attrs["tariff_quarter"] == "Q1"
+    assert attrs["tariff_year"] == 2025
+
+
+def test_sp_services_electricity_bill_estimate_none_when_missing_data() -> None:
+    sensor = SpServicesElectricityEstimatedBillSensor(
+        _sp_services_coordinator(data=None), _coordinator(), "entry1"
+    )
+    assert sensor.native_value is None
 
 
 def test_sp_services_water_month_sensor() -> None:

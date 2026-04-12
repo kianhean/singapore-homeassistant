@@ -121,7 +121,7 @@ Bukit Panjang LRT, Sengkang LRT, Punggol LRT.
 > entirely on your own Home Assistant device and is never transmitted to any third-party
 > server. Credentials are stored in your local HA config entry only.
 
-When configured (see [Setup](#setup) below), five additional sensors track your household
+When configured (see [Setup](#setup) below), six additional sensors track your household
 consumption as reported by [SP Services](https://services.spservices.sg):
 
 | Entity ID | Name | Unit | Description |
@@ -129,13 +129,16 @@ consumption as reported by [SP Services](https://services.spservices.sg):
 | `sensor.singapore_sp_electricity_today` | Singapore SP Electricity Today | kWh | Electricity consumed today |
 | `sensor.singapore_sp_electricity_month` | Singapore SP Electricity This Month | kWh | Electricity consumed this month |
 | `sensor.singapore_sp_electricity_last_month` | Singapore SP Electricity Last Month | kWh | Electricity consumed last month |
+| `sensor.singapore_sp_electricity_bill_estimate` | Singapore SP Electricity Bill Estimate | SGD | Estimated current-month electricity bill using the current SP Group tariff |
 | `sensor.singapore_sp_water_month` | Singapore SP Water This Month | m³ | Water consumed this month |
 | `sensor.singapore_sp_water_last_month` | Singapore SP Water Last Month | m³ | Water consumed last month |
 
 The electricity and water month-based sensors use `SensorDeviceClass.ENERGY` /
 `SensorDeviceClass.WATER` with `SensorStateClass.TOTAL`, so they can be used in the
 Home Assistant **Energy Dashboard**. Water data is only available monthly from the
-observed SP Services exports, so there is no daily water sensor.
+observed SP Services exports, so there is no daily water sensor. The bill estimate is a
+derived `measurement` sensor that multiplies the SP Services month-to-date electricity
+usage by the current SP Group residential electricity tariff.
 
 SP Services requires two-factor authentication (OTP via SMS). Credentials are entered
 through the integration's **Configure** dialog after setup — see [Setup](#setup).

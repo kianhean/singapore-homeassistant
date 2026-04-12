@@ -89,6 +89,9 @@ async def async_setup_entry(
                 SpServicesElectricityLastMonthSensor(
                     sp_services_coordinator, entry.entry_id
                 ),
+                SpServicesElectricityEstimatedBillSensor(
+                    sp_services_coordinator, tariff_coordinator, entry.entry_id
+                ),
                 SpServicesWaterLastMonthSensor(
                     sp_services_coordinator, entry.entry_id
                 ),
@@ -594,3 +597,48 @@ class SpServicesWaterLastMonthSensor(_BaseSpServicesSensor):
         if self.coordinator.data is None:
             return None
         return self.coordinator.data.water_last_month_m3
+
+
+class SpServicesElectricityEstimatedBillSensor(_BaseSpServicesSensor):
+    """Estimated current month's electricity bill based on the live tariff."""
+
+    _attr_name = "SP Services Electricity Bill Estimate"
+    _attr_icon = "mdi:cash"
+    _attr_device_class = None
+    _attr_native_unit_of_measurement = "SGD"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self,
+        coordinator: SpServicesCoordinator,
+        tariff_coordinator: SPGroupCoordinator,
+        entry_id: str,
+    ) -> None:
+        super().__init__(coordinator, entry_id)
+        self._tariff_coordinator = tariff_coordinator
+        self._attr_unique_id = f"{entry_id}_sp_electricity_bill_estimate"
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None or self._tariff_coordinator.data is None:
+            return None
+        usage_kwh = self.coordinator.data.electricity_month_kwh
+        tariff_cents = self._tariff_coordinator.data.electricity_price
+        if usage_kwh is None or tariff_cents is None:
+            return None
+        return round((usage_kwh * tariff_cents) / 100, 2)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs = super().extra_state_attributes
+        if self.coordinator.data is None or self._tariff_coordinator.data is None:
+            return attrs
+        attrs["estimated_from_month_kwh"] = self.coordinator.data.electricity_month_kwh
+        attrs["tariff_cents_per_kwh"] = self._tariff_coordinator.data.electricity_price
+        attrs["tariff_quarter"] = self._tariff_coordinator.data.quarter
+        attrs["tariff_year"] = self._tariff_coordinator.data.year
+        attrs["estimate_note"] = (
+            "Uses the current SP Group residential tariff and SP Services month-to-date "
+            "electricity consumption."
+        )
+        return attrs
