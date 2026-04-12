@@ -278,7 +278,7 @@ class SingaporeOptionsFlow(OptionsFlow):
     """
 
     def __init__(self, config_entry: ConfigEntry) -> None:
-        self.config_entry = config_entry
+        self._config_entry = config_entry
         self._sp_username: str = config_entry.data.get(CONF_USERNAME, "")
         self._sp_password: str = ""
         self._login_response: dict[str, Any] = {}
@@ -321,14 +321,14 @@ class SingaporeOptionsFlow(OptionsFlow):
             else:
                 # Both blank — remove SP Services credentials and reload.
                 self.hass.config_entries.async_update_entry(
-                    self.config_entry,
+                    self._config_entry,
                     data={
                         k: v
-                        for k, v in self.config_entry.data.items()
+                        for k, v in self._config_entry.data.items()
                         if k not in (CONF_USERNAME, CONF_PASSWORD, "sp_token")
                     },
                 )
-                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+                await self.hass.config_entries.async_reload(self._config_entry.entry_id)
                 return self.async_create_entry(title="", data={})
 
         schema = vol.Schema(
@@ -374,16 +374,16 @@ class SingaporeOptionsFlow(OptionsFlow):
             if not errors:
                 # Store credentials in entry.data and reload.
                 self.hass.config_entries.async_update_entry(
-                    self.config_entry,
+                    self._config_entry,
                     data={
-                        **self.config_entry.data,
+                        **self._config_entry.data,
                         CONF_USERNAME: self._sp_username,
                         CONF_PASSWORD: self._sp_password,
                         "sp_token": token,
                     },
                 )
                 await self._close_client()
-                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+                await self.hass.config_entries.async_reload(self._config_entry.entry_id)
                 return self.async_create_entry(title="", data={})
             await self._close_client()
 
