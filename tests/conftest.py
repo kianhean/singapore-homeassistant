@@ -106,6 +106,10 @@ class ConfigFlow:
         super().__init_subclass__(**kwargs)
 
 
+class OptionsFlow:
+    pass
+
+
 class AddEntitiesCallback:
     pass
 
@@ -218,6 +222,7 @@ _HA_MODULES: dict[str, ModuleType] = {
         ConfigEntry=ConfigEntry,
         ConfigFlow=ConfigFlow,
         ConfigFlowResult=dict,
+        OptionsFlow=OptionsFlow,
         SOURCE_USER="user",
     ),
     "homeassistant.exceptions": _mod(
@@ -387,7 +392,12 @@ except ImportError:
 
     sys.modules.setdefault(
         "voluptuous",
-        _mod("voluptuous", Schema=_Schema, Required=lambda k, **kw: k),
+        _mod(
+            "voluptuous",
+            Schema=_Schema,
+            Required=lambda k, **kw: k,
+            Optional=lambda k, **kw: k,
+        ),
     )
 
 
