@@ -158,7 +158,7 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
                 return await self._create_entry()
 
             try:
-                token = await self._sp_client.exchange_callback_url(callback_url)
+                token = await self._exchange_callback_for_token(callback_url)
                 await self._close_sp_client()
                 return await self._create_entry(sp_token=token)
             except Exception:  # noqa: BLE001
@@ -178,6 +178,15 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
         if self._sp_client is not None:
             await self._sp_client.close()
             self._sp_client = None
+
+    async def _exchange_callback_for_token(
+        self, callback_url: str, *, fetch_usage: bool = False
+    ) -> str:
+        """Exchange callback URL for token and optionally validate usage fetch."""
+        token = await self._sp_client.exchange_callback_url(callback_url)
+        if fetch_usage:
+            await self._sp_client.fetch_usage(token)
+        return token
 
     async def _create_entry(self, sp_token: str | None = None) -> ConfigFlowResult:
         """Finalise and create the config entry."""
@@ -214,8 +223,9 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None and not errors:
             try:
-                token = await self._sp_client.exchange_callback_url(
-                    user_input["callback_url"].strip()
+                token = await self._exchange_callback_for_token(
+                    user_input["callback_url"].strip(),
+                    fetch_usage=True,
                 )
                 await self._close_sp_client()
                 return self.async_update_reload_and_abort(
