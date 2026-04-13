@@ -244,3 +244,62 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
                 "callback_url_prefix": "https://services.spservices.sg/callback?fromLogin=true",
             },
         )
+
+    # ------------------------------------------------------------------
+    # Reconfigure (shows Configure/gear action in integration entry)
+    # ------------------------------------------------------------------
+
+    async def async_step_reconfigure(self, user_input=None) -> ConfigFlowResult:
+        """Start reconfigure flow for an existing entry."""
+        return await self.async_step_reconfigure_sp_browser_auth(user_input)
+
+    async def async_step_reconfigure_sp_browser_auth(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Reconfigure SP Services token from the integration entry."""
+        errors: dict[str, str] = {}
+        entry = self._get_reconfigure_entry()
+
+        if self._browser_auth_url is None:
+            try:
+                from sp_services import SpServicesClient
+
+                self._sp_client = SpServicesClient()
+                self._browser_auth_url = await self._sp_client.begin_browser_login()
+            except Exception:  # noqa: BLE001
+                errors["base"] = "sp_cannot_connect"
+
+        if user_input is not None and not errors:
+            callback_url = user_input.get("callback_url", "").strip()
+
+            if not callback_url:
+                await self._close_sp_client()
+                updated_data = {
+                    key: value
+                    for key, value in entry.data.items()
+                    if key != CONF_SP_TOKEN
+                }
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data=updated_data,
+                )
+
+            try:
+                token = await self._exchange_callback_for_token(callback_url)
+                await self._close_sp_client()
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data_updates={CONF_SP_TOKEN: token},
+                )
+            except Exception:  # noqa: BLE001
+                errors["base"] = "sp_invalid_callback"
+
+        return self.async_show_form(
+            step_id="reconfigure_sp_browser_auth",
+            data_schema=STEP_SP_BROWSER_AUTH_SCHEMA,
+            errors=errors,
+            description_placeholders={
+                "auth_url": self._browser_auth_url or "",
+                "callback_url_prefix": "https://services.spservices.sg/callback?fromLogin=true",
+            },
+        )

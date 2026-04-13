@@ -39,6 +39,13 @@
         "data": {
           "callback_url": "Callback URL (paste full URL from browser address bar)"
         }
+      },
+      "reconfigure_sp_browser_auth": {
+        "title": "Configure SP Services Login",
+        "description": "Configure or remove your SP Services login from this integration entry.\n\n**Step 1 — Open the login URL in a browser:**\n{auth_url}\n\n**Step 2 — Sign in** with your SP Services / SP Digital account (email + password + SMS OTP).\n\n**Step 3 — Copy the redirect URL.** After the SMS OTP is accepted, your browser will redirect to a URL starting with `{callback_url_prefix}` — the page may be blank or show an error, that is normal. Copy the **full URL** from the address bar.\n\n**Step 4 — Paste it below** and click Submit.\n\n---\nLeave the field empty and click Submit to remove the saved login token for this entry.",
+        "data": {
+          "callback_url": "Callback URL (paste full URL from browser address bar)"
+        }
       }
     },
     "error": {
@@ -49,7 +56,8 @@
     },
     "abort": {
       "already_configured": "This integration is already configured.",
-      "reauth_successful": "Re-authentication successful."
+      "reauth_successful": "Re-authentication successful.",
+      "reconfigure_successful": "Configuration updated."
     }
   }
 }
