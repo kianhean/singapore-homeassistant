@@ -1,5 +1,6 @@
 """Tests for config flow constants and SP Services re-auth behavior."""
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -31,3 +32,22 @@ async def test_exchange_callback_fetches_usage_when_requested():
     assert token == "token-123"
     flow._sp_client.exchange_callback_url.assert_awaited_once()
     flow._sp_client.fetch_usage.assert_awaited_once_with("token-123")
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_blank_callback_removes_saved_sp_token():
+    flow = SingaporeElectricityConfigFlow()
+    flow._browser_auth_url = "https://example.com/login"
+    flow._close_sp_client = AsyncMock()
+    flow._get_reconfigure_entry = lambda: SimpleNamespace(
+        data={CONF_NAME: "Singapore Electricity", "sp_token": "old-token"}
+    )
+    flow.async_update_reload_and_abort = lambda entry, data: {
+        "entry": entry,
+        "data": data,
+    }
+
+    result = await flow.async_step_reconfigure_sp_browser_auth({"callback_url": ""})
+
+    assert result["data"] == {CONF_NAME: "Singapore Electricity"}
+    flow._close_sp_client.assert_awaited_once()
