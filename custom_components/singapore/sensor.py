@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import re
 
-from homeassistant.components.sensor import SensorEntity, SensorStateClass
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import UnitOfEnergy, UnitOfVolume
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -19,6 +24,7 @@ from .coe_coordinator import (
     CoeCoordinator,
 )
 from .coordinator import UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER, SPGroupCoordinator
+from .sp_services_coordinator import SpServicesCoordinator
 from .train_coordinator import TRAIN_LINES, TrainStatusCoordinator
 from .weather_coordinator import SingaporeWeatherCoordinator
 
@@ -66,6 +72,17 @@ async def async_setup_entry(
         )
 
     async_add_entities(entities)
+
+    # SP Services usage sensors — only created if user set up SP login.
+    sp_coordinator: SpServicesCoordinator | None = entry_data.get("sp_services")
+    if sp_coordinator is not None:
+        sp_entities: list[SensorEntity] = [
+            SpElectricityTodaySensor(sp_coordinator, entry.entry_id),
+            SpElectricityMonthSensor(sp_coordinator, entry.entry_id),
+            SpWaterTodaySensor(sp_coordinator, entry.entry_id),
+            SpWaterMonthSensor(sp_coordinator, entry.entry_id),
+        ]
+        async_add_entities(sp_entities)
 
 
 class _BaseTariffSensor(CoordinatorEntity[SPGroupCoordinator], SensorEntity):
@@ -434,3 +451,136 @@ class SingaporeTrainLineStatusSensor(
             "manufacturer": "Singapore",
             "model": "MyTransport Train Status",
         }
+
+
+# ---------------------------------------------------------------------------
+# SP Services household usage sensors (only present when user logs in via SP)
+# ---------------------------------------------------------------------------
+
+
+class _BaseSpUsageSensor(CoordinatorEntity[SpServicesCoordinator], SensorEntity):
+    """Shared base for SP Services usage sensors."""
+
+    _attr_has_entity_name = False
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator: SpServicesCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._entry_id = entry_id
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        if self.coordinator.data is None:
+            return {}
+        attrs: dict = {
+            "source": "SP Services",
+            "account_no": self.coordinator.data.account_no,
+        }
+        if self.coordinator.last_updated is not None:
+            attrs["last_updated"] = self.coordinator.last_updated.isoformat()
+        return attrs
+
+    @property
+    def device_info(self) -> dict:
+        return {
+            "identifiers": {(DOMAIN, f"{self._entry_id}_sp_services")},
+            "name": "SP Services Usage",
+            "manufacturer": "SP Group",
+            "model": "SP Services Portal",
+        }
+
+
+class SpElectricityTodaySensor(_BaseSpUsageSensor):
+    """Today's electricity consumption (kWh)."""
+
+    _attr_name = "SP Electricity Today"
+    _attr_icon = "mdi:lightning-bolt"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+
+    def __init__(self, coordinator: SpServicesCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_sp_electricity_today"
+
+    @property
+    def native_value(self) -> float | None:
+        return (
+            self.coordinator.data.electricity_today_kwh
+            if self.coordinator.data
+            else None
+        )
+
+
+class SpElectricityMonthSensor(_BaseSpUsageSensor):
+    """Current month electricity consumption (kWh)."""
+
+    _attr_name = "SP Electricity This Month"
+    _attr_icon = "mdi:lightning-bolt"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+
+    def __init__(self, coordinator: SpServicesCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_sp_electricity_month"
+
+    @property
+    def native_value(self) -> float | None:
+        return (
+            self.coordinator.data.electricity_month_kwh
+            if self.coordinator.data
+            else None
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs = super().extra_state_attributes
+        if (
+            self.coordinator.data
+            and self.coordinator.data.electricity_last_month_kwh is not None
+        ):
+            attrs["last_month_kwh"] = self.coordinator.data.electricity_last_month_kwh
+        return attrs
+
+
+class SpWaterTodaySensor(_BaseSpUsageSensor):
+    """Today's water consumption (m³)."""
+
+    _attr_name = "SP Water Today"
+    _attr_icon = "mdi:water"
+    _attr_device_class = SensorDeviceClass.WATER
+    _attr_native_unit_of_measurement = UnitOfVolume.CUBIC_METERS
+
+    def __init__(self, coordinator: SpServicesCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_sp_water_today"
+
+    @property
+    def native_value(self) -> float | None:
+        return self.coordinator.data.water_today_m3 if self.coordinator.data else None
+
+
+class SpWaterMonthSensor(_BaseSpUsageSensor):
+    """Current month water consumption (m³)."""
+
+    _attr_name = "SP Water This Month"
+    _attr_icon = "mdi:water"
+    _attr_device_class = SensorDeviceClass.WATER
+    _attr_native_unit_of_measurement = UnitOfVolume.CUBIC_METERS
+
+    def __init__(self, coordinator: SpServicesCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_sp_water_month"
+
+    @property
+    def native_value(self) -> float | None:
+        return self.coordinator.data.water_month_m3 if self.coordinator.data else None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs = super().extra_state_attributes
+        if (
+            self.coordinator.data
+            and self.coordinator.data.water_last_month_m3 is not None
+        ):
+            attrs["last_month_m3"] = self.coordinator.data.water_last_month_m3
+        return attrs

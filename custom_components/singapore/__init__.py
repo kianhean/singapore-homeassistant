@@ -25,6 +25,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .coe_coordinator import CoeCoordinator
     from .coordinator import SPGroupCoordinator
     from .holiday_coordinator import PublicHolidayCoordinator
+    from .sp_services_coordinator import CONF_SP_TOKEN, SpServicesCoordinator
     from .train_coordinator import TrainStatusCoordinator
     from .weather_coordinator import SingaporeWeatherCoordinator
 
@@ -63,7 +64,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         second=0,
     )
 
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
+    entry_data: dict = {
         "tariff": tariff_coordinator,
         "coe": coe_coordinator,
         "weather": weather_coordinator,
@@ -71,6 +72,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "train": train_coordinator,
         "unsub_coe": unsub_coe,
     }
+
+    # SP Services usage coordinator is optional — only set up if credentials present.
+    if entry.data.get(CONF_SP_TOKEN):
+        sp_coordinator = SpServicesCoordinator(hass, entry)
+
+        async def _initial_refresh_sp() -> None:
+            await sp_coordinator.async_refresh()
+            if not sp_coordinator.last_update_success:
+                _LOGGER.warning(
+                    "Initial SP Services refresh failed; continuing setup and retrying later"
+                )
+
+        await _initial_refresh_sp()
+        entry_data["sp_services"] = sp_coordinator
+
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = entry_data
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
@@ -82,4 +99,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         entry_data = hass.data[DOMAIN].pop(entry.entry_id)
         entry_data["unsub_coe"]()
+        if "sp_services" in entry_data:
+            await entry_data["sp_services"].async_close()
     return unload_ok

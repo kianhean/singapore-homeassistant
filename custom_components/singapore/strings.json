@@ -1,4 +1,22 @@
 {
+  "options": {
+    "step": {
+      "sp_browser_auth": {
+        "title": "SP Services Login",
+        "description": "Add or refresh your SP Services login to enable electricity and water usage sensors.\n\n**Step 1 — Open the login URL in a browser:**\n{auth_url}\n\n**Step 2 — Sign in** with your SP Services / SP Digital account (email + password + SMS OTP).\n\n**Step 3 — Copy the redirect URL.** After the SMS OTP is accepted, your browser will redirect to a URL starting with `{callback_url_prefix}` — the page may be blank or show an error, that is normal. Copy the **full URL** from the address bar.\n\n**Step 4 — Paste it below** and click Submit.\n\n---\nLeave the field empty and click Submit to cancel.",
+        "data": {
+          "callback_url": "Callback URL (paste full URL from browser address bar)"
+        }
+      }
+    },
+    "error": {
+      "sp_cannot_connect": "Could not connect to SP Services. Check your network connection and try again.",
+      "sp_invalid_callback": "Could not exchange the callback URL for a token. Make sure you copied the entire URL from the browser address bar — it must contain both `code=` and `state=` query parameters."
+    },
+    "abort": {
+      "no_sp_token": "No token entered — SP Services login was not changed."
+    }
+  },
   "config": {
     "step": {
       "user": {
@@ -7,14 +25,39 @@
         "data": {
           "name": "Integration Name"
         }
+      },
+      "sp_browser_auth": {
+        "title": "SP Services Login (Optional)",
+        "description": "Enable electricity and water usage sensors by logging in to SP Services.\n\n**Step 1 — Open the login URL in a browser:**\n{auth_url}\n\n**Step 2 — Sign in** with your SP Services / SP Digital account (email + password + SMS OTP sent to your registered mobile).\n\n**Step 3 — Copy the redirect URL.** After the SMS OTP is accepted, your browser will redirect to a URL starting with `{callback_url_prefix}` — the page may be blank or show an error, that is normal. Copy the **full URL** from the browser address bar.\n\n**Step 4 — Paste it below** and click Submit.\n\n---\nLeave the field empty and click Submit to skip.",
+        "data": {
+          "callback_url": "Callback URL (paste full URL from browser address bar)"
+        }
+      },
+      "reauth_browser_auth": {
+        "title": "Re-authenticate SP Services",
+        "description": "Your SP Services session has expired. Log in again to restore usage sensors.\n\n**Step 1 — Open the login URL in a browser:**\n{auth_url}\n\n**Step 2 — Sign in** with your SP Services / SP Digital account (email + password + SMS OTP).\n\n**Step 3 — Copy the redirect URL.** After the SMS OTP is accepted, your browser will redirect to a URL starting with `{callback_url_prefix}` — the page may look blank or broken, that is normal. Copy the **full URL** from the address bar.\n\n**Step 4 — Paste it below** and click Submit.",
+        "data": {
+          "callback_url": "Callback URL (paste full URL from browser address bar)"
+        }
+      },
+      "reconfigure_sp_browser_auth": {
+        "title": "Configure SP Services Login",
+        "description": "Configure or remove your SP Services login from this integration entry.\n\n**Step 1 — Open the login URL in a browser:**\n{auth_url}\n\n**Step 2 — Sign in** with your SP Services / SP Digital account (email + password + SMS OTP).\n\n**Step 3 — Copy the redirect URL.** After the SMS OTP is accepted, your browser will redirect to a URL starting with `{callback_url_prefix}` — the page may be blank or show an error, that is normal. Copy the **full URL** from the address bar.\n\n**Step 4 — Paste it below** and click Submit.\n\n---\nLeave the field empty and click Submit to remove the saved login token for this entry.",
+        "data": {
+          "callback_url": "Callback URL (paste full URL from browser address bar)"
+        }
       }
     },
     "error": {
       "empty_name": "Name cannot be empty.",
-      "name_too_long": "Name must be 64 characters or fewer."
+      "name_too_long": "Name must be 64 characters or fewer.",
+      "sp_cannot_connect": "Could not connect to SP Services. Check your network connection and try again.",
+      "sp_invalid_callback": "Could not exchange the callback URL for a token. Make sure you copied the entire URL from the browser address bar — it must contain both `code=` and `state=` query parameters."
     },
     "abort": {
-      "already_configured": "This integration is already configured."
+      "already_configured": "This integration is already configured.",
+      "reauth_successful": "Re-authentication successful.",
+      "reconfigure_successful": "Configuration updated."
     }
   }
 }
