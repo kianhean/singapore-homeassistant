@@ -99,4 +99,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         entry_data = hass.data[DOMAIN].pop(entry.entry_id)
         entry_data["unsub_coe"]()
+        if "sp_services" in entry_data:
+            await entry_data["sp_services"].async_close()
     return unload_ok

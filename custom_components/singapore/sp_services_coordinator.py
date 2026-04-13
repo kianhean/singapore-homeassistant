@@ -102,6 +102,7 @@ class SpServicesCoordinator(DataUpdateCoordinator[UsageData]):
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self._entry = entry
         self._last_stats_push: datetime | None = None
+        self._client: SpServicesClient | None = None
         super().__init__(
             hass,
             _LOGGER,
@@ -109,17 +110,27 @@ class SpServicesCoordinator(DataUpdateCoordinator[UsageData]):
             update_interval=_UPDATE_INTERVAL,
         )
 
+    async def async_close(self) -> None:
+        """Close the persistent HTTP session."""
+        if self._client is not None:
+            await self._client.close()
+            self._client = None
+
     async def _async_update_data(self) -> UsageData:
         token = self._entry.data.get(CONF_SP_TOKEN)
         if not token:
             raise UpdateFailed("No SP Services token in entry data")
 
+        if self._client is None:
+            self._client = SpServicesClient()
+
         try:
-            async with SpServicesClient() as client:
-                data = await client.fetch_usage(token)
-        except SessionExpiredError as err:
-            raise ConfigEntryAuthFailed("SP Services session expired") from err
-        except AuthenticationError as err:
+            data = await self._client.fetch_usage(token)
+        except (SessionExpiredError, AuthenticationError) as err:
+            # Drop the stale session so the next attempt starts fresh.
+            await self.async_close()
+            if isinstance(err, SessionExpiredError):
+                raise ConfigEntryAuthFailed("SP Services session expired") from err
             raise ConfigEntryAuthFailed(str(err)) from err
         except (ApiError, SpServicesError) as err:
             raise UpdateFailed(f"SP Services error: {err}") from err
