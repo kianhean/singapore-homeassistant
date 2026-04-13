@@ -77,6 +77,7 @@ login steps above. The integration will reload automatically with your usage sen
 #### Re-authentication
 
 The SP Services access token expires periodically. When it does, Home Assistant shows a **re-authentication required** notification. Click it and follow the same browser login steps above to get a fresh callback URL.
+As of `0.3.0`, the re-auth flow validates the refreshed token by fetching usage data before saving it, so usage sensors recover immediately after repair.
 
 ---
 
@@ -251,6 +252,10 @@ See [CLAUDE.md](CLAUDE.md) for project structure, test instructions, and convent
 pip install -r requirements_test.txt
 pytest tests/ -v
 ```
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## License
 
