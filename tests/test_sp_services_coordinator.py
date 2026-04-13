@@ -141,8 +141,6 @@ def test_stats_slot_same_slot_does_not_push(monkeypatch):
 
     usage = _make_usage_data()
     mock_client = AsyncMock()
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.fetch_usage = AsyncMock(return_value=usage)
 
     # "Now" is 08:30 SGT (still slot 1) = 00:30 UTC
@@ -182,8 +180,6 @@ def test_stats_slot_new_slot_pushes(monkeypatch):
 
     usage = _make_usage_data()
     mock_client = AsyncMock()
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.fetch_usage = AsyncMock(return_value=usage)
 
     # "Now" is 16:05 SGT (slot 2) = 08:05 UTC
@@ -279,8 +275,6 @@ async def test_fetch_usage_returns_data():
 
     usage = _make_usage_data()
     mock_client = AsyncMock()
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.fetch_usage = AsyncMock(return_value=usage)
 
     with (
@@ -317,8 +311,6 @@ async def test_session_expired_raises_auth_failed():
     coordinator = SpServicesCoordinator(hass, entry)
 
     mock_client = AsyncMock()
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.fetch_usage = AsyncMock(side_effect=SessionExpiredError("expired"))
 
     with patch(
@@ -327,6 +319,55 @@ async def test_session_expired_raises_auth_failed():
     ):
         with pytest.raises(ConfigEntryAuthFailed):
             await coordinator._async_update_data()
+
+
+@pytest.mark.asyncio
+async def test_auth_error_clears_client():
+    """Client is reset to None after an auth failure so the next refresh starts fresh."""
+    from sp_services import SessionExpiredError
+
+    hass = MagicMock()
+    entry = _make_entry()
+    coordinator = SpServicesCoordinator(hass, entry)
+
+    mock_client = AsyncMock()
+    mock_client.fetch_usage = AsyncMock(side_effect=SessionExpiredError("expired"))
+
+    with patch(
+        "custom_components.singapore.sp_services_coordinator.SpServicesClient",
+        return_value=mock_client,
+    ):
+        try:
+            await coordinator._async_update_data()
+        except Exception:
+            pass
+
+    assert coordinator._client is None
+
+
+@pytest.mark.asyncio
+async def test_client_reused_across_refreshes():
+    """The same SpServicesClient instance is used for consecutive refreshes."""
+    hass = MagicMock()
+    entry = _make_entry()
+    coordinator = SpServicesCoordinator(hass, entry)
+
+    usage = _make_usage_data()
+    mock_client = AsyncMock()
+    mock_client.fetch_usage = AsyncMock(return_value=usage)
+
+    with (
+        patch(
+            "custom_components.singapore.sp_services_coordinator.SpServicesClient",
+            return_value=mock_client,
+        ) as mock_cls,
+        patch.object(coordinator, "_push_statistics"),
+    ):
+        await coordinator._async_update_data()
+        await coordinator._async_update_data()
+
+    # SpServicesClient() should only have been called once
+    mock_cls.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -339,8 +380,6 @@ async def test_api_error_raises_update_failed():
     coordinator = SpServicesCoordinator(hass, entry)
 
     mock_client = AsyncMock()
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.fetch_usage = AsyncMock(side_effect=ApiError("bad response"))
 
     with patch(
@@ -349,6 +388,22 @@ async def test_api_error_raises_update_failed():
     ):
         with pytest.raises(UpdateFailed):
             await coordinator._async_update_data()
+
+
+@pytest.mark.asyncio
+async def test_async_close_closes_client():
+    """async_close() closes and drops the held client."""
+    hass = MagicMock()
+    entry = _make_entry()
+    coordinator = SpServicesCoordinator(hass, entry)
+
+    mock_client = AsyncMock()
+    coordinator._client = mock_client
+
+    await coordinator.async_close()
+
+    mock_client.close.assert_awaited_once()
+    assert coordinator._client is None
 
 
 # ---------------------------------------------------------------------------
