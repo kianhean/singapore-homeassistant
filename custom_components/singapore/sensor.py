@@ -462,7 +462,7 @@ class _BaseSpUsageSensor(CoordinatorEntity[SpServicesCoordinator], SensorEntity)
     """Shared base for SP Services usage sensors."""
 
     _attr_has_entity_name = False
-    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_state_class = "total"
 
     def __init__(self, coordinator: SpServicesCoordinator, entry_id: str) -> None:
         super().__init__(coordinator)

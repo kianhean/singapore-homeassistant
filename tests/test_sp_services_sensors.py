@@ -144,6 +144,17 @@ def test_water_month_none_when_no_data():
     assert sensor.native_value is None
 
 
+def test_sp_usage_sensors_use_total_state_class():
+    sensors = [
+        SpElectricityTodaySensor(_make_coordinator(_usage()), "entry1"),
+        SpElectricityMonthSensor(_make_coordinator(_usage()), "entry1"),
+        SpWaterTodaySensor(_make_coordinator(_usage()), "entry1"),
+        SpWaterMonthSensor(_make_coordinator(_usage()), "entry1"),
+    ]
+
+    assert all(sensor._attr_state_class == "total" for sensor in sensors)
+
+
 # ---------------------------------------------------------------------------
 # Device info
 # ---------------------------------------------------------------------------

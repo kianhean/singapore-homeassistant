@@ -96,6 +96,39 @@ def _account_slug(usage_data: UsageData, entry_id: str) -> str:
     return re.sub(r"[^a-z0-9]", "_", raw.lower()).strip("_")
 
 
+def _make_statistic_metadata(
+    *, name: str, source: str, statistic_id: str, unit_of_measurement: str
+):
+    """Build StatisticMetaData while supporting old and new HA recorder APIs."""
+    from homeassistant.components.recorder.models import StatisticMetaData
+
+    kwargs: dict = {
+        "has_sum": True,
+        "name": name,
+        "source": source,
+        "statistic_id": statistic_id,
+        "unit_of_measurement": unit_of_measurement,
+        # Explicitly set for HA's recorder metadata requirements.
+        "unit_class": None,
+    }
+
+    try:
+        from homeassistant.components.recorder.models import StatisticMeanType
+
+        kwargs["mean_type"] = StatisticMeanType.NONE
+    except ImportError:
+        kwargs["has_mean"] = False
+
+    try:
+        return StatisticMetaData(**kwargs)
+    except TypeError:
+        # Older cores may not accept mean_type/unit_class.
+        kwargs.pop("mean_type", None)
+        kwargs.pop("unit_class", None)
+        kwargs["has_mean"] = False
+        return StatisticMetaData(**kwargs)
+
+
 class SpServicesCoordinator(DataUpdateCoordinator[UsageData]):
     """Fetches household electricity and water usage from SP Services portal."""
 
@@ -103,6 +136,7 @@ class SpServicesCoordinator(DataUpdateCoordinator[UsageData]):
         self._entry = entry
         self._last_stats_push: datetime | None = None
         self._client: SpServicesClient | None = None
+        self.last_updated: datetime | None = None
         super().__init__(
             hass,
             _LOGGER,
@@ -136,6 +170,7 @@ class SpServicesCoordinator(DataUpdateCoordinator[UsageData]):
             raise UpdateFailed(f"SP Services error: {err}") from err
 
         now = datetime.now(tz=timezone.utc)
+        self.last_updated = now
         if _stats_slot(now) != _stats_slot(self._last_stats_push):
             try:
                 self._push_statistics(data)
@@ -154,7 +189,6 @@ class SpServicesCoordinator(DataUpdateCoordinator[UsageData]):
         """
         try:
             from homeassistant.components.recorder import get_instance
-            from homeassistant.components.recorder.models import StatisticMetaData
             from homeassistant.components.recorder.statistics import (
                 async_add_external_statistics,
             )
@@ -177,9 +211,7 @@ class SpServicesCoordinator(DataUpdateCoordinator[UsageData]):
             if elec_stats:
                 async_add_external_statistics(
                     self.hass,
-                    StatisticMetaData(
-                        has_mean=False,
-                        has_sum=True,
+                    _make_statistic_metadata(
                         name=f"SP Electricity ({slug})",
                         source=_STAT_SOURCE,
                         statistic_id=f"{_STAT_SOURCE}:sp_electricity_{slug}",
@@ -195,9 +227,7 @@ class SpServicesCoordinator(DataUpdateCoordinator[UsageData]):
             if water_stats:
                 async_add_external_statistics(
                     self.hass,
-                    StatisticMetaData(
-                        has_mean=False,
-                        has_sum=True,
+                    _make_statistic_metadata(
                         name=f"SP Water ({slug})",
                         source=_STAT_SOURCE,
                         statistic_id=f"{_STAT_SOURCE}:sp_water_{slug}",
