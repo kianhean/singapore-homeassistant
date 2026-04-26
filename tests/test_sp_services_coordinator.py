@@ -423,9 +423,7 @@ async def test_api_error_with_expired_text_raises_auth_failed():
     coordinator = SpServicesCoordinator(hass, entry)
 
     mock_client = AsyncMock()
-    mock_client.fetch_usage = AsyncMock(
-        side_effect=ApiError("HTTP 500: token expired")
-    )
+    mock_client.fetch_usage = AsyncMock(side_effect=ApiError("HTTP 500: token expired"))
 
     with patch(
         "custom_components.singapore.sp_services_coordinator.SpServicesClient",
@@ -483,7 +481,9 @@ async def test_api_error_expired_refreshes_token_from_saved_callback():
 
     usage = _make_usage_data()
     mock_client = AsyncMock()
-    mock_client.fetch_usage = AsyncMock(side_effect=[ApiError("HTTP 500 token expired"), usage])
+    mock_client.fetch_usage = AsyncMock(
+        side_effect=[ApiError("HTTP 500 token expired"), usage]
+    )
     mock_client.exchange_callback_url = AsyncMock(return_value="fresh-token")
 
     with patch(
