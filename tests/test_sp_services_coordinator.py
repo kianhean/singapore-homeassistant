@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from custom_components.singapore.sp_services_coordinator import (
+    CONF_SP_CALLBACK_URL,
     CONF_SP_TOKEN,
     SpServicesCoordinator,
     _account_slug,
@@ -18,9 +19,15 @@ from custom_components.singapore.sp_services_coordinator import (
 )
 
 
-def _make_entry(token: str | None = "tok123") -> MagicMock:
+def _make_entry(
+    token: str | None = "tok123",
+    callback_url: str | None = None,
+) -> MagicMock:
     entry = MagicMock()
-    entry.data = {CONF_SP_TOKEN: token} if token else {}
+    data = {CONF_SP_TOKEN: token} if token else {}
+    if callback_url:
+        data[CONF_SP_CALLBACK_URL] = callback_url
+    entry.data = data
     entry.entry_id = "test_entry_id"
     return entry
 
@@ -428,6 +435,65 @@ async def test_api_error_with_expired_text_raises_auth_failed():
             await coordinator._async_update_data()
 
     assert coordinator._client is None
+
+
+@pytest.mark.asyncio
+async def test_session_expired_refreshes_token_from_saved_callback():
+    from sp_services import SessionExpiredError
+
+    hass = MagicMock()
+    hass.config_entries = MagicMock()
+    entry = _make_entry(
+        token="expired-token",
+        callback_url="https://services.spservices.sg/callback?code=a&state=b",
+    )
+    coordinator = SpServicesCoordinator(hass, entry)
+
+    usage = _make_usage_data()
+    mock_client = AsyncMock()
+    mock_client.fetch_usage = AsyncMock(
+        side_effect=[SessionExpiredError("expired"), usage]
+    )
+    mock_client.exchange_callback_url = AsyncMock(return_value="fresh-token")
+
+    with patch(
+        "custom_components.singapore.sp_services_coordinator.SpServicesClient",
+        return_value=mock_client,
+    ):
+        data = await coordinator._async_update_data()
+
+    assert data == usage
+    mock_client.exchange_callback_url.assert_awaited_once_with(
+        "https://services.spservices.sg/callback?code=a&state=b"
+    )
+    hass.config_entries.async_update_entry.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_api_error_expired_refreshes_token_from_saved_callback():
+    from sp_services import ApiError
+
+    hass = MagicMock()
+    hass.config_entries = MagicMock()
+    entry = _make_entry(
+        token="expired-token",
+        callback_url="https://services.spservices.sg/callback?code=a&state=b",
+    )
+    coordinator = SpServicesCoordinator(hass, entry)
+
+    usage = _make_usage_data()
+    mock_client = AsyncMock()
+    mock_client.fetch_usage = AsyncMock(side_effect=[ApiError("HTTP 500 token expired"), usage])
+    mock_client.exchange_callback_url = AsyncMock(return_value="fresh-token")
+
+    with patch(
+        "custom_components.singapore.sp_services_coordinator.SpServicesClient",
+        return_value=mock_client,
+    ):
+        data = await coordinator._async_update_data()
+
+    assert data == usage
+    hass.config_entries.async_update_entry.assert_called_once()
 
 
 @pytest.mark.asyncio
