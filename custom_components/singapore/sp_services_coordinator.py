@@ -40,6 +40,34 @@ _PERIOD_FORMATS = [
 ]
 
 
+def _looks_like_expired_session_error(err: Exception) -> bool:
+    """Best-effort detection of token/session expiry wrapped as API errors.
+
+    Some upstream responses surface an HTTP 500 while the payload/message still
+    indicates token/session expiry. Treat those as auth failures so HA launches
+    the re-auth flow instead of endlessly retrying as a generic update failure.
+    """
+    text = str(err).lower()
+    markers = (
+        "expired",
+        "session",
+        "token",
+        "unauthorized",
+        "invalid credential",
+        "invalid_token",
+        "jwt",
+        "401",
+        "403",
+    )
+    return any(marker in text for marker in markers) and (
+        "expired" in text
+        or "unauthorized" in text
+        or "invalid_token" in text
+        or "401" in text
+        or "403" in text
+    )
+
+
 def _parse_period(period: str) -> datetime | None:
     """Parse a UsagePoint period string to a timezone-aware datetime in SGT."""
     period = period.strip()
@@ -167,6 +195,9 @@ class SpServicesCoordinator(DataUpdateCoordinator[UsageData]):
                 raise ConfigEntryAuthFailed("SP Services session expired") from err
             raise ConfigEntryAuthFailed(str(err)) from err
         except (ApiError, SpServicesError) as err:
+            if _looks_like_expired_session_error(err):
+                await self.async_close()
+                raise ConfigEntryAuthFailed("SP Services session expired") from err
             raise UpdateFailed(f"SP Services error: {err}") from err
 
         now = datetime.now(tz=timezone.utc)
