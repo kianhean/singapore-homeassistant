@@ -1,0 +1,68 @@
+name: Beta release from PR comment
+
+on:
+  issue_comment:
+    types:
+      - created
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  beta-release:
+    name: Create beta pre-release
+    if: >-
+      github.event.issue.pull_request != null &&
+      contains(github.event.comment.body, '/beta')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read pull request details
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.request(context.payload.issue.pull_request.url);
+            core.setOutput('number', String(pr.data.number));
+            core.setOutput('title', pr.data.title);
+            core.setOutput('head_sha', pr.data.head.sha);
+            core.setOutput('head_ref', pr.data.head.ref);
+
+      - name: Determine next beta tag
+        id: version
+        run: |
+          git fetch --tags --force
+
+          LAST_BETA=$(git tag -l 'v0.0.*b' \
+            | sed -n 's/^v0\.0\.\([0-9]\+\)b$/\1/p' \
+            | sort -n \
+            | tail -n 1)
+
+          if [ -z "$LAST_BETA" ]; then
+            NEXT_BETA=1
+          else
+            NEXT_BETA=$((LAST_BETA + 1))
+          fi
+
+          TAG="v0.0.${NEXT_BETA}b"
+
+          echo "beta_number=$NEXT_BETA" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Create beta release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ steps.pr.outputs.head_sha }}
+          prerelease: true
+          generate_release_notes: true
+          body: |
+            Beta pre-release created from PR #${{ steps.pr.outputs.number }}
+            (${{ steps.pr.outputs.head_ref }})
