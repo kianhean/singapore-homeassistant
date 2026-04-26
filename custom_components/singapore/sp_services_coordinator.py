@@ -28,6 +28,7 @@ _UPDATE_INTERVAL = timedelta(hours=1)
 _SGT = ZoneInfo("Asia/Singapore")
 
 CONF_SP_TOKEN = "sp_token"
+CONF_SP_CALLBACK_URL = "sp_callback_url"
 _STAT_SOURCE = "singapore"
 
 # Period string formats emitted by the SP Services API, tried in order.
@@ -38,6 +39,34 @@ _PERIOD_FORMATS = [
     "%d/%m/%Y %H:%M",  # "11/04/2026 14:00"
     "%d/%m/%Y",  # "11/04/2026"
 ]
+
+
+def _looks_like_expired_session_error(err: Exception) -> bool:
+    """Best-effort detection of token/session expiry wrapped as API errors.
+
+    Some upstream responses surface an HTTP 500 while the payload/message still
+    indicates token/session expiry. Treat those as auth failures so HA launches
+    the re-auth flow instead of endlessly retrying as a generic update failure.
+    """
+    text = str(err).lower()
+    markers = (
+        "expired",
+        "session",
+        "token",
+        "unauthorized",
+        "invalid credential",
+        "invalid_token",
+        "jwt",
+        "401",
+        "403",
+    )
+    return any(marker in text for marker in markers) and (
+        "expired" in text
+        or "unauthorized" in text
+        or "invalid_token" in text
+        or "401" in text
+        or "403" in text
+    )
 
 
 def _parse_period(period: str) -> datetime | None:
@@ -161,13 +190,25 @@ class SpServicesCoordinator(DataUpdateCoordinator[UsageData]):
         try:
             data = await self._client.fetch_usage(token)
         except (SessionExpiredError, AuthenticationError) as err:
-            # Drop the stale session so the next attempt starts fresh.
-            await self.async_close()
-            if isinstance(err, SessionExpiredError):
-                raise ConfigEntryAuthFailed("SP Services session expired") from err
-            raise ConfigEntryAuthFailed(str(err)) from err
+            refreshed = await self._try_refresh_token_from_saved_callback()
+            if refreshed is not None:
+                data = refreshed
+            else:
+                # Drop the stale session so the next attempt starts fresh.
+                await self.async_close()
+                if isinstance(err, SessionExpiredError):
+                    raise ConfigEntryAuthFailed("SP Services session expired") from err
+                raise ConfigEntryAuthFailed(str(err)) from err
         except (ApiError, SpServicesError) as err:
-            raise UpdateFailed(f"SP Services error: {err}") from err
+            if not _looks_like_expired_session_error(err):
+                raise UpdateFailed(f"SP Services error: {err}") from err
+
+            refreshed = await self._try_refresh_token_from_saved_callback()
+            if refreshed is not None:
+                data = refreshed
+            else:
+                await self.async_close()
+                raise ConfigEntryAuthFailed("SP Services session expired") from err
 
         now = datetime.now(tz=timezone.utc)
         self.last_updated = now
@@ -179,6 +220,24 @@ class SpServicesCoordinator(DataUpdateCoordinator[UsageData]):
                 _LOGGER.warning("Failed to push SP Services statistics", exc_info=True)
 
         return data
+
+    async def _try_refresh_token_from_saved_callback(self) -> UsageData | None:
+        """Try refreshing the SP token from the saved callback URL and retry once."""
+        callback_url = self._entry.data.get(CONF_SP_CALLBACK_URL)
+        if not callback_url or self._client is None:
+            return None
+
+        try:
+            new_token = await self._client.exchange_callback_url(callback_url)
+            updated_data = {**self._entry.data, CONF_SP_TOKEN: new_token}
+            self.hass.config_entries.async_update_entry(self._entry, data=updated_data)
+            return await self._client.fetch_usage(new_token)
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug(
+                "Failed to refresh SP Services token via saved callback URL",
+                exc_info=True,
+            )
+            return None
 
     def _push_statistics(self, usage_data: UsageData) -> None:
         """Push SP Services history into HA long-term statistics (recorder).

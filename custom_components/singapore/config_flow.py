@@ -14,7 +14,7 @@ from homeassistant.config_entries import (
 from homeassistant.const import CONF_NAME
 
 from . import DOMAIN
-from .sp_services_coordinator import CONF_SP_TOKEN
+from .sp_services_coordinator import CONF_SP_CALLBACK_URL, CONF_SP_TOKEN
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
@@ -70,7 +70,11 @@ class SingaporeOptionsFlow(OptionsFlow):
                 await self._close_sp_client()
                 return self.async_update_reload_and_abort(
                     self._entry,
-                    data={**self._entry.data, CONF_SP_TOKEN: token},
+                    data={
+                        **self._entry.data,
+                        CONF_SP_TOKEN: token,
+                        CONF_SP_CALLBACK_URL: callback_url,
+                    },
                 )
             except Exception:  # noqa: BLE001
                 errors["base"] = "sp_invalid_callback"
@@ -160,7 +164,10 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
             try:
                 token = await self._exchange_callback_for_token(callback_url)
                 await self._close_sp_client()
-                return await self._create_entry(sp_token=token)
+                return await self._create_entry(
+                    sp_token=token,
+                    sp_callback_url=callback_url,
+                )
             except Exception:  # noqa: BLE001
                 errors["base"] = "sp_invalid_callback"
 
@@ -188,11 +195,17 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
             await self._sp_client.fetch_usage(token)
         return token
 
-    async def _create_entry(self, sp_token: str | None = None) -> ConfigFlowResult:
+    async def _create_entry(
+        self,
+        sp_token: str | None = None,
+        sp_callback_url: str | None = None,
+    ) -> ConfigFlowResult:
         """Finalise and create the config entry."""
         data: dict[str, Any] = {CONF_NAME: self._name}
         if sp_token:
             data[CONF_SP_TOKEN] = sp_token
+        if sp_callback_url:
+            data[CONF_SP_CALLBACK_URL] = sp_callback_url
 
         await self.async_set_unique_id(self._name)
         self._abort_if_unique_id_configured()
@@ -230,7 +243,10 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
                 await self._close_sp_client()
                 return self.async_update_reload_and_abort(
                     self._get_reauth_entry(),
-                    data_updates={CONF_SP_TOKEN: token},
+                    data_updates={
+                        CONF_SP_TOKEN: token,
+                        CONF_SP_CALLBACK_URL: user_input["callback_url"].strip(),
+                    },
                 )
             except Exception:  # noqa: BLE001
                 errors["base"] = "sp_invalid_callback"
@@ -277,7 +293,7 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
                 updated_data = {
                     key: value
                     for key, value in entry.data.items()
-                    if key != CONF_SP_TOKEN
+                    if key not in (CONF_SP_TOKEN, CONF_SP_CALLBACK_URL)
                 }
                 return self.async_update_reload_and_abort(
                     entry,
@@ -289,7 +305,10 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
                 await self._close_sp_client()
                 return self.async_update_reload_and_abort(
                     entry,
-                    data_updates={CONF_SP_TOKEN: token},
+                    data_updates={
+                        CONF_SP_TOKEN: token,
+                        CONF_SP_CALLBACK_URL: callback_url,
+                    },
                 )
             except Exception:  # noqa: BLE001
                 errors["base"] = "sp_invalid_callback"

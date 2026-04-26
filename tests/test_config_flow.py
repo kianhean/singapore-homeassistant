@@ -10,6 +10,10 @@ from custom_components.singapore.config_flow import (
     STEP_USER_DATA_SCHEMA,
     SingaporeElectricityConfigFlow,
 )
+from custom_components.singapore.sp_services_coordinator import (
+    CONF_SP_CALLBACK_URL,
+    CONF_SP_TOKEN,
+)
 
 
 def test_schema_has_name_field():
@@ -40,7 +44,11 @@ async def test_reconfigure_blank_callback_removes_saved_sp_token():
     flow._browser_auth_url = "https://example.com/login"
     flow._close_sp_client = AsyncMock()
     flow._get_reconfigure_entry = lambda: SimpleNamespace(
-        data={CONF_NAME: "Singapore Electricity", "sp_token": "old-token"}
+        data={
+            CONF_NAME: "Singapore Electricity",
+            CONF_SP_TOKEN: "old-token",
+            CONF_SP_CALLBACK_URL: "https://services.spservices.sg/callback?code=x&state=y",
+        }
     )
     flow.async_update_reload_and_abort = lambda entry, data: {
         "entry": entry,
@@ -51,3 +59,23 @@ async def test_reconfigure_blank_callback_removes_saved_sp_token():
 
     assert result["data"] == {CONF_NAME: "Singapore Electricity"}
     flow._close_sp_client.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_create_entry_stores_callback_with_token():
+    flow = SingaporeElectricityConfigFlow()
+    flow._name = "Singapore Electricity"
+    flow.async_set_unique_id = AsyncMock()
+    flow._abort_if_unique_id_configured = lambda: None
+    flow.async_create_entry = lambda title, data: {"title": title, "data": data}
+
+    result = await flow._create_entry(
+        sp_token="token-123",
+        sp_callback_url="https://services.spservices.sg/callback?code=x&state=y",
+    )
+
+    assert result["data"][CONF_SP_TOKEN] == "token-123"
+    assert (
+        result["data"][CONF_SP_CALLBACK_URL]
+        == "https://services.spservices.sg/callback?code=x&state=y"
+    )
