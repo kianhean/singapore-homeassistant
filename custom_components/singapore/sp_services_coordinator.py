@@ -103,6 +103,7 @@ class SpServicesCoordinator(DataUpdateCoordinator[UsageData]):
         self._entry = entry
         self._last_stats_push: datetime | None = None
         self._client: SpServicesClient | None = None
+        self.last_updated: datetime | None = None
         super().__init__(
             hass,
             _LOGGER,
@@ -136,6 +137,7 @@ class SpServicesCoordinator(DataUpdateCoordinator[UsageData]):
             raise UpdateFailed(f"SP Services error: {err}") from err
 
         now = datetime.now(tz=timezone.utc)
+        self.last_updated = now
         if _stats_slot(now) != _stats_slot(self._last_stats_push):
             try:
                 self._push_statistics(data)
