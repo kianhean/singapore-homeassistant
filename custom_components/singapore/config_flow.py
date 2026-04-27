@@ -328,7 +328,9 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
 
             try:
-                token = await self._exchange_callback_for_token(callback_url, fetch_usage=True)
+                token = await self._exchange_callback_for_token(
+                    callback_url, fetch_usage=True
+                )
                 await self._close_sp_client()
                 return self.async_update_reload_and_abort(
                     self._get_reauth_entry(),
