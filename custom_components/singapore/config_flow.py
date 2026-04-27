@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import html
 from typing import Any
+from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
 import voluptuous as vol
 from homeassistant.config_entries import (
@@ -28,6 +30,33 @@ STEP_SP_BROWSER_AUTH_SCHEMA = vol.Schema(
         vol.Optional("callback_url", default=""): str,
     }
 )
+
+
+def _normalise_callback_url(value: str) -> str:
+    """Normalise pasted callback URL values before token exchange.
+
+    Users sometimes paste HTML-escaped URLs (``&amp;``) or URLs copied from a
+    sentence (surrounded by whitespace/punctuation). Keep the original URL
+    shape but make query parsing robust.
+    """
+    callback_url = html.unescape(value).strip().strip("<>'\" ")
+    parts = urlsplit(callback_url)
+    if not parts.query:
+        return urlunsplit(parts)
+
+    query = parse_qs(parts.query, keep_blank_values=True)
+    changed = False
+    if "amp;code" in query and "code" not in query:
+        query["code"] = query.pop("amp;code")
+        changed = True
+    if "amp;state" in query and "state" not in query:
+        query["state"] = query.pop("amp;state")
+        changed = True
+
+    if not changed:
+        return urlunsplit(parts)
+
+    return urlunsplit(parts._replace(query=urlencode(query, doseq=True)))
 
 
 class SingaporeOptionsFlow(OptionsFlow):
@@ -59,7 +88,7 @@ class SingaporeOptionsFlow(OptionsFlow):
                 errors["base"] = "sp_cannot_connect"
 
         if user_input is not None and not errors:
-            callback_url = user_input.get("callback_url", "").strip()
+            callback_url = _normalise_callback_url(user_input.get("callback_url", ""))
 
             if not callback_url:
                 await self._close_sp_client()
@@ -154,7 +183,7 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "sp_cannot_connect"
 
         if user_input is not None and not errors:
-            callback_url = user_input.get("callback_url", "").strip()
+            callback_url = _normalise_callback_url(user_input.get("callback_url", ""))
 
             if not callback_url:
                 # User chose to skip SP Services login.
@@ -236,16 +265,14 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None and not errors:
             try:
-                token = await self._exchange_callback_for_token(
-                    user_input["callback_url"].strip(),
-                    fetch_usage=True,
-                )
+                callback_url = _normalise_callback_url(user_input["callback_url"])
+                token = await self._exchange_callback_for_token(callback_url, fetch_usage=True)
                 await self._close_sp_client()
                 return self.async_update_reload_and_abort(
                     self._get_reauth_entry(),
                     data_updates={
                         CONF_SP_TOKEN: token,
-                        CONF_SP_CALLBACK_URL: user_input["callback_url"].strip(),
+                        CONF_SP_CALLBACK_URL: callback_url,
                     },
                 )
             except Exception:  # noqa: BLE001
@@ -286,7 +313,7 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "sp_cannot_connect"
 
         if user_input is not None and not errors:
-            callback_url = user_input.get("callback_url", "").strip()
+            callback_url = _normalise_callback_url(user_input.get("callback_url", ""))
 
             if not callback_url:
                 await self._close_sp_client()
