@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import html
 from typing import Any
+from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
 import voluptuous as vol
 from homeassistant.config_entries import (
@@ -28,6 +30,58 @@ STEP_SP_BROWSER_AUTH_SCHEMA = vol.Schema(
         vol.Optional("callback_url", default=""): str,
     }
 )
+
+
+def _normalise_callback_url(value: str) -> str:
+    """Normalise pasted callback URL values before token exchange.
+
+    Users sometimes paste HTML-escaped URLs (``&amp;``) or URLs copied from a
+    sentence (surrounded by whitespace/punctuation). Keep the original URL
+    shape but make query parsing robust.
+    """
+    callback_url = html.unescape(value).strip().strip("<>'\" ")
+    parts = urlsplit(callback_url)
+    if not parts.query:
+        return urlunsplit(parts)
+
+    query = parse_qs(parts.query, keep_blank_values=True)
+    fragment = parse_qs(parts.fragment, keep_blank_values=True)
+    changed = False
+
+    for key in ("code", "state"):
+        amp_key = f"amp;{key}"
+        if amp_key in query and key not in query:
+            query[key] = query.pop(amp_key)
+            changed = True
+        if amp_key in fragment and key not in fragment:
+            fragment[key] = fragment.pop(amp_key)
+            changed = True
+
+    # Some browsers/flows can return code/state in the fragment, but the
+    # exchange endpoint expects query params. Move them into query if needed.
+    for key in ("code", "state"):
+        if key not in query and key in fragment:
+            query[key] = fragment[key]
+            changed = True
+
+    if not changed:
+        return urlunsplit(parts)
+
+    return urlunsplit(
+        parts._replace(
+            query=urlencode(query, doseq=True),
+            fragment="",
+        )
+    )
+
+
+def _has_callback_code_and_state(callback_url: str) -> bool:
+    """Return whether callback URL includes both OAuth code and state."""
+    if not callback_url:
+        return False
+
+    query = parse_qs(urlsplit(callback_url).query, keep_blank_values=True)
+    return bool(query.get("code")) and bool(query.get("state"))
 
 
 class SingaporeOptionsFlow(OptionsFlow):
@@ -59,11 +113,23 @@ class SingaporeOptionsFlow(OptionsFlow):
                 errors["base"] = "sp_cannot_connect"
 
         if user_input is not None and not errors:
-            callback_url = user_input.get("callback_url", "").strip()
+            callback_url = _normalise_callback_url(user_input.get("callback_url", ""))
 
             if not callback_url:
                 await self._close_sp_client()
                 return self.async_abort(reason="no_sp_token")
+
+            if not _has_callback_code_and_state(callback_url):
+                errors["base"] = "sp_invalid_callback"
+                return self.async_show_form(
+                    step_id="sp_browser_auth",
+                    data_schema=STEP_SP_BROWSER_AUTH_SCHEMA,
+                    errors=errors,
+                    description_placeholders={
+                        "auth_url": self._browser_auth_url or "",
+                        "callback_url_prefix": "https://services.spservices.sg/callback?fromLogin=true",
+                    },
+                )
 
             try:
                 token = await self._sp_client.exchange_callback_url(callback_url)
@@ -154,12 +220,24 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "sp_cannot_connect"
 
         if user_input is not None and not errors:
-            callback_url = user_input.get("callback_url", "").strip()
+            callback_url = _normalise_callback_url(user_input.get("callback_url", ""))
 
             if not callback_url:
                 # User chose to skip SP Services login.
                 await self._close_sp_client()
                 return await self._create_entry()
+
+            if not _has_callback_code_and_state(callback_url):
+                errors["base"] = "sp_invalid_callback"
+                return self.async_show_form(
+                    step_id="sp_browser_auth",
+                    data_schema=STEP_SP_BROWSER_AUTH_SCHEMA,
+                    errors=errors,
+                    description_placeholders={
+                        "auth_url": self._browser_auth_url or "",
+                        "callback_url_prefix": "https://services.spservices.sg/callback?fromLogin=true",
+                    },
+                )
 
             try:
                 token = await self._exchange_callback_for_token(callback_url)
@@ -235,17 +313,30 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "sp_cannot_connect"
 
         if user_input is not None and not errors:
+            callback_url = _normalise_callback_url(user_input["callback_url"])
+
+            if not _has_callback_code_and_state(callback_url):
+                errors["base"] = "sp_invalid_callback"
+                return self.async_show_form(
+                    step_id="reauth_browser_auth",
+                    data_schema=vol.Schema({vol.Required("callback_url"): str}),
+                    errors=errors,
+                    description_placeholders={
+                        "auth_url": self._browser_auth_url or "",
+                        "callback_url_prefix": "https://services.spservices.sg/callback?fromLogin=true",
+                    },
+                )
+
             try:
                 token = await self._exchange_callback_for_token(
-                    user_input["callback_url"].strip(),
-                    fetch_usage=True,
+                    callback_url, fetch_usage=True
                 )
                 await self._close_sp_client()
                 return self.async_update_reload_and_abort(
                     self._get_reauth_entry(),
                     data_updates={
                         CONF_SP_TOKEN: token,
-                        CONF_SP_CALLBACK_URL: user_input["callback_url"].strip(),
+                        CONF_SP_CALLBACK_URL: callback_url,
                     },
                 )
             except Exception:  # noqa: BLE001
@@ -286,7 +377,7 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "sp_cannot_connect"
 
         if user_input is not None and not errors:
-            callback_url = user_input.get("callback_url", "").strip()
+            callback_url = _normalise_callback_url(user_input.get("callback_url", ""))
 
             if not callback_url:
                 await self._close_sp_client()
@@ -298,6 +389,18 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
                 return self.async_update_reload_and_abort(
                     entry,
                     data=updated_data,
+                )
+
+            if not _has_callback_code_and_state(callback_url):
+                errors["base"] = "sp_invalid_callback"
+                return self.async_show_form(
+                    step_id="reconfigure_sp_browser_auth",
+                    data_schema=STEP_SP_BROWSER_AUTH_SCHEMA,
+                    errors=errors,
+                    description_placeholders={
+                        "auth_url": self._browser_auth_url or "",
+                        "callback_url_prefix": "https://services.spservices.sg/callback?fromLogin=true",
+                    },
                 )
 
             try:

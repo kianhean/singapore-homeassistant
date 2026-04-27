@@ -9,6 +9,8 @@ from homeassistant.const import CONF_NAME
 from custom_components.singapore.config_flow import (
     STEP_USER_DATA_SCHEMA,
     SingaporeElectricityConfigFlow,
+    _has_callback_code_and_state,
+    _normalise_callback_url,
 )
 from custom_components.singapore.sp_services_coordinator import (
     CONF_SP_CALLBACK_URL,
@@ -19,6 +21,31 @@ from custom_components.singapore.sp_services_coordinator import (
 def test_schema_has_name_field():
     """Config flow schema includes a name field."""
     assert CONF_NAME in STEP_USER_DATA_SCHEMA.schema
+
+
+def test_normalise_callback_url_unescapes_and_trims():
+    callback = "  <https://services.spservices.sg/callback?fromLogin=true&amp;code=x&amp;state=y>  "
+
+    assert _normalise_callback_url(callback) == (
+        "https://services.spservices.sg/callback?fromLogin=true&code=x&state=y"
+    )
+
+
+def test_normalise_callback_url_moves_fragment_params_to_query():
+    callback = "https://services.spservices.sg/callback?fromLogin=true#code=x&state=y"
+
+    assert _normalise_callback_url(callback) == (
+        "https://services.spservices.sg/callback?fromLogin=true&code=x&state=y"
+    )
+
+
+def test_has_callback_code_and_state():
+    assert _has_callback_code_and_state(
+        "https://services.spservices.sg/callback?code=x&state=y"
+    )
+    assert not _has_callback_code_and_state(
+        "https://identity.spdigital.auth0.com/authorize?client_id=fixed"
+    )
 
 
 @pytest.mark.asyncio

@@ -44,6 +44,8 @@ The SP Services portal uses Auth0 with SMS MFA, so you need to complete the logi
 
 1. **Start the integration setup** (Settings → Devices & Services → Add Integration → Singapore). After entering a name, the config flow shows a long login URL beginning with `https://identity.spdigital.auth0.com/authorize?...`.
 
+   **What is the `client_id` in that URL?** It is SP Digital/Auth0's application identifier and is expected to be shared across all users. It does **not** identify your personal account.
+
 2. **Open that URL in a browser** — any browser on your phone or computer works. You will land on the SP Digital login page.
 
 3. **Log in** with your SP Services / SP Digital account:
@@ -63,6 +65,8 @@ The SP Services portal uses Auth0 with SMS MFA, so you need to complete the logi
    Make sure you copy everything — the `code=` and `state=` parameters are what the integration uses to obtain your access token.
 
 6. **Paste the full URL** into the "Callback URL" field in the Home Assistant config flow and click **Submit**.
+
+> **Important:** Do not paste the initial `/authorize?...client_id=...` URL back into Home Assistant. The integration needs the **final** callback URL containing both `code=` and `state=`.
 
 > **Tip:** The login URL is time-limited. Try to complete steps 2–6 without long interruptions. If it fails, restart the flow to get a fresh URL.
 

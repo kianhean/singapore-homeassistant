@@ -109,6 +109,16 @@ python3 -m pytest tests/ -v -m "not e2e"
 (Note: `pip install` requires `--break-system-packages` on macOS system Python. Use
 `python3 -m pytest` directly — `pytest` binary may not be on PATH.)
 
+## SP Services OAuth callback notes
+
+- The Auth0 `/authorize` URL shown during setup contains a `client_id`. This value is
+  the SP Digital application ID and is expected to be the same for all users.
+- User-specific auth comes from the one-time OAuth `code` + `state` returned in the
+  final callback URL after login:
+  `https://services.spservices.sg/callback?fromLogin=true&code=...&state=...`
+- If users paste the initial `/authorize?...client_id=...` URL into the callback field,
+  token exchange will fail; the flow should prompt for a valid callback URL.
+
 ## Running Tests
 
 Unit tests (no network, always fast):
