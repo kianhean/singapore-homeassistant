@@ -21,6 +21,10 @@ class UpdateFailed(Exception):
     pass
 
 
+class ConfigEntryAuthFailed(Exception):
+    pass
+
+
 class DataUpdateCoordinator:
     """Minimal coordinator that drives _async_update_data."""
 
@@ -75,7 +79,8 @@ class SensorEntity:
 
 
 class SensorDeviceClass:
-    pass
+    ENERGY = "energy"
+    WATER = "water"
 
 
 class SensorStateClass:
@@ -101,6 +106,10 @@ class ConfigFlow:
         super().__init_subclass__(**kwargs)
 
 
+class OptionsFlow:
+    pass
+
+
 class AddEntitiesCallback:
     pass
 
@@ -120,6 +129,14 @@ class UnitOfTemperature:
 
 class UnitOfSpeed:
     KILOMETERS_PER_HOUR = "km/h"
+
+
+class UnitOfEnergy:
+    KILO_WATT_HOUR = "kWh"
+
+
+class UnitOfVolume:
+    CUBIC_METERS = "m³"
 
 
 class Forecast(dict):
@@ -156,8 +173,12 @@ _HA_MODULES: dict[str, ModuleType] = {
         "homeassistant.const",
         Platform=Platform,
         CONF_NAME="name",
+        CONF_USERNAME="username",
+        CONF_PASSWORD="password",
         UnitOfTemperature=UnitOfTemperature,
         UnitOfSpeed=UnitOfSpeed,
+        UnitOfEnergy=UnitOfEnergy,
+        UnitOfVolume=UnitOfVolume,
     ),
     "homeassistant.helpers": _mod("homeassistant.helpers"),
     "homeassistant.helpers.update_coordinator": _mod(
@@ -201,7 +222,25 @@ _HA_MODULES: dict[str, ModuleType] = {
         ConfigEntry=ConfigEntry,
         ConfigFlow=ConfigFlow,
         ConfigFlowResult=dict,
+        OptionsFlow=OptionsFlow,
         SOURCE_USER="user",
+    ),
+    "homeassistant.exceptions": _mod(
+        "homeassistant.exceptions",
+        ConfigEntryAuthFailed=ConfigEntryAuthFailed,
+    ),
+    "homeassistant.components.recorder": _mod(
+        "homeassistant.components.recorder",
+        get_instance=MagicMock(return_value=MagicMock()),
+    ),
+    "homeassistant.components.recorder.models": _mod(
+        "homeassistant.components.recorder.models",
+        StatisticData=MagicMock(side_effect=lambda **kw: kw),
+        StatisticMetaData=MagicMock(side_effect=lambda **kw: kw),
+    ),
+    "homeassistant.components.recorder.statistics": _mod(
+        "homeassistant.components.recorder.statistics",
+        async_add_external_statistics=MagicMock(),
     ),
 }
 
@@ -249,6 +288,96 @@ sys.modules.setdefault(
     ),
 )
 
+
+# sp_services mock — provides the public surface used by sp_services_coordinator
+class _SpServicesError(Exception):
+    pass
+
+
+class _AuthenticationError(_SpServicesError):
+    pass
+
+
+class _SessionExpiredError(_AuthenticationError):
+    pass
+
+
+class _ApiError(_SpServicesError):
+    pass
+
+
+from dataclasses import dataclass  # noqa: E402
+from datetime import datetime  # noqa: E402
+
+
+@dataclass
+class _LoginChallenge:
+    oauth_state: str = ""
+    login_state: str = ""
+    code_verifier: str = ""
+    csrf: str = ""
+    phone_number: str | None = None
+    transaction_id: str | None = None
+
+
+@dataclass
+class _UsagePoint:
+    period: str = ""
+    value: float = 0.0
+    status: str | None = None
+
+
+@dataclass
+class _UsageData:
+    electricity_today_kwh: float | None = None
+    electricity_month_kwh: float | None = None
+    water_today_m3: float | None = None
+    water_month_m3: float | None = None
+    account_no: str | None = None
+    last_updated: datetime = None  # type: ignore[assignment]
+    electricity_last_month_kwh: float | None = None
+    water_last_month_m3: float | None = None
+    electricity_monthly_history: list | None = None
+    water_monthly_history: list | None = None
+    electricity_daily_history: list | None = None
+    electricity_hourly_history: list | None = None
+
+
+class _SpServicesClient:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def login(self, username, password):
+        return _LoginChallenge()
+
+    async def verify_otp(self, otp, login_challenge=None):
+        return "mock_token"
+
+    async def fetch_usage(self, token):
+        return _UsageData(last_updated=datetime.now())
+
+    async def close(self):
+        pass
+
+
+sys.modules.setdefault(
+    "sp_services",
+    _mod(
+        "sp_services",
+        SpServicesClient=_SpServicesClient,
+        LoginChallenge=_LoginChallenge,
+        UsageData=_UsageData,
+        UsagePoint=_UsagePoint,
+        SpServicesError=_SpServicesError,
+        AuthenticationError=_AuthenticationError,
+        SessionExpiredError=_SessionExpiredError,
+        ApiError=_ApiError,
+    ),
+)
+
 # voluptuous is a real package we can install
 try:
     import voluptuous  # noqa: F401
@@ -263,7 +392,12 @@ except ImportError:
 
     sys.modules.setdefault(
         "voluptuous",
-        _mod("voluptuous", Schema=_Schema, Required=lambda k, **kw: k),
+        _mod(
+            "voluptuous",
+            Schema=_Schema,
+            Required=lambda k, **kw: k,
+            Optional=lambda k, **kw: k,
+        ),
     )
 
 

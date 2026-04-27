@@ -1,0 +1,49 @@
+name: Manual main release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  main-release:
+    name: Create main release from master
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: master
+
+      - name: Determine next main tag
+        id: version
+        run: |
+          git fetch --tags --force
+
+          LAST_MAIN=$(git tag -l 'v0.0.*' \
+            | sed -n 's/^v0\.0\.\([0-9]\+\)$/\1/p' \
+            | sort -n \
+            | tail -n 1)
+
+          if [ -z "$LAST_MAIN" ]; then
+            NEXT_MAIN=1
+          else
+            NEXT_MAIN=$((LAST_MAIN + 1))
+          fi
+
+          TAG="v0.0.${NEXT_MAIN}"
+
+          echo "main_number=$NEXT_MAIN" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Create main release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          target_commitish: master
+          prerelease: false
+          generate_release_notes: true

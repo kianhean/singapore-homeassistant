@@ -1,14 +1,22 @@
-"""Config flow for Singapore Electricity Tariff integration."""
+"""Config flow for Singapore integration."""
 
 from __future__ import annotations
 
+import html
 from typing import Any
+from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.const import CONF_NAME
 
 from . import DOMAIN
+from .sp_services_coordinator import CONF_SP_CALLBACK_URL, CONF_SP_TOKEN
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
@@ -16,11 +24,156 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
     }
 )
 
+# callback_url is optional — leaving it empty skips SP Services login.
+STEP_SP_BROWSER_AUTH_SCHEMA = vol.Schema(
+    {
+        vol.Optional("callback_url", default=""): str,
+    }
+)
+
+
+def _normalise_callback_url(value: str) -> str:
+    """Normalise pasted callback URL values before token exchange.
+
+    Users sometimes paste HTML-escaped URLs (``&amp;``) or URLs copied from a
+    sentence (surrounded by whitespace/punctuation). Keep the original URL
+    shape but make query parsing robust.
+    """
+    callback_url = html.unescape(value).strip().strip("<>'\" ")
+    parts = urlsplit(callback_url)
+    if not parts.query:
+        return urlunsplit(parts)
+
+    query = parse_qs(parts.query, keep_blank_values=True)
+    fragment = parse_qs(parts.fragment, keep_blank_values=True)
+    changed = False
+
+    for key in ("code", "state"):
+        amp_key = f"amp;{key}"
+        if amp_key in query and key not in query:
+            query[key] = query.pop(amp_key)
+            changed = True
+        if amp_key in fragment and key not in fragment:
+            fragment[key] = fragment.pop(amp_key)
+            changed = True
+
+    # Some browsers/flows can return code/state in the fragment, but the
+    # exchange endpoint expects query params. Move them into query if needed.
+    for key in ("code", "state"):
+        if key not in query and key in fragment:
+            query[key] = fragment[key]
+            changed = True
+
+    if not changed:
+        return urlunsplit(parts)
+
+    return urlunsplit(
+        parts._replace(
+            query=urlencode(query, doseq=True),
+            fragment="",
+        )
+    )
+
+
+def _has_callback_code_and_state(callback_url: str) -> bool:
+    """Return whether callback URL includes both OAuth code and state."""
+    if not callback_url:
+        return False
+
+    query = parse_qs(urlsplit(callback_url).query, keep_blank_values=True)
+    return bool(query.get("code")) and bool(query.get("state"))
+
+
+class SingaporeOptionsFlow(OptionsFlow):
+    """Options flow — lets existing users add or refresh their SP Services login."""
+
+    def __init__(self, config_entry) -> None:
+        self._entry = config_entry
+        self._sp_client = None
+        self._browser_auth_url: str | None = None
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        return await self.async_step_sp_browser_auth(user_input)
+
+    async def async_step_sp_browser_auth(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show browser login URL; accept resulting callback URL."""
+        errors: dict[str, str] = {}
+
+        if self._browser_auth_url is None:
+            try:
+                from sp_services import SpServicesClient
+
+                self._sp_client = SpServicesClient()
+                self._browser_auth_url = await self._sp_client.begin_browser_login()
+            except Exception:  # noqa: BLE001
+                errors["base"] = "sp_cannot_connect"
+
+        if user_input is not None and not errors:
+            callback_url = _normalise_callback_url(user_input.get("callback_url", ""))
+
+            if not callback_url:
+                await self._close_sp_client()
+                return self.async_abort(reason="no_sp_token")
+
+            if not _has_callback_code_and_state(callback_url):
+                errors["base"] = "sp_invalid_callback"
+                return self.async_show_form(
+                    step_id="sp_browser_auth",
+                    data_schema=STEP_SP_BROWSER_AUTH_SCHEMA,
+                    errors=errors,
+                    description_placeholders={
+                        "auth_url": self._browser_auth_url or "",
+                        "callback_url_prefix": "https://services.spservices.sg/callback?fromLogin=true",
+                    },
+                )
+
+            try:
+                token = await self._sp_client.exchange_callback_url(callback_url)
+                await self._close_sp_client()
+                return self.async_update_reload_and_abort(
+                    self._entry,
+                    data={
+                        **self._entry.data,
+                        CONF_SP_TOKEN: token,
+                        CONF_SP_CALLBACK_URL: callback_url,
+                    },
+                )
+            except Exception:  # noqa: BLE001
+                errors["base"] = "sp_invalid_callback"
+
+        return self.async_show_form(
+            step_id="sp_browser_auth",
+            data_schema=STEP_SP_BROWSER_AUTH_SCHEMA,
+            errors=errors,
+            description_placeholders={
+                "auth_url": self._browser_auth_url or "",
+                "callback_url_prefix": "https://services.spservices.sg/callback?fromLogin=true",
+            },
+        )
+
+    async def _close_sp_client(self) -> None:
+        if self._sp_client is not None:
+            await self._sp_client.close()
+            self._sp_client = None
+
 
 class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Singapore Electricity Tariff."""
+    """Handle a config flow for Singapore integration."""
 
     VERSION = 1
+
+    @staticmethod
+    def async_get_options_flow(config_entry: ConfigEntry) -> SingaporeOptionsFlow:
+        return SingaporeOptionsFlow(config_entry)
+
+    def __init__(self) -> None:
+        self._name: str = ""
+        self._sp_client = None
+        self._browser_auth_url: str | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -35,12 +188,240 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
             elif len(name) > 64:
                 errors["base"] = "name_too_long"
             else:
-                await self.async_set_unique_id(name)
-                self._abort_if_unique_id_configured()
-                return self.async_create_entry(title=name, data=user_input)
+                self._name = name
+                return await self.async_step_sp_browser_auth()
 
         return self.async_show_form(
             step_id="user",
             data_schema=STEP_USER_DATA_SCHEMA,
             errors=errors,
+        )
+
+    async def async_step_sp_browser_auth(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show Auth0 browser-login URL; accept the resulting callback URL.
+
+        The user opens ``auth_url`` in a browser, completes the SP Services
+        login (including MFA), then copies the full redirect URL from the
+        browser address bar and pastes it here.  Leave the field empty to
+        skip SP Services and set up the integration without usage sensors.
+        """
+        errors: dict[str, str] = {}
+
+        # Start the browser auth session exactly once.
+        if self._browser_auth_url is None:
+            try:
+                from sp_services import SpServicesClient
+
+                self._sp_client = SpServicesClient()
+                self._browser_auth_url = await self._sp_client.begin_browser_login()
+            except Exception:  # noqa: BLE001
+                errors["base"] = "sp_cannot_connect"
+
+        if user_input is not None and not errors:
+            callback_url = _normalise_callback_url(user_input.get("callback_url", ""))
+
+            if not callback_url:
+                # User chose to skip SP Services login.
+                await self._close_sp_client()
+                return await self._create_entry()
+
+            if not _has_callback_code_and_state(callback_url):
+                errors["base"] = "sp_invalid_callback"
+                return self.async_show_form(
+                    step_id="sp_browser_auth",
+                    data_schema=STEP_SP_BROWSER_AUTH_SCHEMA,
+                    errors=errors,
+                    description_placeholders={
+                        "auth_url": self._browser_auth_url or "",
+                        "callback_url_prefix": "https://services.spservices.sg/callback?fromLogin=true",
+                    },
+                )
+
+            try:
+                token = await self._exchange_callback_for_token(callback_url)
+                await self._close_sp_client()
+                return await self._create_entry(
+                    sp_token=token,
+                    sp_callback_url=callback_url,
+                )
+            except Exception:  # noqa: BLE001
+                errors["base"] = "sp_invalid_callback"
+
+        return self.async_show_form(
+            step_id="sp_browser_auth",
+            data_schema=STEP_SP_BROWSER_AUTH_SCHEMA,
+            errors=errors,
+            description_placeholders={
+                "auth_url": self._browser_auth_url or "",
+                "callback_url_prefix": "https://services.spservices.sg/callback?fromLogin=true",
+            },
+        )
+
+    async def _close_sp_client(self) -> None:
+        if self._sp_client is not None:
+            await self._sp_client.close()
+            self._sp_client = None
+
+    async def _exchange_callback_for_token(
+        self, callback_url: str, *, fetch_usage: bool = False
+    ) -> str:
+        """Exchange callback URL for token and optionally validate usage fetch."""
+        token = await self._sp_client.exchange_callback_url(callback_url)
+        if fetch_usage:
+            await self._sp_client.fetch_usage(token)
+        return token
+
+    async def _create_entry(
+        self,
+        sp_token: str | None = None,
+        sp_callback_url: str | None = None,
+    ) -> ConfigFlowResult:
+        """Finalise and create the config entry."""
+        data: dict[str, Any] = {CONF_NAME: self._name}
+        if sp_token:
+            data[CONF_SP_TOKEN] = sp_token
+        if sp_callback_url:
+            data[CONF_SP_CALLBACK_URL] = sp_callback_url
+
+        await self.async_set_unique_id(self._name)
+        self._abort_if_unique_id_configured()
+        return self.async_create_entry(title=self._name, data=data)
+
+    # ------------------------------------------------------------------
+    # Re-authentication (triggered when ConfigEntryAuthFailed is raised)
+    # ------------------------------------------------------------------
+
+    async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:
+        """Start re-auth flow after token expiry."""
+        return await self.async_step_reauth_browser_auth()
+
+    async def async_step_reauth_browser_auth(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Re-authenticate via browser callback URL."""
+        errors: dict[str, str] = {}
+
+        if self._browser_auth_url is None:
+            try:
+                from sp_services import SpServicesClient
+
+                self._sp_client = SpServicesClient()
+                self._browser_auth_url = await self._sp_client.begin_browser_login()
+            except Exception:  # noqa: BLE001
+                errors["base"] = "sp_cannot_connect"
+
+        if user_input is not None and not errors:
+            callback_url = _normalise_callback_url(user_input["callback_url"])
+
+            if not _has_callback_code_and_state(callback_url):
+                errors["base"] = "sp_invalid_callback"
+                return self.async_show_form(
+                    step_id="reauth_browser_auth",
+                    data_schema=vol.Schema({vol.Required("callback_url"): str}),
+                    errors=errors,
+                    description_placeholders={
+                        "auth_url": self._browser_auth_url or "",
+                        "callback_url_prefix": "https://services.spservices.sg/callback?fromLogin=true",
+                    },
+                )
+
+            try:
+                token = await self._exchange_callback_for_token(
+                    callback_url, fetch_usage=True
+                )
+                await self._close_sp_client()
+                return self.async_update_reload_and_abort(
+                    self._get_reauth_entry(),
+                    data_updates={
+                        CONF_SP_TOKEN: token,
+                        CONF_SP_CALLBACK_URL: callback_url,
+                    },
+                )
+            except Exception:  # noqa: BLE001
+                errors["base"] = "sp_invalid_callback"
+
+        return self.async_show_form(
+            step_id="reauth_browser_auth",
+            data_schema=vol.Schema({vol.Required("callback_url"): str}),
+            errors=errors,
+            description_placeholders={
+                "auth_url": self._browser_auth_url or "",
+                "callback_url_prefix": "https://services.spservices.sg/callback?fromLogin=true",
+            },
+        )
+
+    # ------------------------------------------------------------------
+    # Reconfigure (shows Configure/gear action in integration entry)
+    # ------------------------------------------------------------------
+
+    async def async_step_reconfigure(self, user_input=None) -> ConfigFlowResult:
+        """Start reconfigure flow for an existing entry."""
+        return await self.async_step_reconfigure_sp_browser_auth(user_input)
+
+    async def async_step_reconfigure_sp_browser_auth(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Reconfigure SP Services token from the integration entry."""
+        errors: dict[str, str] = {}
+        entry = self._get_reconfigure_entry()
+
+        if self._browser_auth_url is None:
+            try:
+                from sp_services import SpServicesClient
+
+                self._sp_client = SpServicesClient()
+                self._browser_auth_url = await self._sp_client.begin_browser_login()
+            except Exception:  # noqa: BLE001
+                errors["base"] = "sp_cannot_connect"
+
+        if user_input is not None and not errors:
+            callback_url = _normalise_callback_url(user_input.get("callback_url", ""))
+
+            if not callback_url:
+                await self._close_sp_client()
+                updated_data = {
+                    key: value
+                    for key, value in entry.data.items()
+                    if key not in (CONF_SP_TOKEN, CONF_SP_CALLBACK_URL)
+                }
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data=updated_data,
+                )
+
+            if not _has_callback_code_and_state(callback_url):
+                errors["base"] = "sp_invalid_callback"
+                return self.async_show_form(
+                    step_id="reconfigure_sp_browser_auth",
+                    data_schema=STEP_SP_BROWSER_AUTH_SCHEMA,
+                    errors=errors,
+                    description_placeholders={
+                        "auth_url": self._browser_auth_url or "",
+                        "callback_url_prefix": "https://services.spservices.sg/callback?fromLogin=true",
+                    },
+                )
+
+            try:
+                token = await self._exchange_callback_for_token(callback_url)
+                await self._close_sp_client()
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data_updates={
+                        CONF_SP_TOKEN: token,
+                        CONF_SP_CALLBACK_URL: callback_url,
+                    },
+                )
+            except Exception:  # noqa: BLE001
+                errors["base"] = "sp_invalid_callback"
+
+        return self.async_show_form(
+            step_id="reconfigure_sp_browser_auth",
+            data_schema=STEP_SP_BROWSER_AUTH_SCHEMA,
+            errors=errors,
+            description_placeholders={
+                "auth_url": self._browser_auth_url or "",
+                "callback_url_prefix": "https://services.spservices.sg/callback?fromLogin=true",
+            },
         )
