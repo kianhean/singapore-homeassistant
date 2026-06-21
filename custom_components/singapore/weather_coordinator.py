@@ -7,8 +7,9 @@ import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 
-import niquests
+import aiohttp
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 _LOGGER = logging.getLogger(__name__)
@@ -120,28 +121,33 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
 
     async def _async_update_data(self) -> WeatherData:
         try:
-            async with niquests.AsyncSession() as session:
-                two_hr_resp, four_day_resp = await asyncio.gather(
-                    session.get(WEATHER_URL, timeout=30),
-                    session.get(FOUR_DAY_URL, timeout=30),
+            session = async_get_clientsession(self.hass)
+            timeout = aiohttp.ClientTimeout(total=30)
+
+            two_hr_resp, four_day_resp = await asyncio.gather(
+                session.get(WEATHER_URL, timeout=timeout),
+                session.get(FOUR_DAY_URL, timeout=timeout),
+            )
+            if two_hr_resp.status != 200:
+                four_day_resp.release()
+                raise UpdateFailed(
+                    f"data.gov.sg weather endpoint returned HTTP {two_hr_resp.status}"
                 )
-                if two_hr_resp.status_code != 200:
-                    raise UpdateFailed(
-                        f"data.gov.sg weather endpoint returned HTTP {two_hr_resp.status_code}"
-                    )
-                parsed = _parse_weather(two_hr_resp.json())
-                if not parsed.areas:
-                    raise UpdateFailed("No area forecasts found in weather payload")
-                if four_day_resp.status_code == 200:
-                    parsed.four_day_forecast = _parse_four_day(four_day_resp.json())
-                else:
-                    _LOGGER.warning(
-                        "four-day-outlook returned HTTP %s; skipping daily forecast",
-                        four_day_resp.status_code,
-                    )
-                parsed.readings = await _fetch_aggregated_readings(
-                    session, self._readings_sem
+            parsed = _parse_weather(await two_hr_resp.json())
+            if not parsed.areas:
+                four_day_resp.release()
+                raise UpdateFailed("No area forecasts found in weather payload")
+            if four_day_resp.status == 200:
+                parsed.four_day_forecast = _parse_four_day(await four_day_resp.json())
+            else:
+                four_day_resp.release()
+                _LOGGER.warning(
+                    "four-day-outlook returned HTTP %s; skipping daily forecast",
+                    four_day_resp.status,
                 )
+            parsed.readings = await _fetch_aggregated_readings(
+                session, self._readings_sem
+            )
             return parsed
         except Exception as err:
             if self.data is not None:
@@ -153,16 +159,19 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
 
 
 async def _fetch_with_retry(
-    session: niquests.AsyncSession, url: str, timeout: int = 20
-) -> niquests.Response:
+    session: aiohttp.ClientSession, url: str, timeout: int = 20
+) -> aiohttp.ClientResponse:
     """GET url, retrying up to _MAX_RETRIES times on HTTP 429.
 
     Respects the Retry-After response header when present; falls back to
     exponential backoff (_RETRY_BACKOFF_BASE ** attempt seconds).
+
+    Callers must consume or release the returned response.
     """
-    response = await session.get(url, timeout=timeout)
+    client_timeout = aiohttp.ClientTimeout(total=timeout)
+    response = await session.get(url, timeout=client_timeout)
     for attempt in range(_MAX_RETRIES):
-        if response.status_code != 429:
+        if response.status != 429:
             return response
         retry_after = float(
             response.headers.get("Retry-After", _RETRY_BACKOFF_BASE**attempt)
@@ -174,13 +183,14 @@ async def _fetch_with_retry(
             attempt + 1,
             _MAX_RETRIES,
         )
+        response.release()
         await asyncio.sleep(retry_after)
-        response = await session.get(url, timeout=timeout)
+        response = await session.get(url, timeout=client_timeout)
     return response  # last response (may still be 429 if all retries exhausted)
 
 
 async def _fetch_aggregated_readings(
-    session: niquests.AsyncSession, sem: asyncio.Semaphore
+    session: aiohttp.ClientSession, sem: asyncio.Semaphore
 ) -> WeatherReadings:
     keys = list(_READINGS_ENDPOINTS.keys())
     results = await asyncio.gather(
@@ -201,7 +211,7 @@ async def _fetch_aggregated_readings(
 
 
 async def _fetch_reading_average(
-    session: niquests.AsyncSession,
+    session: aiohttp.ClientSession,
     sem: asyncio.Semaphore,
     url: str,
     metric_key: str,
@@ -214,16 +224,18 @@ async def _fetch_reading_average(
     - data.readings[]
     """
     async with sem:
+        response = None
         try:
             response = await _fetch_with_retry(session, url)
-            if response.status_code != 200:
-                _LOGGER.debug(
-                    "Skipping %s due to HTTP %s", metric_key, response.status_code
-                )
+            if response.status != 200:
+                _LOGGER.debug("Skipping %s due to HTTP %s", metric_key, response.status)
+                response.release()
                 return None
-            payload = response.json()
+            payload = await response.json()
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug("Skipping %s due to fetch error: %s", metric_key, err)
+            if response is not None:
+                response.release()
             return None
 
     rows = _extract_readings_rows(payload)

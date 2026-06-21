@@ -93,17 +93,15 @@ async def test_weather_coordinator_http_error_without_cache_fails():
     hass = MagicMock()
 
     mock_response = MagicMock()
-    mock_response.status_code = 503
+    mock_response.status = 503
 
     mock_session = AsyncMock()
     mock_session.get = AsyncMock(return_value=mock_response)
-    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-    mock_session.__aexit__ = AsyncMock(return_value=False)
 
     coordinator = SingaporeWeatherCoordinator(hass)
 
     with patch(
-        "custom_components.singapore.weather_coordinator.niquests.AsyncSession",
+        "custom_components.singapore.weather_coordinator.async_get_clientsession",
         return_value=mock_session,
     ):
         await coordinator.async_refresh()
@@ -123,12 +121,10 @@ async def test_weather_coordinator_http_error_uses_last_known_data():
     hass = MagicMock()
 
     mock_response = MagicMock()
-    mock_response.status_code = 503
+    mock_response.status = 503
 
     mock_session = AsyncMock()
     mock_session.get = AsyncMock(return_value=mock_response)
-    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-    mock_session.__aexit__ = AsyncMock(return_value=False)
 
     coordinator = SingaporeWeatherCoordinator(hass)
     cached = WeatherData(
@@ -146,7 +142,7 @@ async def test_weather_coordinator_http_error_uses_last_known_data():
     coordinator.data = cached
 
     with patch(
-        "custom_components.singapore.weather_coordinator.niquests.AsyncSession",
+        "custom_components.singapore.weather_coordinator.async_get_clientsession",
         return_value=mock_session,
     ):
         await coordinator.async_refresh()
@@ -356,32 +352,34 @@ async def test_weather_coordinator_fetches_four_day():
         ]
     }
 
-    two_hr_resp = MagicMock()
-    two_hr_resp.status_code = 200
-    two_hr_resp.json = MagicMock(return_value=two_hr_payload)
+    class _MockResponse:
+        def __init__(self, status=200, json_data=None):
+            self.status = status
+            self._json_data = json_data
 
-    four_day_resp = MagicMock()
-    four_day_resp.status_code = 200
-    four_day_resp.json = MagicMock(return_value=four_day_payload)
+        async def json(self):
+            return self._json_data
 
-    async def _mock_get(url, timeout=20):
+        def release(self):
+            pass
+
+    two_hr_resp = _MockResponse(200, two_hr_payload)
+    four_day_resp = _MockResponse(200, four_day_payload)
+
+    async def _mock_get(url, timeout=None):
         if "four-day" in url:
             return four_day_resp
         if "two-hr" in url:
             return two_hr_resp
-        r = MagicMock()
-        r.status_code = 404
-        return r
+        return _MockResponse(404)
 
-    mock_session = AsyncMock()
+    mock_session = MagicMock()
     mock_session.get = _mock_get
-    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-    mock_session.__aexit__ = AsyncMock(return_value=False)
 
     coordinator = SingaporeWeatherCoordinator(hass)
 
     with patch(
-        "custom_components.singapore.weather_coordinator.niquests.AsyncSession",
+        "custom_components.singapore.weather_coordinator.async_get_clientsession",
         return_value=mock_session,
     ):
         await coordinator.async_refresh()
@@ -413,30 +411,33 @@ async def test_weather_coordinator_four_day_http_error_is_soft():
         ]
     }
 
-    two_hr_resp = MagicMock()
-    two_hr_resp.status_code = 200
-    two_hr_resp.json = MagicMock(return_value=two_hr_payload)
+    class _MockResponse:
+        def __init__(self, status=200, json_data=None):
+            self.status = status
+            self._json_data = json_data
 
-    four_day_resp = MagicMock()
-    four_day_resp.status_code = 503
+        async def json(self):
+            return self._json_data
 
-    async def _mock_get(url, timeout=20):
+        def release(self):
+            pass
+
+    two_hr_resp = _MockResponse(200, two_hr_payload)
+    four_day_resp = _MockResponse(503)
+
+    async def _mock_get(url, timeout=None):
         if "four-day" in url:
             return four_day_resp
         if "two-hr" in url:
             return two_hr_resp
-        r = MagicMock()
-        r.status_code = 404
-        return r
+        return _MockResponse(404)
 
-    mock_session = AsyncMock()
+    mock_session = MagicMock()
     mock_session.get = _mock_get
-    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-    mock_session.__aexit__ = AsyncMock(return_value=False)
 
     coordinator = SingaporeWeatherCoordinator(hass)
     with patch(
-        "custom_components.singapore.weather_coordinator.niquests.AsyncSession",
+        "custom_components.singapore.weather_coordinator.async_get_clientsession",
         return_value=mock_session,
     ):
         await coordinator.async_refresh()

@@ -17,7 +17,7 @@ custom_components/singapore/
 ├── weather.py              # Weather entities (one per Singapore forecast area)
 ├── config_flow.py          # UI config flow (name input)
 ├── sensor.py               # Sensor entities (tariff + COE + weather readings + train status)
-├── manifest.json           # Integration metadata; declares beautifulsoup4 + niquests deps
+├── manifest.json           # Integration metadata; declares beautifulsoup4 dep
 ├── strings.json            # Config flow UI strings
 └── translations/
     └── en.json             # English translations (mirrors strings.json)
@@ -181,8 +181,11 @@ Solar export price = total electricity tariff − network costs.
 - realtime readings from collection 1459 endpoints (`air-temperature`, `relative-humidity`,
   `wind-speed`, `wind-direction`, `rainfall`)
 
-HTTP is handled via **`niquests.AsyncSession`** (not HA's `async_get_clientsession`) to get
-HTTP/2 connection reuse and rate-limit protection:
+HTTP is handled via HA's **`async_get_clientsession`** (the standard aiohttp session managed by
+Home Assistant) with manual retry on HTTP 429.  The coordinator uses
+`aiohttp.ClientTimeout` for request timeouts and an `asyncio.Semaphore`
+(`_READINGS_CONCURRENCY = 2`) to cap parallel readings requests, avoiding 429s
+from data.gov.sg.
 
 - `_READINGS_CONCURRENCY = 2` — `asyncio.Semaphore` caps the 5 parallel readings requests
   to 2 in-flight at a time, avoiding 429s from data.gov.sg.
@@ -304,8 +307,10 @@ Both commands must exit cleanly — CI will fail otherwise.
 
 - All HA I/O must be `async`; use `async_`-prefixed HA helpers
 - Use `async_get_clientsession(hass)` for aiohttp — never create a bare `aiohttp.ClientSession`
-- Exception: `weather_coordinator.py` uses `niquests.AsyncSession` directly for HTTP/2 and
-  built-in rate-limit retry; all other coordinators use `async_get_clientsession`
+- All coordinators use `async_get_clientsession(hass)` for aiohttp requests
+- `weather_coordinator.py` handles HTTP 429 rate limits from data.gov.sg with
+  `_fetch_with_retry()` (3 retries, respects `Retry-After` header, exponential backoff)
+  and an `asyncio.Semaphore` capping concurrent readings requests at 2
 - Entity unique IDs must be stable: `{entry_id}_{suffix}`
 - Always bump `custom_components/singapore/manifest.json` `version` for every PR that changes
   shipped integration behavior/code, so merge-to-main release automation can create the next
