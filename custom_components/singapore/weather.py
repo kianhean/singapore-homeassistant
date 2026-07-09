@@ -7,14 +7,16 @@ from homeassistant.components.weather import (
     WeatherEntity,
     WeatherEntityFeature,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfSpeed, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import DOMAIN
+from . import DOMAIN, SingaporeConfigEntry
 from .weather_coordinator import SingaporeWeatherCoordinator, _wind_direction_to_degrees
+
+PARALLEL_UPDATES = 0
 
 _CONDITION_MAP = {
     "fair": "sunny",
@@ -39,12 +41,11 @@ _CONDITION_MAP = {
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: SingaporeConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up weather entities for each forecast area."""
-    entry_data = hass.data[DOMAIN][entry.entry_id]
-    coordinator: SingaporeWeatherCoordinator = entry_data["weather"]
+    coordinator = entry.runtime_data.weather
 
     if coordinator.data is None:
         async_add_entities([])
@@ -62,7 +63,7 @@ class SingaporeAreaWeatherEntity(
 ):
     """One weather entity per Singapore forecast area."""
 
-    _attr_has_entity_name = False
+    _attr_has_entity_name = True
     _attr_supported_features = WeatherEntityFeature.FORECAST_DAILY
     _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_native_wind_speed_unit = UnitOfSpeed.KILOMETERS_PER_HOUR
@@ -75,13 +76,15 @@ class SingaporeAreaWeatherEntity(
         self._area = area
         slug = area.lower().replace(" ", "_")
         self._attr_unique_id = f"{entry_id}_weather_{slug}"
-        self._attr_name = f"Singapore Weather {area}"
+        # Area names are dynamic Singapore place names, not translatable
+        # strings, so this uses a raw name rather than a translation_key.
+        self._attr_name = area
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         super()._handle_coordinator_update()
-        self.hass.async_create_task(self.async_update_listeners())
+        self.hass.async_create_task(self.async_update_listeners(("daily",)))
 
     @property
     def native_temperature(self) -> float | None:
@@ -169,13 +172,15 @@ class SingaporeAreaWeatherEntity(
         return result
 
     @property
-    def device_info(self) -> dict:
-        return {
-            "identifiers": {(DOMAIN, f"{self._entry_id}_weather")},
-            "name": "Singapore Weather",
-            "manufacturer": "Singapore",
-            "model": "NEA Weather",
-        }
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{self._entry_id}_weather")},
+            name="Weather",
+            manufacturer="Singapore",
+            model="NEA Weather",
+            entry_type=DeviceEntryType.SERVICE,
+            configuration_url="https://www.nea.gov.sg",
+        )
 
 
 def _map_condition(text: str) -> str:

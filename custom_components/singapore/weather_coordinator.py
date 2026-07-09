@@ -120,27 +120,25 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
         self._readings_sem = asyncio.Semaphore(_READINGS_CONCURRENCY)
 
     async def _async_update_data(self) -> WeatherData:
+        session = async_get_clientsession(self.hass)
+        timeout = aiohttp.ClientTimeout(total=30)
+        two_hr_resp: aiohttp.ClientResponse | None = None
+        four_day_resp: aiohttp.ClientResponse | None = None
         try:
-            session = async_get_clientsession(self.hass)
-            timeout = aiohttp.ClientTimeout(total=30)
-
             two_hr_resp, four_day_resp = await asyncio.gather(
                 session.get(WEATHER_URL, timeout=timeout),
                 session.get(FOUR_DAY_URL, timeout=timeout),
             )
             if two_hr_resp.status != 200:
-                four_day_resp.release()
                 raise UpdateFailed(
                     f"data.gov.sg weather endpoint returned HTTP {two_hr_resp.status}"
                 )
             parsed = _parse_weather(await two_hr_resp.json())
             if not parsed.areas:
-                four_day_resp.release()
                 raise UpdateFailed("No area forecasts found in weather payload")
             if four_day_resp.status == 200:
                 parsed.four_day_forecast = _parse_four_day(await four_day_resp.json())
             else:
-                four_day_resp.release()
                 _LOGGER.warning(
                     "four-day-outlook returned HTTP %s; skipping daily forecast",
                     four_day_resp.status,
@@ -149,13 +147,25 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
                 session, self._readings_sem
             )
             return parsed
-        except Exception as err:
+        except (aiohttp.ClientError, TimeoutError) as err:
             if self.data is not None:
                 _LOGGER.warning(
                     "Error fetching weather data (%s); using last known values", err
                 )
                 return self.data
             raise UpdateFailed(f"Error fetching weather data: {err}") from err
+        except UpdateFailed as err:
+            if self.data is not None:
+                _LOGGER.warning(
+                    "Error fetching weather data (%s); using last known values", err
+                )
+                return self.data
+            raise
+        finally:
+            if two_hr_resp is not None:
+                two_hr_resp.release()
+            if four_day_resp is not None:
+                four_day_resp.release()
 
 
 async def _fetch_with_retry(

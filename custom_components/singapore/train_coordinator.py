@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Final
 
+import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -91,15 +92,14 @@ class TrainStatusCoordinator(DataUpdateCoordinator[TrainStatusData]):
                     "X-Requested-With": "XMLHttpRequest",
                     "Referer": _TRAIN_STATUS_REFERER,
                 },
-                timeout=30,
+                timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status != 200:
                     raise UpdateFailed(
                         f"mytransport.sg train status returned HTTP {response.status}"
                     )
                 payload = await response.json(content_type=None)
-            return _parse_train_status(payload)
-        except Exception as err:
+        except (aiohttp.ClientError, TimeoutError) as err:
             if self.data is not None:
                 _LOGGER.warning(
                     "Error fetching train status data (%s); using last known values",
@@ -107,6 +107,16 @@ class TrainStatusCoordinator(DataUpdateCoordinator[TrainStatusData]):
                 )
                 return self.data
             raise UpdateFailed(f"Error fetching train status data: {err}") from err
+        except UpdateFailed as err:
+            if self.data is not None:
+                _LOGGER.warning(
+                    "Error fetching train status data (%s); using last known values",
+                    err,
+                )
+                return self.data
+            raise
+
+        return _parse_train_status(payload)
 
 
 _DISRUPTION_PATTERNS = tuple(

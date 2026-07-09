@@ -21,14 +21,25 @@ class UpdateFailed(Exception):
     pass
 
 
+class ConfigEntryNotReady(Exception):
+    pass
+
+
 class DataUpdateCoordinator:
-    """Minimal coordinator that drives _async_update_data."""
+    """Minimal coordinator that drives _async_update_data.
+
+    Mirrors real HA semantics closely enough for tests: async_refresh()
+    never raises (it just flips last_update_success), while
+    async_config_entry_first_refresh() raises ConfigEntryNotReady when the
+    first refresh fails, matching homeassistant.helpers.update_coordinator.
+    """
 
     def __class_getitem__(cls, item):
         return cls
 
     def __init__(self, hass, logger, name, update_interval):
         self.hass = hass
+        self.name = name
         self.data = None
         self.last_update_success = True
         self._logger = logger
@@ -43,6 +54,8 @@ class DataUpdateCoordinator:
 
     async def async_config_entry_first_refresh(self):
         await self.async_refresh()
+        if not self.last_update_success:
+            raise ConfigEntryNotReady(f"{self.name} first refresh failed")
 
     async def _async_update_data(self):
         raise NotImplementedError
@@ -61,11 +74,17 @@ class CoordinatorEntity:
 
     @property
     def name(self):
-        return self._attr_name
+        return getattr(self, "_attr_name", None)
 
     @property
     def native_unit_of_measurement(self):
         return self._attr_native_unit_of_measurement
+
+    def _handle_coordinator_update(self):
+        self.async_write_ha_state()
+
+    def async_write_ha_state(self):
+        pass
 
 
 class SensorEntity:
@@ -75,7 +94,10 @@ class SensorEntity:
 
 
 class SensorDeviceClass:
-    pass
+    TEMPERATURE = "temperature"
+    HUMIDITY = "humidity"
+    WIND_SPEED = "wind_speed"
+    PRECIPITATION = "precipitation"
 
 
 class SensorStateClass:
@@ -93,7 +115,21 @@ class HomeAssistant:
 
 
 class ConfigEntry:
-    pass
+    def __class_getitem__(cls, item):
+        return cls
+
+    def __init__(self, entry_id: str = "test_entry"):
+        self.entry_id = entry_id
+        self.runtime_data = None
+        self._on_unload: list = []
+
+    def async_on_unload(self, func):
+        self._on_unload.append(func)
+
+    def async_create_background_task(self, hass, coro, name):
+        import asyncio
+
+        return asyncio.ensure_future(coro)
 
 
 class ConfigFlow:
@@ -106,7 +142,9 @@ class AddEntitiesCallback:
 
 
 class WeatherEntity:
-    pass
+    async def async_update_listeners(self, forecast_types):
+        """Real HA requires forecast_types; enforce the same signature."""
+        return None
 
 
 class WeatherEntityFeature:
@@ -122,6 +160,14 @@ class UnitOfSpeed:
     KILOMETERS_PER_HOUR = "km/h"
 
 
+class UnitOfPrecipitationDepth:
+    MILLIMETERS = "mm"
+
+
+PERCENTAGE = "%"
+DEGREE = "°"
+
+
 class Forecast(dict):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -134,6 +180,21 @@ class CalendarEntity:
 class CalendarEvent(dict):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+
+class DeviceInfo(dict):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+
+class DeviceEntryType:
+    SERVICE = "service"
+
+
+def _dt_now():
+    from datetime import datetime
+
+    return datetime.now()
 
 
 # ---------------------------------------------------------------------------
@@ -158,6 +219,12 @@ _HA_MODULES: dict[str, ModuleType] = {
         CONF_NAME="name",
         UnitOfTemperature=UnitOfTemperature,
         UnitOfSpeed=UnitOfSpeed,
+        UnitOfPrecipitationDepth=UnitOfPrecipitationDepth,
+        PERCENTAGE=PERCENTAGE,
+        DEGREE=DEGREE,
+    ),
+    "homeassistant.exceptions": _mod(
+        "homeassistant.exceptions", ConfigEntryNotReady=ConfigEntryNotReady
     ),
     "homeassistant.helpers": _mod("homeassistant.helpers"),
     "homeassistant.helpers.update_coordinator": _mod(
@@ -178,6 +245,13 @@ _HA_MODULES: dict[str, ModuleType] = {
         "homeassistant.helpers.event",
         async_track_time_change=MagicMock(return_value=MagicMock()),
     ),
+    "homeassistant.helpers.device_registry": _mod(
+        "homeassistant.helpers.device_registry",
+        DeviceInfo=DeviceInfo,
+        DeviceEntryType=DeviceEntryType,
+    ),
+    "homeassistant.util": _mod("homeassistant.util"),
+    "homeassistant.util.dt": _mod("homeassistant.util.dt", now=_dt_now),
     "homeassistant.components": _mod("homeassistant.components"),
     "homeassistant.components.weather": _mod(
         "homeassistant.components.weather",
@@ -261,16 +335,3 @@ except ImportError:
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "asyncio: mark test as asyncio")
-
-
-def pytest_pyfunc_call(pyfuncitem):
-    import asyncio
-    import inspect
-
-    if inspect.iscoroutinefunction(pyfuncitem.obj):
-        kwargs = {
-            name: pyfuncitem.funcargs[name] for name in pyfuncitem._fixtureinfo.argnames
-        }
-        asyncio.run(pyfuncitem.obj(**kwargs))
-        return True
-    return None

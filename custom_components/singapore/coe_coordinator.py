@@ -8,6 +8,7 @@ import random
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -72,7 +73,9 @@ class CoeCoordinator(DataUpdateCoordinator[CoeData]):
 
         for attempt in range(1, _MAX_FETCH_ATTEMPTS + 1):
             try:
-                async with session.get(COE_API_URL, timeout=30) as response:
+                async with session.get(
+                    COE_API_URL, timeout=aiohttp.ClientTimeout(total=30)
+                ) as response:
                     if response.status != 200:
                         raise UpdateFailed(
                             f"data.gov.sg returned HTTP {response.status}"

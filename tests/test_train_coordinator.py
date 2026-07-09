@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiohttp
 import pytest
 
 from custom_components.singapore.train_coordinator import _parse_train_status
@@ -197,3 +198,62 @@ async def test_train_coordinator_http_error_uses_last_known_data():
 
     assert coordinator.last_update_success is True
     assert coordinator.data.status == "normal"
+
+
+@pytest.mark.asyncio
+async def test_train_coordinator_success():
+    from custom_components.singapore.train_coordinator import TrainStatusCoordinator
+
+    hass = MagicMock()
+
+    mock_response = AsyncMock()
+    mock_response.status = 200
+    mock_response.json = AsyncMock(return_value=_payload(["21:00-NSL-Planned works."]))
+    mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_response.__aexit__ = AsyncMock(return_value=False)
+
+    mock_session = MagicMock()
+    mock_session.post = MagicMock(return_value=mock_response)
+
+    coordinator = TrainStatusCoordinator(hass)
+
+    with patch(
+        "custom_components.singapore.train_coordinator.async_get_clientsession",
+        return_value=mock_session,
+    ):
+        await coordinator.async_refresh()
+
+    assert coordinator.last_update_success is True
+    assert coordinator.data.status == "planned"
+    assert coordinator.data.line_statuses["North-South Line"] == "planned"
+
+
+@pytest.mark.asyncio
+async def test_train_coordinator_client_error_uses_last_known_data():
+    """Transient network errors (aiohttp.ClientError) fall back to stale data."""
+    from custom_components.singapore.train_coordinator import (
+        TRAIN_LINES,
+        TrainStatusCoordinator,
+        TrainStatusData,
+    )
+
+    hass = MagicMock()
+    mock_session = MagicMock()
+    mock_session.post = MagicMock(side_effect=aiohttp.ClientConnectionError("boom"))
+
+    coordinator = TrainStatusCoordinator(hass)
+    cached = TrainStatusData(
+        status="normal",
+        details="",
+        line_statuses={line: "normal" for line in TRAIN_LINES},
+    )
+    coordinator.data = cached
+
+    with patch(
+        "custom_components.singapore.train_coordinator.async_get_clientsession",
+        return_value=mock_session,
+    ):
+        await coordinator.async_refresh()
+
+    assert coordinator.last_update_success is True
+    assert coordinator.data is cached

@@ -4,16 +4,26 @@ from __future__ import annotations
 
 import re
 
-from homeassistant.components.sensor import SensorEntity, SensorStateClass
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
+from homeassistant.const import (
+    DEGREE,
+    PERCENTAGE,
+    UnitOfPrecipitationDepth,
+    UnitOfSpeed,
+    UnitOfTemperature,
+)
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import DOMAIN
+from . import DOMAIN, SingaporeConfigEntry
 from .coe_coordinator import (
     _CATEGORY_DESCRIPTIONS,
-    _CATEGORY_NAMES,
     COE_CATEGORIES,
     UNIT_COE,
     CoeCoordinator,
@@ -22,24 +32,26 @@ from .coordinator import UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER, SPGroupCoordina
 from .train_coordinator import TRAIN_LINES, TrainStatusCoordinator
 from .weather_coordinator import SingaporeWeatherCoordinator
 
-UNIT_TEMP = "°C"
-UNIT_HUMIDITY = "%"
-UNIT_WIND_SPEED = "km/h"
-UNIT_WIND_BEARING = "°"
-UNIT_RAINFALL = "mm"
+PARALLEL_UPDATES = 0
+
+UNIT_TEMP = UnitOfTemperature.CELSIUS
+UNIT_HUMIDITY = PERCENTAGE
+UNIT_WIND_SPEED = UnitOfSpeed.KILOMETERS_PER_HOUR
+UNIT_WIND_BEARING = DEGREE
+UNIT_RAINFALL = UnitOfPrecipitationDepth.MILLIMETERS
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: SingaporeConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up SP Group tariff and COE sensors."""
-    entry_data = hass.data[DOMAIN][entry.entry_id]
-    tariff_coordinator: SPGroupCoordinator = entry_data["tariff"]
-    coe_coordinator: CoeCoordinator = entry_data["coe"]
-    weather_coordinator: SingaporeWeatherCoordinator = entry_data["weather"]
-    train_coordinator: TrainStatusCoordinator = entry_data["train"]
+    data = entry.runtime_data
+    tariff_coordinator = data.tariff
+    coe_coordinator = data.coe
+    weather_coordinator = data.weather
+    train_coordinator = data.train
 
     entities: list[SensorEntity] = [
         SingaporeElectricityTariffSensor(tariff_coordinator, entry.entry_id),
@@ -77,7 +89,7 @@ class _BaseTariffSensor(CoordinatorEntity[SPGroupCoordinator], SensorEntity):
     homeassistant/components/sensor/__init__.py.
     """
 
-    _attr_has_entity_name = False
+    _attr_has_entity_name = True
     _attr_device_class = None  # custom price-rate units; no HA device class applies
     _attr_state_class = SensorStateClass.MEASUREMENT
 
@@ -98,19 +110,23 @@ class _BaseTariffSensor(CoordinatorEntity[SPGroupCoordinator], SensorEntity):
         return attrs
 
     @property
-    def device_info(self) -> dict:
-        return {
-            "identifiers": {(DOMAIN, f"{self._entry_id}_energy")},
-            "name": "Singapore Energy",
-            "manufacturer": "Singapore",
-            "model": "SP Group Tariffs",
-        }
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{self._entry_id}_energy")},
+            name="Energy",
+            manufacturer="Singapore",
+            model="SP Group Tariffs",
+            entry_type=DeviceEntryType.SERVICE,
+            configuration_url=(
+                "https://www.spgroup.com.sg/our-services/utilities/tariff-information"
+            ),
+        )
 
 
 class SingaporeElectricityTariffSensor(_BaseTariffSensor):
     """Total residential electricity tariff (¢/kWh)."""
 
-    _attr_name = "Singapore Electricity Tariff"
+    _attr_translation_key = "electricity_tariff"
     _attr_icon = "mdi:lightning-bolt"
     _attr_native_unit_of_measurement = UNIT_ELECTRICITY
 
@@ -132,7 +148,7 @@ class SingaporeElectricityTariffSensor(_BaseTariffSensor):
 class SingaporeSolarExportPriceSensor(_BaseTariffSensor):
     """Solar export price = electricity tariff minus network costs (¢/kWh)."""
 
-    _attr_name = "Singapore Solar Export Price"
+    _attr_translation_key = "solar_export_price"
     _attr_icon = "mdi:solar-power"
     _attr_native_unit_of_measurement = UNIT_ELECTRICITY
 
@@ -158,7 +174,7 @@ class SingaporeSolarExportPriceSensor(_BaseTariffSensor):
 class SingaporeGasTariffSensor(_BaseTariffSensor):
     """Piped natural gas tariff (¢/kWh)."""
 
-    _attr_name = "Singapore Gas Tariff"
+    _attr_translation_key = "gas_tariff"
     _attr_icon = "mdi:gas-burner"
     _attr_native_unit_of_measurement = UNIT_GAS
 
@@ -178,7 +194,7 @@ class SingaporeGasTariffSensor(_BaseTariffSensor):
 class SingaporeWaterTariffSensor(_BaseTariffSensor):
     """Water tariff (SGD/m³)."""
 
-    _attr_name = "Singapore Water Tariff"
+    _attr_translation_key = "water_tariff"
     _attr_icon = "mdi:water"
     _attr_native_unit_of_measurement = UNIT_WATER
 
@@ -198,7 +214,8 @@ class SingaporeWaterTariffSensor(_BaseTariffSensor):
 class SingaporeCoeResultSensor(CoordinatorEntity[CoeCoordinator], SensorEntity):
     """COE bidding result (premium in SGD) for a single vehicle category."""
 
-    _attr_has_entity_name = False
+    _attr_has_entity_name = True
+    _attr_translation_key = "coe_category"
     _attr_device_class = None
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = UNIT_COE
@@ -211,7 +228,7 @@ class SingaporeCoeResultSensor(CoordinatorEntity[CoeCoordinator], SensorEntity):
         self._entry_id = entry_id
         self._category = category
         self._attr_unique_id = f"{entry_id}_coe_cat_{category.lower()}"
-        self._attr_name = _CATEGORY_NAMES[category]
+        self._attr_translation_placeholders = {"category": category}
 
     @property
     def native_value(self) -> int | None:
@@ -235,13 +252,17 @@ class SingaporeCoeResultSensor(CoordinatorEntity[CoeCoordinator], SensorEntity):
         return attrs
 
     @property
-    def device_info(self) -> dict:
-        return {
-            "identifiers": {(DOMAIN, f"{self._entry_id}_coe")},
-            "name": "Singapore COE",
-            "manufacturer": "Singapore",
-            "model": "LTA COE Results",
-        }
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{self._entry_id}_coe")},
+            name="COE",
+            manufacturer="Singapore",
+            model="LTA COE Results",
+            entry_type=DeviceEntryType.SERVICE,
+            configuration_url=(
+                "https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view"
+            ),
+        )
 
 
 class _BaseWeatherReadingSensor(
@@ -249,8 +270,7 @@ class _BaseWeatherReadingSensor(
 ):
     """Base class for realtime weather reading sensors from data.gov.sg collection 1459."""
 
-    _attr_has_entity_name = False
-    _attr_device_class = None
+    _attr_has_entity_name = True
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(
@@ -265,18 +285,21 @@ class _BaseWeatherReadingSensor(
         return {"source": "data.gov.sg / NEA (collection 1459)"}
 
     @property
-    def device_info(self) -> dict:
-        return {
-            "identifiers": {(DOMAIN, f"{self._entry_id}_weather")},
-            "name": "Singapore Weather",
-            "manufacturer": "Singapore",
-            "model": "NEA Weather",
-        }
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{self._entry_id}_weather")},
+            name="Weather",
+            manufacturer="Singapore",
+            model="NEA Weather",
+            entry_type=DeviceEntryType.SERVICE,
+            configuration_url="https://www.nea.gov.sg",
+        )
 
 
 class SingaporeTemperatureSensor(_BaseWeatherReadingSensor):
-    _attr_name = "Singapore Temperature"
+    _attr_translation_key = "temperature"
     _attr_icon = "mdi:thermometer"
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
     _attr_native_unit_of_measurement = UNIT_TEMP
 
     def __init__(self, coordinator: SingaporeWeatherCoordinator, entry_id: str) -> None:
@@ -290,8 +313,9 @@ class SingaporeTemperatureSensor(_BaseWeatherReadingSensor):
 
 
 class SingaporeHumiditySensor(_BaseWeatherReadingSensor):
-    _attr_name = "Singapore Humidity"
+    _attr_translation_key = "humidity"
     _attr_icon = "mdi:water-percent"
+    _attr_device_class = SensorDeviceClass.HUMIDITY
     _attr_native_unit_of_measurement = UNIT_HUMIDITY
 
     def __init__(self, coordinator: SingaporeWeatherCoordinator, entry_id: str) -> None:
@@ -305,8 +329,9 @@ class SingaporeHumiditySensor(_BaseWeatherReadingSensor):
 
 
 class SingaporeWindSpeedSensor(_BaseWeatherReadingSensor):
-    _attr_name = "Singapore Wind Speed"
+    _attr_translation_key = "wind_speed"
     _attr_icon = "mdi:weather-windy"
+    _attr_device_class = SensorDeviceClass.WIND_SPEED
     _attr_native_unit_of_measurement = UNIT_WIND_SPEED
 
     def __init__(self, coordinator: SingaporeWeatherCoordinator, entry_id: str) -> None:
@@ -320,8 +345,9 @@ class SingaporeWindSpeedSensor(_BaseWeatherReadingSensor):
 
 
 class SingaporeWindBearingSensor(_BaseWeatherReadingSensor):
-    _attr_name = "Singapore Wind Bearing"
+    _attr_translation_key = "wind_bearing"
     _attr_icon = "mdi:compass-outline"
+    _attr_device_class = None  # no standard HA device class for wind bearing sensors
     _attr_native_unit_of_measurement = UNIT_WIND_BEARING
 
     def __init__(self, coordinator: SingaporeWeatherCoordinator, entry_id: str) -> None:
@@ -335,8 +361,9 @@ class SingaporeWindBearingSensor(_BaseWeatherReadingSensor):
 
 
 class SingaporeRainfallSensor(_BaseWeatherReadingSensor):
-    _attr_name = "Singapore Rainfall"
+    _attr_translation_key = "rainfall"
     _attr_icon = "mdi:weather-rainy"
+    _attr_device_class = SensorDeviceClass.PRECIPITATION
     _attr_native_unit_of_measurement = UNIT_RAINFALL
 
     def __init__(self, coordinator: SingaporeWeatherCoordinator, entry_id: str) -> None:
@@ -354,8 +381,8 @@ class SingaporeTrainStatusSensor(
 ):
     """Overall MRT/LRT network status from mytransport.sg."""
 
-    _attr_has_entity_name = False
-    _attr_name = "Singapore Train Status"
+    _attr_has_entity_name = True
+    _attr_translation_key = "train_status"
     _attr_icon = "mdi:train"
     _attr_device_class = None
     _attr_state_class = None
@@ -383,13 +410,15 @@ class SingaporeTrainStatusSensor(
         }
 
     @property
-    def device_info(self) -> dict:
-        return {
-            "identifiers": {(DOMAIN, f"{self._entry_id}_train")},
-            "name": "Singapore MRT/LRT",
-            "manufacturer": "Singapore",
-            "model": "MyTransport Train Status",
-        }
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{self._entry_id}_train")},
+            name="MRT/LRT",
+            manufacturer="Singapore",
+            model="MyTransport Train Status",
+            entry_type=DeviceEntryType.SERVICE,
+            configuration_url="https://www.mytransport.sg/trainstatus#",
+        )
 
 
 class SingaporeTrainLineStatusSensor(
@@ -397,7 +426,8 @@ class SingaporeTrainLineStatusSensor(
 ):
     """Status sensor for a single MRT/LRT line."""
 
-    _attr_has_entity_name = False
+    _attr_has_entity_name = True
+    _attr_translation_key = "train_line_status"
     _attr_icon = "mdi:train"
     _attr_device_class = None
     _attr_state_class = None
@@ -410,7 +440,7 @@ class SingaporeTrainLineStatusSensor(
         self._line_name = line_name
         slug = re.sub(r"[^a-z0-9]+", "_", line_name.lower()).strip("_")
         self._attr_unique_id = f"{entry_id}_train_{slug}_status"
-        self._attr_name = f"Singapore {line_name} Status"
+        self._attr_translation_placeholders = {"line": line_name}
 
     @property
     def native_value(self) -> str | None:
@@ -427,10 +457,12 @@ class SingaporeTrainLineStatusSensor(
         }
 
     @property
-    def device_info(self) -> dict:
-        return {
-            "identifiers": {(DOMAIN, f"{self._entry_id}_train")},
-            "name": "Singapore MRT/LRT",
-            "manufacturer": "Singapore",
-            "model": "MyTransport Train Status",
-        }
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{self._entry_id}_train")},
+            name="MRT/LRT",
+            manufacturer="Singapore",
+            model="MyTransport Train Status",
+            entry_type=DeviceEntryType.SERVICE,
+            configuration_url="https://www.mytransport.sg/trainstatus#",
+        )

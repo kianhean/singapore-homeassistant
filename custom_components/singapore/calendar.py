@@ -5,23 +5,24 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import DOMAIN
+from . import DOMAIN, SingaporeConfigEntry
 from .holiday_coordinator import PublicHoliday, PublicHolidayCoordinator
+
+PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: SingaporeConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up public holiday calendar."""
-    entry_data = hass.data[DOMAIN][entry.entry_id]
-    coordinator: PublicHolidayCoordinator = entry_data["holiday"]
+    coordinator = entry.runtime_data.holiday
     async_add_entities([SingaporePublicHolidayCalendar(coordinator, entry.entry_id)])
 
 
@@ -30,8 +31,8 @@ class SingaporePublicHolidayCalendar(
 ):
     """Single calendar containing Singapore public holidays."""
 
-    _attr_has_entity_name = False
-    _attr_name = "Singapore Public Holidays"
+    _attr_has_entity_name = True
+    _attr_name = None
     _attr_icon = "mdi:calendar"
 
     def __init__(self, coordinator: PublicHolidayCoordinator, entry_id: str) -> None:
@@ -81,13 +82,15 @@ class SingaporePublicHolidayCalendar(
         }
 
     @property
-    def device_info(self) -> dict:
-        return {
-            "identifiers": {(DOMAIN, f"{self._entry_id}_holiday")},
-            "name": "Singapore Public Holidays",
-            "manufacturer": "Singapore",
-            "model": "MOM Public Holidays",
-        }
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{self._entry_id}_holiday")},
+            name="Public Holidays",
+            manufacturer="Singapore",
+            model="MOM Public Holidays",
+            entry_type=DeviceEntryType.SERVICE,
+            configuration_url="https://www.mom.gov.sg/employment-practices/public-holidays",
+        )
 
 
 def _to_event(holiday: PublicHoliday) -> CalendarEvent:
