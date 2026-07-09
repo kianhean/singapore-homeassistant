@@ -301,6 +301,17 @@ COE sensors are generated automatically for every category in `COE_CATEGORIES` i
 `coe_coordinator.py`. To add a new COE-based sensor with different logic, subclass
 `CoordinatorEntity[CoeCoordinator]` in `sensor.py` and register it in `async_setup_entry`.
 
+## Brand Assets — Do Not Remove
+
+`custom_components/singapore/brand/icon.png` and `logo.png` look like unused duplicates of
+`custom_components/singapore/images/icon.png` (they're byte-for-byte identical and oversized
+for actual `home-assistant/brands` size limits), but **do not delete them**. The `hacs/action`
+CI check (`.github/workflows/hacs.yaml`) validates brand assets by checking for these files
+locally as a fallback whenever the repository isn't registered in the `home-assistant/brands`
+repo — this repo isn't, so removing `brand/` fails the `<Validation brands>` check and breaks
+CI. If this integration is ever submitted to `home-assistant/brands` with correctly-sized
+assets there, the local fallback files can be removed at that point, not before.
+
 ## Linting and Formatting
 
 After every code change, always run and fix before committing:
