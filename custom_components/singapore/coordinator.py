@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+import aiohttp
 from bs4 import BeautifulSoup
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -125,15 +126,12 @@ class SPGroupCoordinator(DataUpdateCoordinator[TariffData]):
         session = async_get_clientsession(self.hass)
         try:
             async with session.get(
-                TARIFF_URL, headers=_HEADERS, timeout=30
+                TARIFF_URL, headers=_HEADERS, timeout=aiohttp.ClientTimeout(total=30)
             ) as response:
                 if response.status != 200:
                     raise UpdateFailed(f"SP Group returned HTTP {response.status}")
                 html = await response.text()
-            result = _parse_tariff(html)
-            self.last_updated = datetime.now(timezone.utc)
-            return result
-        except Exception as err:
+        except (aiohttp.ClientError, TimeoutError) as err:
             if self.data is not None:
                 _LOGGER.warning(
                     "Error fetching SP Group tariffs (%s); using last known values",
@@ -141,6 +139,22 @@ class SPGroupCoordinator(DataUpdateCoordinator[TariffData]):
                 )
                 return self.data
             raise UpdateFailed(f"Error fetching SP Group tariffs: {err}") from err
+        except UpdateFailed as err:
+            if self.data is not None:
+                _LOGGER.warning(
+                    "Error fetching SP Group tariffs (%s); using last known values",
+                    err,
+                )
+                return self.data
+            raise
+
+        # Parsing runs BeautifulSoup + regex scans; offload to avoid blocking
+        # the event loop. A parse failure raises UpdateFailed and is allowed
+        # to propagate so the coordinator reports the update as failed rather
+        # than silently reusing stale data forever.
+        result = await self.hass.async_add_executor_job(_parse_tariff, html)
+        self.last_updated = datetime.now(timezone.utc)
+        return result
 
 
 def _parse_tariff(html: str) -> TariffData:

@@ -391,6 +391,52 @@ async def test_weather_coordinator_fetches_four_day():
 
 
 @pytest.mark.asyncio
+async def test_weather_coordinator_releases_both_responses_on_two_hr_error():
+    """Regression test: both responses must be released even if two_hr fails.
+
+    The original code only released four_day_resp on the two_hr-status
+    error path, leaking the two_hr response's connection.
+    """
+    from custom_components.singapore.weather_coordinator import (
+        SingaporeWeatherCoordinator,
+    )
+
+    hass = MagicMock()
+
+    class _MockResponse:
+        def __init__(self, status=200, json_data=None):
+            self.status = status
+            self._json_data = json_data
+            self.release = MagicMock()
+
+        async def json(self):
+            return self._json_data
+
+    two_hr_resp = _MockResponse(503)
+    four_day_resp = _MockResponse(200, {})
+
+    async def _mock_get(url, timeout=None):
+        if "four-day" in url:
+            return four_day_resp
+        return two_hr_resp
+
+    mock_session = MagicMock()
+    mock_session.get = _mock_get
+
+    coordinator = SingaporeWeatherCoordinator(hass)
+
+    with patch(
+        "custom_components.singapore.weather_coordinator.async_get_clientsession",
+        return_value=mock_session,
+    ):
+        await coordinator.async_refresh()
+
+    assert coordinator.last_update_success is False
+    two_hr_resp.release.assert_called_once()
+    four_day_resp.release.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_weather_coordinator_four_day_http_error_is_soft():
     from custom_components.singapore.weather_coordinator import (
         SingaporeWeatherCoordinator,

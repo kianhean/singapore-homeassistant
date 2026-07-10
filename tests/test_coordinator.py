@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiohttp
 import pytest
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
@@ -201,6 +202,7 @@ async def test_coordinator_success():
     from custom_components.singapore.coordinator import SPGroupCoordinator
 
     hass = MagicMock()
+    hass.async_add_executor_job = AsyncMock(side_effect=lambda func, *a: func(*a))
 
     mock_response = AsyncMock()
     mock_response.status = 200
@@ -300,3 +302,79 @@ async def test_coordinator_http_error_uses_last_known_data():
 
     assert coordinator.last_update_success is True
     assert coordinator.data.electricity_price == 29.29
+
+
+@pytest.mark.asyncio
+async def test_coordinator_client_error_uses_last_known_data():
+    """Transient network errors (aiohttp.ClientError) fall back to stale data."""
+    from custom_components.singapore.coordinator import SPGroupCoordinator
+
+    hass = MagicMock()
+    mock_session = MagicMock()
+    mock_session.get = MagicMock(side_effect=aiohttp.ClientConnectionError("boom"))
+
+    coordinator = SPGroupCoordinator(hass)
+    coordinator.data = TariffData(
+        electricity_price=29.29,
+        network_cost=7.61,
+        gas_price=20.14,
+        water_price=3.69,
+        quarter="Q1",
+        year=2025,
+    )
+
+    with patch(
+        "custom_components.singapore.coordinator.async_get_clientsession",
+        return_value=mock_session,
+    ):
+        await coordinator.async_refresh()
+
+    assert coordinator.last_update_success is True
+    assert coordinator.data.electricity_price == 29.29
+
+
+@pytest.mark.asyncio
+async def test_coordinator_parse_failure_with_cached_data_fails_update():
+    """A genuine parse failure (site changed) must not be masked as success.
+
+    Unlike a transient network error, a page that no longer contains a
+    recognisable electricity price indicates the scraper is broken. The
+    update must fail (last_update_success False) even though stale data
+    exists, so entities become unavailable rather than silently reporting
+    old data forever.
+    """
+    from custom_components.singapore.coordinator import SPGroupCoordinator
+
+    hass = MagicMock()
+    hass.async_add_executor_job = AsyncMock(side_effect=lambda func, *a: func(*a))
+
+    mock_response = AsyncMock()
+    mock_response.status = 200
+    mock_response.text = AsyncMock(return_value=_HTML_NO_PRICE)
+    mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_response.__aexit__ = AsyncMock(return_value=False)
+
+    mock_session = MagicMock()
+    mock_session.get = MagicMock(return_value=mock_response)
+
+    coordinator = SPGroupCoordinator(hass)
+    cached = TariffData(
+        electricity_price=29.29,
+        network_cost=7.61,
+        gas_price=20.14,
+        water_price=3.69,
+        quarter="Q1",
+        year=2025,
+    )
+    coordinator.data = cached
+
+    with patch(
+        "custom_components.singapore.coordinator.async_get_clientsession",
+        return_value=mock_session,
+    ):
+        await coordinator.async_refresh()
+
+    assert coordinator.last_update_success is False
+    # Stale data is left untouched (real HA keeps last-known data on failure;
+    # it just stops treating the update as successful).
+    assert coordinator.data is cached

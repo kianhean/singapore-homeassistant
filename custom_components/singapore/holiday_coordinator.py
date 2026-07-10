@@ -7,10 +7,12 @@ import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
+import aiohttp
 from bs4 import BeautifulSoup
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,13 +55,14 @@ class PublicHolidayCoordinator(DataUpdateCoordinator[list[PublicHoliday]]):
         session = async_get_clientsession(self.hass)
         try:
             async with session.get(
-                PUBLIC_HOLIDAYS_URL, headers=_HEADERS, timeout=30
+                PUBLIC_HOLIDAYS_URL,
+                headers=_HEADERS,
+                timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status != 200:
                     raise UpdateFailed(f"MOM returned HTTP {response.status}")
                 html = await response.text()
-            return _parse_public_holidays(html)
-        except Exception as err:
+        except (aiohttp.ClientError, TimeoutError) as err:
             if self.data is not None:
                 _LOGGER.warning(
                     "Error fetching MOM public holidays (%s); using last known values",
@@ -67,12 +70,25 @@ class PublicHolidayCoordinator(DataUpdateCoordinator[list[PublicHoliday]]):
                 )
                 return self.data
             raise UpdateFailed(f"Error fetching MOM public holidays: {err}") from err
+        except UpdateFailed as err:
+            if self.data is not None:
+                _LOGGER.warning(
+                    "Error fetching MOM public holidays (%s); using last known values",
+                    err,
+                )
+                return self.data
+            raise
+
+        # Parsing runs BeautifulSoup + regex scans; offload to avoid blocking
+        # the event loop. A parse failure raises UpdateFailed and propagates
+        # so the coordinator reports the update as failed.
+        return await self.hass.async_add_executor_job(_parse_public_holidays, html)
 
 
 def _parse_public_holidays(html: str) -> list[PublicHoliday]:
     """Parse public holidays from MOM HTML for current year and later."""
     soup = BeautifulSoup(html, "html.parser")
-    current_year = datetime.now().year
+    current_year = dt_util.now().year
 
     holidays: list[PublicHoliday] = []
     seen: set[tuple[str, date]] = set()
@@ -85,7 +101,7 @@ def _parse_public_holidays(html: str) -> list[PublicHoliday]:
         name = cells[0].get_text(" ", strip=True)
         date_text = cells[1].get_text(" ", strip=True)
 
-        if not name or "holiday" in name.lower() and "date" in date_text.lower():
+        if not name or ("holiday" in name.lower() and "date" in date_text.lower()):
             continue
 
         parsed_date = _extract_date(date_text)

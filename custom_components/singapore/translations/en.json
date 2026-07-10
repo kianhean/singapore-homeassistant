@@ -16,5 +16,45 @@
     "abort": {
       "already_configured": "This integration is already configured."
     }
+  },
+  "entity": {
+    "sensor": {
+      "electricity_tariff": {
+        "name": "Electricity Tariff"
+      },
+      "solar_export_price": {
+        "name": "Solar Export Price"
+      },
+      "gas_tariff": {
+        "name": "Gas Tariff"
+      },
+      "water_tariff": {
+        "name": "Water Tariff"
+      },
+      "coe_category": {
+        "name": "Category {category}"
+      },
+      "temperature": {
+        "name": "Temperature"
+      },
+      "humidity": {
+        "name": "Humidity"
+      },
+      "wind_speed": {
+        "name": "Wind Speed"
+      },
+      "wind_bearing": {
+        "name": "Wind Bearing"
+      },
+      "rainfall": {
+        "name": "Rainfall"
+      },
+      "train_status": {
+        "name": "Status"
+      },
+      "train_line_status": {
+        "name": "{line} Status"
+      }
+    }
   }
 }

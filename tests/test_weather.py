@@ -3,6 +3,8 @@
 from datetime import datetime
 from unittest.mock import MagicMock
 
+import pytest
+
 from custom_components.singapore.weather import SingaporeAreaWeatherEntity
 from custom_components.singapore.weather_coordinator import (
     FourDayForecastEntry,
@@ -214,6 +216,50 @@ async def test_weather_daily_forecast_none_when_no_data():
     )
     ent = SingaporeAreaWeatherEntity(_coordinator(data), "entry1", "Bedok")
     assert await ent.async_forecast_daily() is None
+
+
+# ---------------------------------------------------------------------------
+# _handle_coordinator_update regression test
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_weather_entity_handle_coordinator_update_passes_forecast_types():
+    """Regression test: async_update_listeners requires a forecast_types arg.
+
+    Calling it with no arguments (the original bug) raises TypeError before
+    a coroutine object is even constructed, so _handle_coordinator_update
+    would blow up on every coordinator refresh.
+    """
+    data = WeatherData(
+        areas={
+            "Bedok": WeatherAreaData(
+                area="Bedok",
+                condition_text="Cloudy",
+                valid_start=datetime.fromisoformat("2026-04-05T08:00:00+08:00"),
+                valid_end=datetime.fromisoformat("2026-04-05T10:00:00+08:00"),
+            )
+        },
+        updated_at=None,
+        readings=WeatherReadings(),
+    )
+    ent = SingaporeAreaWeatherEntity(_coordinator(data), "entry1", "Bedok")
+    ent.hass = MagicMock()
+
+    captured = {}
+
+    def _capture(coro):
+        captured["coro"] = coro
+        return MagicMock()
+
+    ent.hass.async_create_task = MagicMock(side_effect=_capture)
+
+    ent._handle_coordinator_update()
+
+    assert "coro" in captured
+    # Awaiting must not raise; a missing forecast_types argument would have
+    # already raised TypeError above, before this point.
+    await captured["coro"]
 
 
 def test_weather_entity_supports_daily_feature_only():

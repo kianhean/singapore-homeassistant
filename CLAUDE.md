@@ -24,7 +24,7 @@ custom_components/singapore/
 
 tests/
 ├── conftest.py                  # Mocks HA modules so tests run without installing homeassistant
-├── test_init.py                 # Domain constant check
+├── test_init.py                 # Domain constant check + async_setup_entry wiring tests
 ├── test_config_flow.py          # Config flow schema check
 ├── test_coordinator.py          # SP Group parser unit tests + coordinator HTTP mock tests
 ├── test_coe_coordinator.py      # COE parser unit tests + coordinator HTTP mock tests
@@ -39,17 +39,23 @@ tests/
 .github/workflows/tests.yml   # CI: three jobs — unit tests, e2e scrape, ruff lint
 ```
 
-Entry data is stored as a dict per `entry_id`:
+Entry data is stored on `entry.runtime_data` as a `SingaporeData` dataclass (not
+`hass.data[DOMAIN]`, which is the legacy pattern):
 ```python
-hass.data[DOMAIN][entry_id] = {
-    "tariff": SPGroupCoordinator,
-    "coe": CoeCoordinator,
-    "weather": SingaporeWeatherCoordinator,
-    "holiday": PublicHolidayCoordinator,
-    "train": TrainStatusCoordinator,
-    "unsub_coe": <unsubscribe callable>,
-}
+@dataclass
+class SingaporeData:
+    tariff: SPGroupCoordinator
+    coe: CoeCoordinator
+    weather: SingaporeWeatherCoordinator
+    holiday: PublicHolidayCoordinator
+    train: TrainStatusCoordinator
+
+SingaporeConfigEntry: TypeAlias = ConfigEntry[SingaporeData]
 ```
+Platforms read it via `entry.runtime_data.<coordinator>` (see `sensor.py`, `weather.py`,
+`calendar.py`). The COE refresh-time unsubscribe callable is registered with
+`entry.async_on_unload(unsub_coe)` instead of being stored manually and unsubscribed in
+`async_unload_entry`.
 
 ## Sensors
 
@@ -204,13 +210,16 @@ for Home Assistant (`t` and `t+1h`) with mapped HA conditions.
 In HA 2024.3+, weather forecast data is subscription-based. `SingaporeAreaWeatherEntity`
 overrides `_handle_coordinator_update` to call `async_update_listeners()` after every
 coordinator refresh — without this, forecast subscribers (the HA frontend weather card)
-never receive updated data and the spinner stays permanently:
+never receive updated data and the spinner stays permanently. `async_update_listeners`
+takes a required `forecast_types` argument (a tuple of the forecast types this entity
+supports, e.g. `("daily",)` since this entity only declares `FORECAST_DAILY`) — omitting
+it raises `TypeError` on every coordinator refresh:
 
 ```python
 @callback
 def _handle_coordinator_update(self) -> None:
     super()._handle_coordinator_update()
-    self.hass.async_create_task(self.async_update_listeners())
+    self.hass.async_create_task(self.async_update_listeners(("daily",)))
 ```
 
 ### Collection 1456 — Not Yet Integrated
@@ -292,6 +301,17 @@ COE sensors are generated automatically for every category in `COE_CATEGORIES` i
 `coe_coordinator.py`. To add a new COE-based sensor with different logic, subclass
 `CoordinatorEntity[CoeCoordinator]` in `sensor.py` and register it in `async_setup_entry`.
 
+## Brand Assets — Do Not Remove
+
+`custom_components/singapore/brand/icon.png` and `logo.png` look like unused duplicates of
+`custom_components/singapore/images/icon.png` (they're byte-for-byte identical and oversized
+for actual `home-assistant/brands` size limits), but **do not delete them**. The `hacs/action`
+CI check (`.github/workflows/hacs.yaml`) validates brand assets by checking for these files
+locally as a fallback whenever the repository isn't registered in the `home-assistant/brands`
+repo — this repo isn't, so removing `brand/` fails the `<Validation brands>` check and breaks
+CI. If this integration is ever submitted to `home-assistant/brands` with correctly-sized
+assets there, the local fallback files can be removed at that point, not before.
+
 ## Linting and Formatting
 
 After every code change, always run and fix before committing:
@@ -312,6 +332,20 @@ Both commands must exit cleanly — CI will fail otherwise.
   `_fetch_with_retry()` (3 retries, respects `Retry-After` header, exponential backoff)
   and an `asyncio.Semaphore` capping concurrent readings requests at 2
 - Entity unique IDs must be stable: `{entry_id}_{suffix}`
+- Entities use `_attr_has_entity_name = True` with `_attr_translation_key`
+  (+ `_attr_translation_placeholders` where dynamic) and `DeviceInfo` (not a raw dict) with
+  `entry_type=DeviceEntryType.SERVICE`. Entity strings live under `entity.sensor.<key>` in
+  `strings.json`/`translations/en.json`. Unique IDs are unaffected by naming, so entity IDs
+  stay stable across the naming migration — only the displayed friendly name changes.
+- Coordinator `_async_update_data()` exception handling: only catch `(aiohttp.ClientError,
+  TimeoutError)` and an explicit `UpdateFailed` raised for a bad HTTP status — those fall back
+  to last-known data with a warning (transient network resilience). Do **not** catch bare
+  `Exception`: a parsing failure (site markup changed, no data found) must raise `UpdateFailed`
+  and propagate so the coordinator reports the update as failed and entities go unavailable,
+  rather than silently reporting stale data as "successful" forever.
+- `coordinator.py` and `holiday_coordinator.py` parse HTML with BeautifulSoup + regex, which is
+  blocking; parsing is offloaded via `await hass.async_add_executor_job(_parse_x, html)` rather
+  than run inline on the event loop.
 - Always bump `custom_components/singapore/manifest.json` `version` for every PR that changes
   shipped integration behavior/code, so merge-to-main release automation can create the next
   GitHub release tag from that version.

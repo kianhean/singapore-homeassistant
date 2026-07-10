@@ -237,9 +237,11 @@ def test_coe_unique_id():
     assert sensor.device_info["identifiers"] == {("singapore", "entry1_coe")}
 
 
-def test_coe_name():
+def test_coe_translation_key_and_placeholder():
     sensor = SingaporeCoeResultSensor(_coe_coordinator(), "entry1", "A")
-    assert sensor.name == "Singapore COE Category A"
+    assert sensor._attr_translation_key == "coe_category"
+    assert sensor._attr_translation_placeholders == {"category": "A"}
+    assert sensor._attr_has_entity_name is True
 
 
 def test_coe_attributes():

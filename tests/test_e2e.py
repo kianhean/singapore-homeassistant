@@ -9,6 +9,9 @@ for upstream payload/markup changes across every external source.
 
 from __future__ import annotations
 
+import asyncio
+
+import aiohttp
 import pytest
 
 # Skip entire module unless -m e2e is explicitly passed
@@ -52,14 +55,27 @@ _WATER_MIN, _WATER_MAX = 1.0, 10.0  # SGD/m³
 _NETWORK_MIN, _NETWORK_MAX = 1.0, 20.0  # ¢/kWh
 
 
-def _fetch_url_html(url: str) -> str:
-    import niquests
-
-    try:
-        with niquests.Session() as session:
-            response = session.get(url, headers=_HEADERS, timeout=30)
+async def _async_get_text(url: str, headers: dict | None = None) -> str:
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            url, headers=headers, timeout=aiohttp.ClientTimeout(total=30)
+        ) as response:
             response.raise_for_status()
-            return response.text
+            return await response.text()
+
+
+async def _async_get_json(url: str, headers: dict | None = None) -> dict:
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            url, headers=headers, timeout=aiohttp.ClientTimeout(total=30)
+        ) as response:
+            response.raise_for_status()
+            return await response.json()
+
+
+def _fetch_url_html(url: str) -> str:
+    try:
+        return asyncio.run(_async_get_text(url, headers=_HEADERS))
     except Exception as err:
         pytest.skip(
             f"Skipping e2e due to external network/proxy error for {url}: {err}"
@@ -67,13 +83,8 @@ def _fetch_url_html(url: str) -> str:
 
 
 def _fetch_json(url: str) -> dict:
-    import niquests
-
     try:
-        with niquests.Session() as session:
-            response = session.get(url, timeout=30)
-            response.raise_for_status()
-            return response.json()
+        return asyncio.run(_async_get_json(url))
     except Exception as err:
         pytest.skip(
             f"Skipping e2e due to external network/proxy error for {url}: {err}"
@@ -210,10 +221,17 @@ def test_e2e_holiday_page_fetch_and_parse():
     assert all(h.name for h in holidays), "Found holiday with empty name"
 
 
+async def _async_post_json(url: str, *, data: dict, headers: dict) -> dict:
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            url, data=data, headers=headers, timeout=aiohttp.ClientTimeout(total=30)
+        ) as response:
+            response.raise_for_status()
+            return await response.json(content_type=None)
+
+
 def test_e2e_train_status_page_fetch_and_parse():
     """Fetch live train status API and assert parser emits overall + per-line status."""
-    import niquests
-
     from custom_components.singapore.train_coordinator import (
         _TRAIN_STATUS_REFERER,
         TRAIN_LINES,
@@ -222,8 +240,8 @@ def test_e2e_train_status_page_fetch_and_parse():
     )
 
     try:
-        with niquests.Session() as session:
-            response = session.post(
+        payload = asyncio.run(
+            _async_post_json(
                 TRAIN_STATUS_URL,
                 data={"serviceName": "LTAGOVTrainServiceAlerts", "param": ""},
                 headers={
@@ -232,10 +250,8 @@ def test_e2e_train_status_page_fetch_and_parse():
                     "X-Requested-With": "XMLHttpRequest",
                     "Referer": _TRAIN_STATUS_REFERER,
                 },
-                timeout=30,
             )
-            response.raise_for_status()
-            payload = response.json()
+        )
     except Exception as err:
         pytest.skip(f"Skipping e2e due to network error: {err}")
 
