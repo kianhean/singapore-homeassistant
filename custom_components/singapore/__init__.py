@@ -16,7 +16,13 @@ from .coe_coordinator import CoeCoordinator
 from .coordinator import SPGroupCoordinator
 from .holiday_coordinator import PublicHolidayCoordinator
 from .train_coordinator import TrainStatusCoordinator
-from .usage_coordinator import SPUsageCoordinator, has_sp_credentials
+from .usage_coordinator import (
+    CONF_SP_ACCOUNT_NO,
+    CONF_SP_REFRESH_TOKEN,
+    CONF_SP_SESSION_COOKIE,
+    SPUsageCoordinator,
+    has_sp_credentials,
+)
 from .weather_coordinator import SingaporeWeatherCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -84,8 +90,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
         await coe_coordinator.async_refresh()
 
     usage_coordinator: SPUsageCoordinator | None = None
-    if has_sp_credentials(entry.data):
+    if not has_sp_credentials(entry.data):
+        # Says out loud why there are no usage sensors — otherwise this branch
+        # is completely silent and indistinguishable from a broken fetch.
+        _LOGGER.info(
+            "No SP Services credentials stored on this entry, so household usage "
+            "sensors are not created. Link an account via Configure on the "
+            "Singapore integration entry"
+        )
+    else:
         usage_coordinator = SPUsageCoordinator(hass, entry)
+        _LOGGER.info(
+            "SP Services usage enabled for account %s (renewal: %s)",
+            entry.data.get(CONF_SP_ACCOUNT_NO) or "first linked",
+            "refresh token"
+            if entry.data.get(CONF_SP_REFRESH_TOKEN)
+            else "session cookie"
+            if entry.data.get(CONF_SP_SESSION_COOKIE)
+            else "none — access token only",
+        )
 
         async def _initial_refresh_usage() -> None:
             # Backgrounded so a slow or broken private SP endpoint cannot hold

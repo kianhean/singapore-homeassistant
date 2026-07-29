@@ -392,6 +392,13 @@ async def async_fetch_usage(
     if not account_no or not ebs_premise_no:
         raise SPUsageApiError("SP Services account payload is missing premise details")
 
+    _LOGGER.debug(
+        "SP Services returned %s account(s); using %s (premise %s)",
+        len(accounts),
+        account_no,
+        ebs_premise_no,
+    )
+
     now = now or datetime.now(SP_TIMEZONE)
 
     monthly_payload = await _skalbox_call(
@@ -456,6 +463,15 @@ async def async_fetch_usage(
     electricity_daily_history = _parse_daily_history_csv(daily_csv, now)
     if electricity_today is None:
         electricity_today = _latest_value_for_day(electricity_daily_history, now)
+
+    # An export SP refuses comes back empty rather than failing the fetch, which
+    # is invisible unless the sizes are logged.
+    _LOGGER.debug(
+        "SP CSV exports: monthly %s bytes, half-hourly %s bytes, daily %s bytes",
+        len(monthly_csv),
+        len(hourly_csv),
+        len(daily_csv),
+    )
 
     return UsageData(
         account_no=account_no,

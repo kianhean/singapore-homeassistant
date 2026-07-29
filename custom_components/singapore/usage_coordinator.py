@@ -122,17 +122,13 @@ class SPUsageCoordinator(DataUpdateCoordinator[UsageData]):
         try:
             token = await self._async_valid_token(session)
             try:
-                return await async_fetch_usage(
-                    session, token.access_token, self._account_no
-                )
+                return await self._async_fetch(session, token)
             except SPUsageSessionExpired:
                 # SP rejected an access token we believed was still valid;
                 # refresh once and retry before giving up on the session.
                 _LOGGER.debug("SP access token rejected mid-fetch; refreshing")
                 token = await self._async_refresh(session)
-                return await async_fetch_usage(
-                    session, token.access_token, self._account_no
-                )
+                return await self._async_fetch(session, token)
         except SPUsageAuthError as err:
             # Only a new browser login can fix this — trigger HA's reauth flow.
             raise ConfigEntryAuthFailed(str(err)) from err
@@ -140,6 +136,29 @@ class SPUsageCoordinator(DataUpdateCoordinator[UsageData]):
             raise UpdateFailed(f"SP Services returned unusable data: {err}") from err
         except (aiohttp.ClientError, TimeoutError) as err:
             raise UpdateFailed(f"Error communicating with SP Services: {err}") from err
+
+    async def _async_fetch(
+        self, session: aiohttp.ClientSession, token: TokenSet
+    ) -> UsageData:
+        data = await async_fetch_usage(session, token.access_token, self._account_no)
+        # SP legitimately publishes nothing for some fields, so a successful
+        # update can still leave every sensor unknown. Say which ones came back
+        # so "no data" can be told apart from "not running".
+        _LOGGER.debug(
+            "SP usage for account %s: today=%s kWh, this month=%s kWh, last month=%s "
+            "kWh, water this month=%s m³, water last month=%s m³ "
+            "(%s hourly, %s daily, %s monthly points)",
+            data.account_no,
+            data.electricity_today_kwh,
+            data.electricity_month_kwh,
+            data.electricity_last_month_kwh,
+            data.water_month_m3,
+            data.water_last_month_m3,
+            len(data.electricity_hourly_history),
+            len(data.electricity_daily_history),
+            len(data.electricity_monthly_history),
+        )
+        return data
 
     async def _async_valid_token(self, session: aiohttp.ClientSession) -> TokenSet:
         if self._token is not None and not self._token.is_expired():
