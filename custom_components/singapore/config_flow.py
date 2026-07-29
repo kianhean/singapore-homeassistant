@@ -19,6 +19,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from . import DOMAIN
 from .sp_usage_client import (
+    AUTH0_COOKIE_ORIGIN,
     LoginSession,
     SPUsageApiError,
     SPUsageAuthError,
@@ -132,6 +133,7 @@ class _SPLoginMixin:
             step_id="sp_session",
             data_schema=STEP_SP_SESSION_SCHEMA,
             errors=errors or {},
+            description_placeholders={"auth0_url": AUTH0_COOKIE_ORIGIN},
         )
 
     async def async_step_sp_login(

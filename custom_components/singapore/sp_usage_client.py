@@ -36,6 +36,11 @@ _BASE_URL = "https://services.spservices.sg"
 _AUTH0_BASE_URL = "https://identity.spdigital.auth0.com"
 _SKALBOX_BASE_URL = "https://c-api-gateway.tkg.spdigital.io/skalbox"
 
+# Where the Auth0 tenant session cookie lives, shown in the config flow.
+# Passed as a description placeholder because hassfest rejects literal URLs in
+# strings.json.
+AUTH0_COOKIE_ORIGIN = _AUTH0_BASE_URL
+
 _AUTH0_AUTHORIZE_URL = f"{_AUTH0_BASE_URL}/authorize"
 _AUTH0_TOKEN_URL = f"{_AUTH0_BASE_URL}/oauth/token"
 
