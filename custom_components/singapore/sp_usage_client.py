@@ -146,6 +146,7 @@ class TokenSet:
     access_token: str
     refresh_token: str | None = None
     expires_at: datetime | None = None
+    scope: str | None = None
 
     def is_expired(self, *, leeway_seconds: int = 60) -> bool:
         """Whether the access token is expired or about to expire."""
@@ -250,6 +251,14 @@ def _token_set_from_body(
 
     expires_in = _coerce_float(body.get("expires_in"))
     refresh_token = body.get("refresh_token") or fallback_refresh_token
+    scope = body.get("scope")
+    if not refresh_token:
+        # SP's Auth0 tenant drops `offline_access` for some accounts; log what
+        # it did grant so the difference is diagnosable from the HA log.
+        _LOGGER.debug(
+            "SP Services issued no refresh token (granted scope: %s)",
+            scope or "unknown",
+        )
     return TokenSet(
         access_token=str(access_token),
         refresh_token=str(refresh_token) if refresh_token else None,
@@ -258,6 +267,7 @@ def _token_set_from_body(
             if expires_in is not None
             else None
         ),
+        scope=str(scope) if scope else None,
     )
 
 

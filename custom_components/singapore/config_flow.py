@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import aiohttp
@@ -25,7 +26,16 @@ from .sp_usage_client import (
     async_exchange_callback_url,
     async_list_accounts,
 )
-from .usage_coordinator import CONF_SP_ACCOUNT_NO, CONF_SP_REFRESH_TOKEN
+from .usage_coordinator import (
+    CONF_SP_ACCESS_TOKEN,
+    CONF_SP_ACCESS_TOKEN_EXPIRES_AT,
+    CONF_SP_ACCOUNT_NO,
+    CONF_SP_REFRESH_TOKEN,
+    has_sp_credentials,
+    token_entry_data,
+)
+
+_LOGGER = logging.getLogger(__name__)
 
 CONF_LINK_SP = "link_sp_services"
 CONF_CALLBACK_URL = "callback_url"
@@ -83,10 +93,16 @@ class _SPLoginMixin:
         except (SPUsageApiError, aiohttp.ClientError, TimeoutError):
             return None, [], "cannot_connect"
 
-        if not token.refresh_token:
-            return None, [], "no_refresh_token"
         if not accounts:
             return None, [], "no_accounts"
+        if not token.refresh_token:
+            # SP does not always honour `offline_access`. The access token still
+            # works, so link the account anyway; the coordinator falls back to
+            # HA's reauth flow once it expires.
+            _LOGGER.info(
+                "SP Services issued no refresh token; usage data will need "
+                "another browser sign-in when the access token expires"
+            )
         return token, accounts, None
 
     def _account_select_form(self, step_id: str) -> ConfigFlowResult:
@@ -100,9 +116,9 @@ class _SPLoginMixin:
         )
 
     def _sp_entry_data(self, account_no: str) -> dict[str, Any]:
-        assert self._token is not None and self._token.refresh_token is not None
+        assert self._token is not None
         return {
-            CONF_SP_REFRESH_TOKEN: self._token.refresh_token,
+            **token_entry_data(self._token),
             CONF_SP_ACCOUNT_NO: account_no,
         }
 
@@ -230,7 +246,7 @@ class SingaporeOptionsFlow(_SPLoginMixin, OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Show what can be done with the SP Services link."""
-        if not self.config_entry.data.get(CONF_SP_REFRESH_TOKEN):
+        if not has_sp_credentials(self.config_entry.data):
             return self._sp_login_form("sp_login")
         return self.async_show_menu(
             step_id="init", menu_options=["sp_login", "sp_unlink"]
@@ -271,7 +287,13 @@ class SingaporeOptionsFlow(_SPLoginMixin, OptionsFlow):
         data = {
             key: value
             for key, value in entry.data.items()
-            if key not in (CONF_SP_REFRESH_TOKEN, CONF_SP_ACCOUNT_NO)
+            if key
+            not in (
+                CONF_SP_REFRESH_TOKEN,
+                CONF_SP_ACCESS_TOKEN,
+                CONF_SP_ACCESS_TOKEN_EXPIRES_AT,
+                CONF_SP_ACCOUNT_NO,
+            )
         }
         return self._async_update_entry(entry, data)
 

@@ -224,10 +224,27 @@ for the URL your browser lands on afterwards:
 4. Paste it back into the form. It must contain both `code=` and `state=`.
 5. If several utility accounts are linked to the login, pick the one to track.
 
-The integration stores the refresh token SP returns and uses it to keep itself
-logged in; your username and password are never entered into Home Assistant.
-When the refresh token eventually dies, Home Assistant raises a **reauthentication**
-notification and you repeat the same paste-the-callback-URL steps.
+Your username and password are never entered into Home Assistant — only the
+tokens SP hands back are stored.
+
+**How long a link lasts depends on your account.** SP's Auth0 tenant does not
+always issue a refresh token:
+
+- **With a refresh token** — the integration keeps itself signed in indefinitely.
+- **Without one** (SP simply does not return it for some accounts) — the access
+  token is used until it expires, typically hours. Home Assistant then raises a
+  **reauthentication** notification and you repeat the same
+  paste-the-callback-URL steps.
+
+Either way the sensors work; only how often you have to sign in again differs.
+To see which one you got, enable debug logging for the integration and look for
+`SP Services issued no refresh token`:
+
+```yaml
+logger:
+  logs:
+    custom_components.singapore: debug
+```
 
 To stop tracking usage, open **Configure** on the entry and choose
 **Unlink SP Services account** — the stored token is deleted and the usage

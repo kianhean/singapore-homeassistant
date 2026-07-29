@@ -11,7 +11,7 @@
       },
       "sp_login": {
         "title": "Link SP Services account",
-        "description": "SP Services requires a captcha and SMS OTP, so log in with your browser:\n\n1. Open this link and sign in: {authorize_url}\n2. Complete the captcha and OTP.\n3. When the browser reaches `services.spservices.sg/callback?...`, copy the full URL (use the browser's Network tab with 'Preserve log' if it redirects too fast).\n4. Paste it below — it must contain both `code=` and `state=`.",
+        "description": "SP Services requires a captcha and SMS OTP, so log in with your browser:\n\n1. Open this link and sign in: {authorize_url}\n2. Complete the captcha and OTP.\n3. When the browser reaches `services.spservices.sg/callback?...`, copy the full URL (use the browser's Network tab with 'Preserve log' if it redirects too fast).\n4. Paste it below — it must contain both `code=` and `state=`.\n\nIf SP does not keep the session alive (some accounts get no refresh token), Home Assistant will ask you to sign in again when it expires.",
         "data": {
           "callback_url": "Callback URL"
         }
@@ -36,7 +36,6 @@
       "name_too_long": "Name must be 64 characters or fewer.",
       "invalid_callback": "That callback URL did not contain a valid authorization code for this login attempt. Open the new link below and try again.",
       "cannot_connect": "Could not reach SP Services. Try again in a moment.",
-      "no_refresh_token": "SP Services did not return a refresh token, so the login cannot be kept alive. Open the new link below and try again.",
       "no_accounts": "This SP Services login has no linked utility accounts."
     },
     "abort": {
@@ -56,7 +55,7 @@
       },
       "sp_login": {
         "title": "Link SP Services account",
-        "description": "SP Services requires a captcha and SMS OTP, so log in with your browser:\n\n1. Open this link and sign in: {authorize_url}\n2. Complete the captcha and OTP.\n3. When the browser reaches `services.spservices.sg/callback?...`, copy the full URL (use the browser's Network tab with 'Preserve log' if it redirects too fast).\n4. Paste it below — it must contain both `code=` and `state=`.",
+        "description": "SP Services requires a captcha and SMS OTP, so log in with your browser:\n\n1. Open this link and sign in: {authorize_url}\n2. Complete the captcha and OTP.\n3. When the browser reaches `services.spservices.sg/callback?...`, copy the full URL (use the browser's Network tab with 'Preserve log' if it redirects too fast).\n4. Paste it below — it must contain both `code=` and `state=`.\n\nIf SP does not keep the session alive (some accounts get no refresh token), Home Assistant will ask you to sign in again when it expires.",
         "data": {
           "callback_url": "Callback URL"
         }
@@ -72,7 +71,6 @@
     "error": {
       "invalid_callback": "That callback URL did not contain a valid authorization code for this login attempt. Open the new link below and try again.",
       "cannot_connect": "Could not reach SP Services. Try again in a moment.",
-      "no_refresh_token": "SP Services did not return a refresh token, so the login cannot be kept alive. Open the new link below and try again.",
       "no_accounts": "This SP Services login has no linked utility accounts."
     }
   },

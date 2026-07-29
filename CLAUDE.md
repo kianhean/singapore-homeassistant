@@ -281,18 +281,35 @@ Every failed attempt regenerates the `LoginSession`, so a burnt PKCE state is ne
 retried. `_code_from_url` requires the returned `state` to match — a code without a
 matching state is rejected rather than accepted.
 
-The flow refuses a login that returns no refresh token (`no_refresh_token` error):
-without one the integration would break at the first access-token expiry with no
-unattended way back.
+### Tokens — SP does not always issue a refresh token
 
-### Tokens
+**Confirmed against a real account (2026-07):** SP's Auth0 tenant can return a token
+response with no `refresh_token` even though the authorize URL requests
+`offline_access` (the classic SPA setup — the portal itself re-authenticates through
+its Auth0 session cookie, which HA does not have). An earlier version of this flow
+rejected those logins outright; it must not — that left affected accounts with no usage
+data at all. Both modes are supported:
 
-Only the refresh token is persisted, in `entry.data[sp_refresh_token]` (plus
-`sp_account_no`). `SPUsageCoordinator` holds the access token in memory, refreshes it
-when `TokenSet.is_expired()` (60 s leeway), retries once on a mid-fetch 401, and writes
-the refresh token back to the entry if Auth0 rotates it. A dead refresh token raises
-`ConfigEntryAuthFailed`, which triggers HA's reauth flow (the coordinator is constructed
-with `config_entry=entry` so HA can start it).
+| SP returns | Behaviour |
+|------------|-----------|
+| refresh token | coordinator refreshes on expiry and keeps itself signed in |
+| access token only | stored token is used until it expires, then `ConfigEntryAuthFailed` → reauth |
+
+`entry.data` therefore carries `sp_access_token`, `sp_access_token_expires_at`,
+`sp_refresh_token` (may be `None`), and `sp_account_no`. `token_entry_data()` always
+writes all three token fields — including `None` — because they are merged over
+existing entry data and a re-link that returned no refresh token must clear the stale
+one instead of leaving a dead token behind.
+
+`SPUsageCoordinator` rebuilds the token from the entry at startup (`stored_token()`),
+refreshes when `TokenSet.is_expired()` (60 s leeway), retries once on a mid-fetch 401,
+and persists every new token (access + rotated refresh) so a restart does not burn a
+round trip — or, in access-token-only mode, does not force an immediate re-login.
+`ConfigEntryAuthFailed` triggers HA's reauth flow (the coordinator is constructed with
+`config_entry=entry` so HA can start it).
+
+A token whose stored expiry is missing or unparsable is treated as valid and used: a
+401 then drives reauth, which is better than discarding a working token.
 
 Note that the config entry is **not** given an update listener: the coordinator writes
 rotated tokens with `async_update_entry`, and an update listener would reload the entry

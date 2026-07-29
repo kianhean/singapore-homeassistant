@@ -16,11 +16,7 @@ from .coe_coordinator import CoeCoordinator
 from .coordinator import SPGroupCoordinator
 from .holiday_coordinator import PublicHolidayCoordinator
 from .train_coordinator import TrainStatusCoordinator
-from .usage_coordinator import (
-    CONF_SP_ACCOUNT_NO,
-    CONF_SP_REFRESH_TOKEN,
-    SPUsageCoordinator,
-)
+from .usage_coordinator import SPUsageCoordinator, has_sp_credentials
 from .weather_coordinator import SingaporeWeatherCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -88,13 +84,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
         await coe_coordinator.async_refresh()
 
     usage_coordinator: SPUsageCoordinator | None = None
-    if refresh_token := entry.data.get(CONF_SP_REFRESH_TOKEN):
-        usage_coordinator = SPUsageCoordinator(
-            hass,
-            entry,
-            refresh_token,
-            entry.data.get(CONF_SP_ACCOUNT_NO),
-        )
+    if has_sp_credentials(entry.data):
+        usage_coordinator = SPUsageCoordinator(hass, entry)
 
         async def _initial_refresh_usage() -> None:
             # Backgrounded so a slow or broken private SP endpoint cannot hold

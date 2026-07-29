@@ -1,5 +1,6 @@
 """Tests for the config and options flows."""
 
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -18,6 +19,8 @@ from custom_components.singapore.sp_usage_client import (
     TokenSet,
 )
 from custom_components.singapore.usage_coordinator import (
+    CONF_SP_ACCESS_TOKEN,
+    CONF_SP_ACCESS_TOKEN_EXPIRES_AT,
     CONF_SP_ACCOUNT_NO,
     CONF_SP_REFRESH_TOKEN,
 )
@@ -101,6 +104,8 @@ async def test_sp_login_single_account_creates_entry():
     assert result["data"] == {
         CONF_NAME: "Singapore",
         CONF_SP_REFRESH_TOKEN: "rt",
+        CONF_SP_ACCESS_TOKEN: "at",
+        CONF_SP_ACCESS_TOKEN_EXPIRES_AT: None,
         CONF_SP_ACCOUNT_NO: "8949049293",
     }
 
@@ -145,16 +150,38 @@ async def test_sp_login_bad_callback_url_restarts_login():
 
 
 @pytest.mark.asyncio
-async def test_sp_login_without_refresh_token_is_rejected():
-    """Without a refresh token the integration would break at the first expiry."""
+async def test_sp_login_without_refresh_token_still_links():
+    """SP does not always issue a refresh token; the access token still works.
+
+    Rejecting the login would leave those accounts with no usage data at all;
+    instead the entry is created and reauth asks for a new sign-in on expiry.
+    """
     flow = _flow()
     await flow.async_step_user({CONF_NAME: "Singapore", CONF_LINK_SP: True})
 
-    patches = _patch_login(token=TokenSet(access_token="at", refresh_token=None))
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=8)
+    patches = _patch_login(
+        token=TokenSet(access_token="at", refresh_token=None, expires_at=expires_at)
+    )
     with patches[0], patches[1], patches[2]:
         result = await flow.async_step_sp_login({CONF_CALLBACK_URL: _CALLBACK_URL})
 
-    assert result["errors"]["base"] == "no_refresh_token"
+    assert result["type"] == "create_entry"
+    assert result["data"][CONF_SP_ACCESS_TOKEN] == "at"
+    assert result["data"][CONF_SP_ACCESS_TOKEN_EXPIRES_AT] == expires_at.isoformat()
+    assert result["data"][CONF_SP_REFRESH_TOKEN] is None
+
+
+@pytest.mark.asyncio
+async def test_sp_login_without_accounts_is_rejected():
+    flow = _flow()
+    await flow.async_step_user({CONF_NAME: "Singapore", CONF_LINK_SP: True})
+
+    patches = _patch_login(accounts=[])
+    with patches[0], patches[1], patches[2]:
+        result = await flow.async_step_sp_login({CONF_CALLBACK_URL: _CALLBACK_URL})
+
+    assert result["errors"]["base"] == "no_accounts"
 
 
 @pytest.mark.asyncio
@@ -265,3 +292,26 @@ async def test_options_unlink_drops_credentials():
     flow.hass.config_entries.async_schedule_reload.assert_called_once_with(
         entry.entry_id
     )
+
+
+@pytest.mark.asyncio
+async def test_relink_without_refresh_token_clears_the_stale_one():
+    """A dead refresh token must not survive a re-link that returned none."""
+    entry = ConfigEntry(
+        data={
+            CONF_NAME: "Singapore",
+            CONF_SP_REFRESH_TOKEN: "dead",
+            CONF_SP_ACCOUNT_NO: "111",
+        }
+    )
+    flow = _options_flow(entry)
+    await flow.async_step_init()
+    await flow.async_step_sp_login()
+
+    patches = _patch_login(token=TokenSet(access_token="fresh", refresh_token=None))
+    with patches[0], patches[1], patches[2]:
+        await flow.async_step_sp_login({CONF_CALLBACK_URL: _CALLBACK_URL})
+
+    stored = flow.hass.config_entries.async_update_entry.call_args.kwargs["data"]
+    assert stored[CONF_SP_REFRESH_TOKEN] is None
+    assert stored[CONF_SP_ACCESS_TOKEN] == "fresh"

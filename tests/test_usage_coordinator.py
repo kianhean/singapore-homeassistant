@@ -1,6 +1,6 @@
 """Tests for the SP Services usage coordinator."""
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
@@ -18,8 +18,12 @@ from custom_components.singapore.sp_usage_client import (
     UsageData,
 )
 from custom_components.singapore.usage_coordinator import (
+    CONF_SP_ACCESS_TOKEN,
+    CONF_SP_ACCESS_TOKEN_EXPIRES_AT,
+    CONF_SP_ACCOUNT_NO,
     CONF_SP_REFRESH_TOKEN,
     SPUsageCoordinator,
+    stored_token,
 )
 
 _USAGE = UsageData(
@@ -30,11 +34,17 @@ _USAGE = UsageData(
 )
 
 
-def _coordinator(entry=None):
+def _coordinator(data=None):
     hass = MagicMock()
-    entry = entry or ConfigEntry(data={CONF_SP_REFRESH_TOKEN: "stored-refresh"})
-    coordinator = SPUsageCoordinator(hass, entry, "stored-refresh", "8949049293")
-    return coordinator, hass, entry
+    entry = ConfigEntry(
+        data=data
+        if data is not None
+        else {
+            CONF_SP_REFRESH_TOKEN: "stored-refresh",
+            CONF_SP_ACCOUNT_NO: "8949049293",
+        }
+    )
+    return SPUsageCoordinator(hass, entry), hass, entry
 
 
 @pytest.mark.asyncio
@@ -114,10 +124,13 @@ async def test_rotated_refresh_token_is_persisted():
 
 
 @pytest.mark.asyncio
-async def test_unrotated_refresh_token_is_not_rewritten():
+async def test_access_token_is_persisted_for_restarts():
     coordinator, hass, _entry = _coordinator()
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
     refresh = AsyncMock(
-        return_value=TokenSet(access_token="at", refresh_token="stored-refresh")
+        return_value=TokenSet(
+            access_token="at", refresh_token="stored-refresh", expires_at=expires_at
+        )
     )
 
     with (
@@ -135,7 +148,105 @@ async def test_unrotated_refresh_token_is_not_rewritten():
     ):
         await coordinator.async_refresh()
 
-    hass.config_entries.async_update_entry.assert_not_called()
+    stored = hass.config_entries.async_update_entry.call_args.kwargs["data"]
+    assert stored[CONF_SP_ACCESS_TOKEN] == "at"
+    assert stored[CONF_SP_ACCESS_TOKEN_EXPIRES_AT] == expires_at.isoformat()
+    assert stored[CONF_SP_REFRESH_TOKEN] == "stored-refresh"
+
+
+@pytest.mark.asyncio
+async def test_stored_access_token_is_used_without_refreshing():
+    """SP does not always issue a refresh token; the access token must carry."""
+    coordinator, _hass, _entry = _coordinator(
+        {
+            CONF_SP_ACCESS_TOKEN: "still-valid",
+            CONF_SP_ACCESS_TOKEN_EXPIRES_AT: (
+                datetime.now(timezone.utc) + timedelta(hours=2)
+            ).isoformat(),
+            CONF_SP_ACCOUNT_NO: "8949049293",
+        }
+    )
+    refresh = AsyncMock()
+    fetch = AsyncMock(return_value=_USAGE)
+
+    with (
+        patch(
+            "custom_components.singapore.usage_coordinator.async_get_clientsession",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "custom_components.singapore.usage_coordinator.async_refresh_token", refresh
+        ),
+        patch("custom_components.singapore.usage_coordinator.async_fetch_usage", fetch),
+    ):
+        await coordinator.async_refresh()
+
+    assert coordinator.last_update_success is True
+    refresh.assert_not_awaited()
+    assert fetch.await_args.args[1] == "still-valid"
+
+
+@pytest.mark.asyncio
+async def test_expired_access_token_without_refresh_token_asks_for_reauth():
+    coordinator, _hass, _entry = _coordinator(
+        {
+            CONF_SP_ACCESS_TOKEN: "expired",
+            CONF_SP_ACCESS_TOKEN_EXPIRES_AT: (
+                datetime.now(timezone.utc) - timedelta(minutes=1)
+            ).isoformat(),
+        }
+    )
+
+    with (
+        patch(
+            "custom_components.singapore.usage_coordinator.async_get_clientsession",
+            return_value=MagicMock(),
+        ),
+        pytest.raises(ConfigEntryAuthFailed, match="did not issue a refresh token"),
+    ):
+        await coordinator._async_update_data()
+
+
+@pytest.mark.asyncio
+async def test_rejected_access_token_without_refresh_token_asks_for_reauth():
+    coordinator, _hass, _entry = _coordinator({CONF_SP_ACCESS_TOKEN: "revoked"})
+
+    with (
+        patch(
+            "custom_components.singapore.usage_coordinator.async_get_clientsession",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "custom_components.singapore.usage_coordinator.async_fetch_usage",
+            AsyncMock(side_effect=SPUsageSessionExpired("401")),
+        ),
+        pytest.raises(ConfigEntryAuthFailed),
+    ):
+        await coordinator._async_update_data()
+
+
+def test_stored_token_parsing():
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    token = stored_token(
+        {
+            CONF_SP_ACCESS_TOKEN: "at",
+            CONF_SP_ACCESS_TOKEN_EXPIRES_AT: expires_at.isoformat(),
+            CONF_SP_REFRESH_TOKEN: "rt",
+        }
+    )
+    assert token.access_token == "at"
+    assert token.refresh_token == "rt"
+    assert token.expires_at == expires_at
+    assert stored_token({CONF_SP_REFRESH_TOKEN: "rt"}) is None
+
+
+def test_stored_token_survives_unparsable_expiry():
+    token = stored_token(
+        {CONF_SP_ACCESS_TOKEN: "at", CONF_SP_ACCESS_TOKEN_EXPIRES_AT: "not-a-date"}
+    )
+    # Unknown expiry: use it and let a 401 drive reauth instead of discarding it.
+    assert token.expires_at is None
+    assert token.is_expired() is False
 
 
 @pytest.mark.asyncio
