@@ -326,6 +326,25 @@ it — the same mechanism SP's own portal uses to stay signed in.
 
 `_async_refresh()` order is refresh token → session cookie → `SPUsageAuthError`.
 
+The options flow can update the cookie on its own (`init` menu → `sp_session`), because
+Auth0 sessions do eventually end and re-pasting a cookie beats redoing the whole login.
+That path seeds `_token`/`_account_no` from the entry first, so submitting it cannot
+blank the linked account.
+
+#### Ruled out: device authorization flow (2026-07)
+
+The tenant advertises `urn:ietf:params:oauth:grant-type:device_code`, which would give a
+nicer pairing UX and normally a refresh token, but SP's client does not allow it:
+
+```
+POST https://identity.spdigital.auth0.com/oauth/device/code  (client_id=0I6XpX…)
+{"error":"unauthorized_client","error_description":"Grant type '…device_code' not allowed for the client."}
+```
+
+Do not re-investigate without a different `client_id` (e.g. one extracted from SP's
+mobile app, which as a native client would likely allow both device code and
+`offline_access`).
+
 `SPUsageCoordinator` rebuilds the token from the entry at startup (`stored_token()`),
 refreshes when `TokenSet.is_expired()` (60 s leeway), retries once on a mid-fetch 401,
 and persists every new token (access + rotated refresh) so a restart does not burn a

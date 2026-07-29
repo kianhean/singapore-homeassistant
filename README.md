@@ -202,56 +202,78 @@ sensor.singapore_electricity_usage_today:
 
 1. Go to **Settings → Devices & Services → Add Integration**.
 2. Search for **Singapore**.
-3. Enter a name and click **Submit**.
+3. Enter a name.
+4. Optionally tick **Link my SP Services account** to add your own electricity
+   and water usage sensors — see
+   [Linking your SP Services account](#linking-your-sp-services-account) for the
+   browser sign-in that follows.
+5. Click **Submit**.
 
-All public data (tariffs, COE, weather, trains, holidays) works with no account.
+All public data (tariffs, COE, weather, trains, holidays) works with no account,
+and the SP account can be linked later from **Configure** on the entry.
 
 ## Linking your SP Services account
 
 Optional — only needed for your own electricity and water usage sensors.
+Everything else in the integration works without it.
 
-SP Services logs in through Auth0 with a captcha and an SMS OTP, so the
-integration cannot log in for you. Instead it hands you a login link and asks
-for the URL your browser lands on afterwards:
+SP Services signs in through Auth0 with a captcha and an SMS OTP, so the
+integration cannot sign in for you. It hands you a login link instead and asks
+for the URL your browser lands on afterwards. Your username and password are
+never entered into Home Assistant.
 
-1. Tick **Link my SP Services account** while adding the integration, or open
-   **Configure** on an existing Singapore entry.
-2. Open the link shown in the form and sign in to SP Services (captcha + OTP).
-3. When the browser reaches `https://services.spservices.sg/callback?...`, copy
-   the **full** URL. It disappears quickly — if you miss it, open the browser's
-   developer tools **Network** tab, tick **Preserve log**, redo the login, and
-   copy the request URL for `services.spservices.sg/callback`.
-4. Paste it back into the form. It must contain both `code=` and `state=`.
-5. If several utility accounts are linked to the login, pick the one to track.
+### 1. Start the link
 
-Your username and password are never entered into Home Assistant — only the
-credentials SP hands back are stored.
+Tick **Link my SP Services account** while adding the integration, or open
+**Configure** on an existing Singapore entry and choose **Sign in to SP
+Services again**.
 
-### Keeping the session alive
+### 2. Sign in and hand back the callback URL
 
-SP's Auth0 tenant does not issue a refresh token for every account. What happens
-next depends on which case you are in:
+1. Open the link shown in the form and sign in to SP Services.
+2. Complete the captcha and the SMS OTP in the browser.
+3. The browser lands on `https://services.spservices.sg/callback?...` — copy
+   that **full** URL. It usually redirects away immediately; if you miss it,
+   open developer tools (F12) → **Network**, tick **Preserve log**, sign in
+   again, and copy the Request URL of the `callback` request.
+4. Paste it back into the form. It must contain both `code=` and `state=`, and
+   it has to come from the link currently shown — every attempt generates a new
+   one, and a callback from an earlier attempt is rejected.
+5. If several utility accounts are linked to the login, pick the premises to
+   track.
 
-- **With a refresh token** — nothing to do; the integration stays signed in
+### 3. Keep the session alive (only for some accounts)
+
+SP's Auth0 tenant does not issue a refresh token for every account:
+
+- **With a refresh token** — nothing more to do. The integration stays signed in
   indefinitely.
-- **Without one** — the access token expires on its own (often within hours), so
-  the flow offers an extra step: paste your **Auth0 session cookie** and Home
-  Assistant renews the login unattended, exactly the way the SP web portal does.
+- **Without one** — the access token expires on its own, often within hours, so
+  the flow shows an extra step asking for your **Auth0 session cookie**. Home
+  Assistant then renews the sign-in unattended, exactly the way the SP web
+  portal does.
 
-To copy the cookie: in the browser you just signed in with, open developer tools
-(F12) → **Application** (Chrome/Edge) or **Storage** (Firefox) → **Cookies** →
-`https://identity.spdigital.auth0.com`, and copy the **Value** of the cookie
-named `auth0`. It is `HttpOnly`, so it will not show up in `document.cookie`.
+To copy the cookie:
 
-The cookie is stored in Home Assistant alongside the tokens and is refreshed on
-every renewal, so the link lasts until SP ends the session itself — typically
-weeks — and only then does Home Assistant raise a **reauthentication**
-notification.
+1. In the same browser you signed in with, open developer tools (F12) →
+   **Application** (Chrome/Edge) or **Storage** (Firefox) → **Cookies** →
+   `https://identity.spdigital.auth0.com`.
+2. Copy the **Value** of the cookie named `auth0`. It is `HttpOnly`, so it does
+   not appear in `document.cookie` — devtools is the only way to read it.
+3. Paste it into the form (the value alone is enough).
 
-You can skip the cookie step. Usage sensors still work; you will just be asked
-to sign in again whenever the access token expires. To check which case your
-account is in, enable debug logging and look for
-`SP Services issued no refresh token`:
+The cookie is stored with your tokens and replaced automatically on every
+renewal, so the link lasts until SP ends the session itself — typically weeks —
+and only then does Home Assistant raise a **reauthentication** notification.
+
+Leaving the field empty is fine: usage sensors still work, you will just be
+asked to sign in again whenever the access token expires. You can add or replace
+the cookie at any time from **Configure** → **Update the session cookie**.
+
+### Which case is my account in?
+
+Enable debug logging and look for `SP Services issued no refresh token` after a
+sign-in:
 
 ```yaml
 logger:
@@ -259,9 +281,29 @@ logger:
     custom_components.singapore: debug
 ```
 
-To stop tracking usage, open **Configure** on the entry and choose
-**Unlink SP Services account** — the stored token is deleted and the usage
-sensors are removed.
+### Unlinking
+
+**Configure** → **Unlink SP Services account** deletes the stored tokens and
+cookie and removes the usage sensors. The rest of the integration is unaffected.
+
+### What is stored, and where
+
+In the config entry (`.storage/core.config_entries`, same as every other
+integration's credentials): the SP access token and its expiry, the refresh
+token if SP issued one, the Auth0 session cookie if you provided one, and the
+account number being tracked. Only the cookies Auth0 needs (`auth0`,
+`auth0_compat`, `did`, `did_compat`) are kept from what you paste — anything
+else is discarded rather than stored.
+
+### Troubleshooting
+
+| Symptom | What it means |
+|---------|---------------|
+| "That callback URL did not contain a valid authorization code" | The URL came from an older attempt, or `state=` is missing. Use the link currently shown in the form and copy the whole callback URL. |
+| "SP would not renew a session with that cookie" | The `auth0` cookie is stale or was copied from a different browser/profile. Sign in again in that browser and copy it fresh. |
+| Usage sensors go unavailable and a **reauthentication** notice appears | The SP session ended. Complete the reauth prompt; add the session cookie at that step to make it last longer. |
+| Usage sensors show `unknown` | SP has not published that figure yet — the in-progress month lands late, and same-day water is never published. This is not an error. |
+| Everything else works but usage never appears | The entry has no SP account linked. Open **Configure** on the entry. |
 
 ## Data sources
 

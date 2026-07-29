@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Singapore",
-        "description": "Set up the Singapore integration.",
+        "description": "Set up the Singapore integration.\n\nTariffs, COE, weather, train status and public holidays need no account. Tick the box below to also track your own SP Services electricity and water usage — that needs a one-time sign-in through your browser.",
         "data": {
           "name": "Integration Name",
           "link_sp_services": "Link my SP Services account (electricity and water usage)"
@@ -11,28 +11,28 @@
       },
       "sp_login": {
         "title": "Link SP Services account",
-        "description": "SP Services requires a captcha and SMS OTP, so log in with your browser:\n\n1. Open this link and sign in: {authorize_url}\n2. Complete the captcha and OTP.\n3. When the browser reaches `services.spservices.sg/callback?...`, copy the full URL (use the browser's Network tab with 'Preserve log' if it redirects too fast).\n4. Paste it below — it must contain both `code=` and `state=`.\n\nIf SP does not issue a refresh token for your account, the next step offers a way to keep the session alive.",
+        "description": "SP Services enforces a captcha and an SMS OTP, so the sign-in happens in your browser and you hand the result back here.\n\n1. Open this link and sign in to SP Services: {authorize_url}\n2. Complete the captcha and the SMS OTP in the browser.\n3. The browser then lands on `services.spservices.sg/callback?...` — copy that **full** URL. It often redirects away immediately; if you miss it, open developer tools (F12) → **Network**, tick **Preserve log**, sign in again, and copy the Request URL of the `callback` request.\n4. Paste it below. It must contain both `code=` and `state=`, and it has to come from the link above — a callback from an earlier attempt is rejected.\n\nIf SP does not issue a refresh token for your account, the next step offers a way to keep the session alive.",
         "data": {
           "callback_url": "Callback URL"
         }
       },
       "sp_account": {
         "title": "Choose SP Services account",
-        "description": "Several utility accounts are linked to this login. Pick the one to track.",
+        "description": "Several utility accounts are linked to this SP Services login. Pick the premises to track — one set of usage sensors is created for it.",
         "data": {
           "sp_account_no": "Account number"
         }
       },
       "reauth_confirm": {
         "title": "Re-link SP Services account",
-        "description": "The SP Services session expired. Log in again with your browser:\n\n1. Open this link and sign in: {authorize_url}\n2. Complete the captcha and OTP.\n3. Copy the full `services.spservices.sg/callback?...` URL.\n4. Paste it below — it must contain both `code=` and `state=`.",
+        "description": "The SP Services session has ended and needs a fresh browser sign-in.\n\n1. Open this link and sign in to SP Services: {authorize_url}\n2. Complete the captcha and the SMS OTP in the browser.\n3. The browser then lands on `services.spservices.sg/callback?...` — copy that **full** URL. It often redirects away immediately; if you miss it, open developer tools (F12) → **Network**, tick **Preserve log**, sign in again, and copy the Request URL of the `callback` request.\n4. Paste it below. It must contain both `code=` and `state=`, and it has to come from the link above — a callback from an earlier attempt is rejected.\n\nYour previously selected SP account is kept if it is still linked.",
         "data": {
           "callback_url": "Callback URL"
         }
       },
       "sp_session": {
         "title": "Keep the SP Services session alive",
-        "description": "SP did not issue a refresh token for this account, so the sign-in above expires on its own. Home Assistant can renew it the same way the SP web portal does — with your Auth0 session cookie:\n\n1. In the browser you just signed in with, open developer tools (F12) → **Application** (Chrome/Edge) or **Storage** (Firefox) → **Cookies** → `https://identity.spdigital.auth0.com`.\n2. Copy the **Value** of the cookie named `auth0`.\n3. Paste it below.\n\nThe cookie is stored in Home Assistant and refreshed automatically on every renewal, so the link lasts until SP ends the session (typically weeks). Leave the field empty to skip — usage still works, but you will be asked to sign in again when the access token expires.",
+        "description": "SP issued no refresh token for this account, so the sign-in expires on its own — often within hours. Home Assistant can renew it unattended the same way the SP web portal does, using your Auth0 session cookie.\n\n1. In the same browser you just signed in with, open developer tools (F12) → **Application** (Chrome/Edge) or **Storage** (Firefox) → **Cookies** → `https://identity.spdigital.auth0.com`.\n2. Copy the **Value** of the cookie named `auth0`. It is HttpOnly, so it will not appear in `document.cookie` — devtools is the only way to read it.\n3. Paste it below (the value alone is enough).\n\nHome Assistant stores the cookie with your tokens and replaces it each time it renews, so the link lasts until SP ends the session itself — typically weeks — and only then are you asked to sign in again.\n\nLeaving the field empty continues without a cookie (and clears one that was stored before). Usage sensors still work; you will just be asked to sign in again each time the access token expires. You can add the cookie later from **Configure** on the integration entry.",
         "data": {
           "session_cookie": "Auth0 session cookie (`auth0`)"
         }
@@ -41,10 +41,10 @@
     "error": {
       "empty_name": "Name cannot be empty.",
       "name_too_long": "Name must be 64 characters or fewer.",
-      "invalid_callback": "That callback URL did not contain a valid authorization code for this login attempt. Open the new link below and try again.",
+      "invalid_callback": "That callback URL did not contain a valid authorization code for this sign-in. Each attempt gets a new link, so use the one below and copy the callback URL it produces — including `code=` and `state=`.",
       "cannot_connect": "Could not reach SP Services. Try again in a moment.",
       "no_accounts": "This SP Services login has no linked utility accounts.",
-      "invalid_session_cookie": "SP would not renew a session with that cookie. Copy the `auth0` cookie value again from the browser you signed in with, or leave the field empty to skip."
+      "invalid_session_cookie": "SP would not renew a session with that cookie. Copy the `auth0` cookie value again from the browser you signed in with (it may have been rotated since), or leave the field empty to continue without it."
     },
     "abort": {
       "already_configured": "This integration is already configured.",
@@ -54,40 +54,41 @@
   "options": {
     "step": {
       "init": {
-        "title": "Singapore",
-        "description": "Manage the SP Services usage link.",
+        "title": "SP Services usage",
+        "description": "Manage the SP Services account linked to this integration. Everything else in the integration works without it.",
         "menu_options": {
-          "sp_login": "Re-link SP Services account",
+          "sp_login": "Sign in to SP Services again",
+          "sp_session": "Update the session cookie (keeps the link alive)",
           "sp_unlink": "Unlink SP Services account"
         }
       },
       "sp_login": {
         "title": "Link SP Services account",
-        "description": "SP Services requires a captcha and SMS OTP, so log in with your browser:\n\n1. Open this link and sign in: {authorize_url}\n2. Complete the captcha and OTP.\n3. When the browser reaches `services.spservices.sg/callback?...`, copy the full URL (use the browser's Network tab with 'Preserve log' if it redirects too fast).\n4. Paste it below — it must contain both `code=` and `state=`.\n\nIf SP does not issue a refresh token for your account, the next step offers a way to keep the session alive.",
+        "description": "SP Services enforces a captcha and an SMS OTP, so the sign-in happens in your browser and you hand the result back here.\n\n1. Open this link and sign in to SP Services: {authorize_url}\n2. Complete the captcha and the SMS OTP in the browser.\n3. The browser then lands on `services.spservices.sg/callback?...` — copy that **full** URL. It often redirects away immediately; if you miss it, open developer tools (F12) → **Network**, tick **Preserve log**, sign in again, and copy the Request URL of the `callback` request.\n4. Paste it below. It must contain both `code=` and `state=`, and it has to come from the link above — a callback from an earlier attempt is rejected.\n\nIf SP does not issue a refresh token for your account, the next step offers a way to keep the session alive.",
         "data": {
           "callback_url": "Callback URL"
         }
       },
       "sp_account": {
         "title": "Choose SP Services account",
-        "description": "Several utility accounts are linked to this login. Pick the one to track.",
+        "description": "Several utility accounts are linked to this SP Services login. Pick the premises to track — one set of usage sensors is created for it.",
         "data": {
           "sp_account_no": "Account number"
         }
       },
       "sp_session": {
         "title": "Keep the SP Services session alive",
-        "description": "SP did not issue a refresh token for this account, so the sign-in above expires on its own. Home Assistant can renew it the same way the SP web portal does — with your Auth0 session cookie:\n\n1. In the browser you just signed in with, open developer tools (F12) → **Application** (Chrome/Edge) or **Storage** (Firefox) → **Cookies** → `https://identity.spdigital.auth0.com`.\n2. Copy the **Value** of the cookie named `auth0`.\n3. Paste it below.\n\nThe cookie is stored in Home Assistant and refreshed automatically on every renewal, so the link lasts until SP ends the session (typically weeks). Leave the field empty to skip — usage still works, but you will be asked to sign in again when the access token expires.",
+        "description": "Home Assistant renews the SP sign-in unattended using your Auth0 session cookie. Paste a fresh one here whenever the link stops renewing.\n\n1. In the same browser you just signed in with, open developer tools (F12) → **Application** (Chrome/Edge) or **Storage** (Firefox) → **Cookies** → `https://identity.spdigital.auth0.com`.\n2. Copy the **Value** of the cookie named `auth0`. It is HttpOnly, so it will not appear in `document.cookie` — devtools is the only way to read it.\n3. Paste it below (the value alone is enough).\n\nHome Assistant stores the cookie with your tokens and replaces it each time it renews, so the link lasts until SP ends the session itself — typically weeks — and only then are you asked to sign in again.\n\nLeaving the field empty continues without a cookie (and clears one that was stored before). Usage sensors still work; you will just be asked to sign in again each time the access token expires. You can add the cookie later from **Configure** on the integration entry.",
         "data": {
           "session_cookie": "Auth0 session cookie (`auth0`)"
         }
       }
     },
     "error": {
-      "invalid_callback": "That callback URL did not contain a valid authorization code for this login attempt. Open the new link below and try again.",
+      "invalid_callback": "That callback URL did not contain a valid authorization code for this sign-in. Each attempt gets a new link, so use the one below and copy the callback URL it produces — including `code=` and `state=`.",
       "cannot_connect": "Could not reach SP Services. Try again in a moment.",
       "no_accounts": "This SP Services login has no linked utility accounts.",
-      "invalid_session_cookie": "SP would not renew a session with that cookie. Copy the `auth0` cookie value again from the browser you signed in with, or leave the field empty to skip."
+      "invalid_session_cookie": "SP would not renew a session with that cookie. Copy the `auth0` cookie value again from the browser you signed in with (it may have been rotated since), or leave the field empty to continue without it."
     }
   },
   "entity": {

@@ -324,7 +324,7 @@ async def test_options_linked_entry_offers_relink_and_unlink():
     result = await flow.async_step_init()
 
     assert result["type"] == "menu"
-    assert result["menu_options"] == ["sp_login", "sp_unlink"]
+    assert result["menu_options"] == ["sp_login", "sp_session", "sp_unlink"]
 
 
 @pytest.mark.asyncio
@@ -387,3 +387,31 @@ async def test_relink_without_refresh_token_clears_the_stale_one():
     stored = flow.hass.config_entries.async_update_entry.call_args.kwargs["data"]
     assert stored[CONF_SP_REFRESH_TOKEN] is None
     assert stored[CONF_SP_ACCESS_TOKEN] == "fresh"
+
+
+@pytest.mark.asyncio
+async def test_options_can_replace_only_the_session_cookie():
+    """Auth0 sessions end eventually; refreshing the cookie must not re-link."""
+    entry = ConfigEntry(
+        data={
+            CONF_NAME: "Singapore",
+            CONF_SP_ACCESS_TOKEN: "at",
+            CONF_SP_SESSION_COOKIE: "auth0=old",
+            CONF_SP_ACCOUNT_NO: "8949049293",
+        }
+    )
+    flow = _options_flow(entry)
+    await flow.async_step_init()
+    await flow.async_step_sp_session()
+
+    patches = _patch_renewal()
+    with patches[0], patches[1]:
+        result = await flow.async_step_sp_session({CONF_SESSION_COOKIE: "auth0=new"})
+
+    assert result["type"] == "create_entry"
+    stored = flow.hass.config_entries.async_update_entry.call_args.kwargs["data"]
+    assert stored[CONF_SP_SESSION_COOKIE] == "auth0=rotated"
+    assert stored[CONF_SP_ACCESS_TOKEN] == "renewed"
+    # The linked account must survive a cookie-only update.
+    assert stored[CONF_SP_ACCOUNT_NO] == "8949049293"
+    assert stored[CONF_NAME] == "Singapore"

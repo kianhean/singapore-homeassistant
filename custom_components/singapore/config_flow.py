@@ -35,6 +35,7 @@ from .usage_coordinator import (
     CONF_SP_REFRESH_TOKEN,
     CONF_SP_SESSION_COOKIE,
     has_sp_credentials,
+    stored_token,
     token_entry_data,
 )
 
@@ -204,12 +205,13 @@ class _SPLoginMixin:
         return self._async_store()
 
     def _sp_entry_data(self) -> dict[str, Any]:
-        assert self._token is not None
-        return {
-            **token_entry_data(self._token),
+        data: dict[str, Any] = {
             CONF_SP_ACCOUNT_NO: self._account_no,
             CONF_SP_SESSION_COOKIE: self._session_cookie,
         }
+        if self._token is not None:
+            data.update(token_entry_data(self._token))
+        return data
 
     def _async_store(self) -> ConfigFlowResult:
         """Persist the linked account; implemented per flow."""
@@ -318,8 +320,23 @@ class SingaporeOptionsFlow(_SPLoginMixin, OptionsFlow):
         if not has_sp_credentials(self.config_entry.data):
             return self._sp_login_form("sp_login")
         return self.async_show_menu(
-            step_id="init", menu_options=["sp_login", "sp_unlink"]
+            step_id="init", menu_options=["sp_login", "sp_session", "sp_unlink"]
         )
+
+    async def async_step_sp_session(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Add or replace the renewal cookie without redoing the whole login.
+
+        Auth0 sessions do eventually end, so this is reachable straight from the
+        menu; carry over what the entry already knows so submitting the step
+        cannot blank the linked account or the working token.
+        """
+        if self._account_no is None:
+            self._account_no = self.config_entry.data.get(CONF_SP_ACCOUNT_NO)
+        if self._token is None:
+            self._token = stored_token(self.config_entry.data)
+        return await super().async_step_sp_session(user_input)
 
     async def async_step_sp_unlink(
         self, user_input: dict[str, Any] | None = None
