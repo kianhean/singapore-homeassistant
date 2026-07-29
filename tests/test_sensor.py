@@ -389,3 +389,141 @@ def test_train_line_status_sensor_unknown_when_line_missing():
         "East-West Line",
     )
     assert sensor.native_value == "unknown"
+
+
+# ---------------------------------------------------------------------------
+# SP Services usage sensors
+# ---------------------------------------------------------------------------
+
+
+def _usage_coordinator(data="default"):
+    from datetime import datetime
+
+    from custom_components.singapore.sp_usage_client import (
+        SP_TIMEZONE,
+        UsageData,
+        UsagePoint,
+    )
+
+    if data == "default":
+        data = UsageData(
+            account_no="8949049293",
+            last_updated=datetime(2026, 4, 12, 16, 42, tzinfo=SP_TIMEZONE),
+            electricity_today_kwh=19.967,
+            electricity_month_kwh=120.5,
+            electricity_last_month_kwh=572.0,
+            water_month_m3=None,
+            water_last_month_m3=34.1,
+            electricity_monthly_history=[
+                UsagePoint(period=f"2026-{month:02d}-01", value=float(month))
+                for month in range(1, 5)
+            ],
+            water_monthly_history=[
+                UsagePoint(period="2026-03-01", value=34.1, status="Estimated")
+            ],
+        )
+    coordinator = MagicMock()
+    coordinator.data = data
+    return coordinator
+
+
+def test_electricity_usage_today_sensor():
+    from custom_components.singapore.sensor import (
+        SingaporeElectricityUsageTodaySensor,
+    )
+
+    sensor = SingaporeElectricityUsageTodaySensor(_usage_coordinator(), "entry1")
+    assert sensor.native_value == 19.967
+    assert sensor.native_unit_of_measurement == "kWh"
+    assert sensor.device_class == "energy"
+    assert sensor.unique_id == "entry1_sp_electricity_usage_today"
+    assert sensor.device_info["identifiers"] == {("singapore", "entry1_sp_usage")}
+
+
+def test_usage_sensor_attributes():
+    from custom_components.singapore.sensor import (
+        SingaporeElectricityUsageTodaySensor,
+    )
+
+    attrs = SingaporeElectricityUsageTodaySensor(
+        _usage_coordinator(), "entry1"
+    ).extra_state_attributes
+    assert attrs["account_no"] == "8949049293"
+    assert attrs["source"] == "SP Services"
+    assert attrs["last_updated"].startswith("2026-04-12T16:42")
+
+
+def test_electricity_usage_month_sensors():
+    from custom_components.singapore.sensor import (
+        SingaporeElectricityUsageLastMonthSensor,
+        SingaporeElectricityUsageMonthSensor,
+    )
+
+    coordinator = _usage_coordinator()
+    month = SingaporeElectricityUsageMonthSensor(coordinator, "entry1")
+    last_month = SingaporeElectricityUsageLastMonthSensor(coordinator, "entry1")
+
+    assert month.native_value == 120.5
+    assert last_month.native_value == 572.0
+    assert month.extra_state_attributes["monthly_history"][-1] == {
+        "period": "2026-04-01",
+        "value": 4.0,
+        "status": None,
+    }
+
+
+def test_water_usage_sensors():
+    from custom_components.singapore.sensor import (
+        SingaporeWaterUsageLastMonthSensor,
+        SingaporeWaterUsageMonthSensor,
+    )
+
+    coordinator = _usage_coordinator()
+    month = SingaporeWaterUsageMonthSensor(coordinator, "entry1")
+    last_month = SingaporeWaterUsageLastMonthSensor(coordinator, "entry1")
+
+    # SP publishes the in-progress month late: unknown, not zero.
+    assert month.native_value is None
+    assert last_month.native_value == 34.1
+    assert month.native_unit_of_measurement == "m³"
+    assert month.device_class == "water"
+
+
+def test_usage_history_attribute_is_capped():
+    from custom_components.singapore.sensor import (
+        _MAX_HISTORY_ATTR_POINTS,
+        SingaporeElectricityUsageMonthSensor,
+    )
+    from custom_components.singapore.sp_usage_client import UsagePoint
+
+    coordinator = _usage_coordinator()
+    coordinator.data.electricity_monthly_history = [
+        UsagePoint(period=f"2025-{i:02d}-01", value=float(i)) for i in range(1, 30)
+    ]
+    sensor = SingaporeElectricityUsageMonthSensor(coordinator, "entry1")
+    assert (
+        len(sensor.extra_state_attributes["monthly_history"])
+        == _MAX_HISTORY_ATTR_POINTS
+    )
+
+
+def test_usage_sensors_none_safe():
+    from custom_components.singapore.sensor import (
+        SingaporeElectricityUsageLastMonthSensor,
+        SingaporeElectricityUsageMonthSensor,
+        SingaporeElectricityUsageTodaySensor,
+        SingaporeWaterUsageLastMonthSensor,
+        SingaporeWaterUsageMonthSensor,
+    )
+
+    coordinator = _usage_coordinator(data=None)
+    for cls in (
+        SingaporeElectricityUsageTodaySensor,
+        SingaporeElectricityUsageMonthSensor,
+        SingaporeElectricityUsageLastMonthSensor,
+        SingaporeWaterUsageMonthSensor,
+        SingaporeWaterUsageLastMonthSensor,
+    ):
+        sensor = cls(coordinator, "entry1")
+        assert sensor.native_value is None
+        assert sensor.extra_state_attributes == {"source": "SP Services"}

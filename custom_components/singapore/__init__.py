@@ -16,6 +16,11 @@ from .coe_coordinator import CoeCoordinator
 from .coordinator import SPGroupCoordinator
 from .holiday_coordinator import PublicHolidayCoordinator
 from .train_coordinator import TrainStatusCoordinator
+from .usage_coordinator import (
+    CONF_SP_ACCOUNT_NO,
+    CONF_SP_REFRESH_TOKEN,
+    SPUsageCoordinator,
+)
 from .weather_coordinator import SingaporeWeatherCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,6 +42,8 @@ class SingaporeData:
     weather: SingaporeWeatherCoordinator
     holiday: PublicHolidayCoordinator
     train: TrainStatusCoordinator
+    # Only set when the user linked an SP Services account (see config flow).
+    usage: SPUsageCoordinator | None = None
 
 
 SingaporeConfigEntry: TypeAlias = ConfigEntry[SingaporeData]
@@ -80,6 +87,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
     async def _refresh_coe(_now) -> None:
         await coe_coordinator.async_refresh()
 
+    usage_coordinator: SPUsageCoordinator | None = None
+    if refresh_token := entry.data.get(CONF_SP_REFRESH_TOKEN):
+        usage_coordinator = SPUsageCoordinator(
+            hass,
+            entry,
+            refresh_token,
+            entry.data.get(CONF_SP_ACCOUNT_NO),
+        )
+
+        async def _initial_refresh_usage() -> None:
+            # Backgrounded so a slow or broken private SP endpoint cannot hold
+            # up (or fail) the public Singapore entities.
+            await usage_coordinator.async_refresh()
+            if not usage_coordinator.last_update_success:
+                _LOGGER.warning(
+                    "Initial SP Services usage refresh failed; retrying later"
+                )
+
+        entry.async_create_background_task(
+            hass, _initial_refresh_usage(), "singapore_sp_usage_initial_refresh"
+        )
+
     unsub_coe = async_track_time_change(
         hass,
         _refresh_coe,
@@ -95,6 +124,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
         weather=weather_coordinator,
         holiday=holiday_coordinator,
         train=train_coordinator,
+        usage=usage_coordinator,
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

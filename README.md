@@ -112,6 +112,25 @@ Bukit Panjang LRT, Sengkang LRT, Punggol LRT.
   <img src="images/train-status.jpeg" alt="Singapore MRT/LRT device page showing overall and per-line train status sensors" width="320">
 </p>
 
+### SP Services household usage (optional, requires login)
+
+Your own electricity and water consumption from the
+[SP Services portal](https://services.spservices.sg), polled every **30 minutes**.
+This is opt-in: it only appears after you link your SP account (see
+[Linking your SP Services account](#linking-your-sp-services-account)).
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.singapore_electricity_usage_today` | Singapore Electricity Usage Today | kWh | Electricity used today |
+| `sensor.singapore_electricity_usage_this_month` | Singapore Electricity Usage This Month | kWh | Electricity used in the current month |
+| `sensor.singapore_electricity_usage_last_month` | Singapore Electricity Usage Last Month | kWh | Last published monthly electricity total |
+| `sensor.singapore_water_usage_this_month` | Singapore Water Usage This Month | m³ | Water used in the current month |
+| `sensor.singapore_water_usage_last_month` | Singapore Water Usage Last Month | m³ | Last published monthly water total |
+
+SP publishes the in-progress month late, so the "this month" sensors stay
+`unknown` (not `0`) until SP publishes them. SP does not publish same-day water
+usage in any of its exports, so there is no "water today" sensor.
+
 ### Public holidays
 
 Updated every 24 hours from [MOM](https://www.mom.gov.sg/employment-practices/public-holidays).
@@ -161,6 +180,14 @@ sensor.singapore_temperature:
   unit_of_measurement: °C
   attributes:
     source: data.gov.sg / NEA (collection 1459)
+
+sensor.singapore_electricity_usage_today:
+  state: 19.967
+  unit_of_measurement: kWh
+  attributes:
+    account_no: "8949049293"
+    last_updated: "2026-04-12T16:42:41+08:00"
+    source: SP Services
 ```
 
 ## Installation via HACS (manual custom repository)
@@ -177,6 +204,35 @@ sensor.singapore_temperature:
 2. Search for **Singapore**.
 3. Enter a name and click **Submit**.
 
+All public data (tariffs, COE, weather, trains, holidays) works with no account.
+
+## Linking your SP Services account
+
+Optional — only needed for your own electricity and water usage sensors.
+
+SP Services logs in through Auth0 with a captcha and an SMS OTP, so the
+integration cannot log in for you. Instead it hands you a login link and asks
+for the URL your browser lands on afterwards:
+
+1. Tick **Link my SP Services account** while adding the integration, or open
+   **Configure** on an existing Singapore entry.
+2. Open the link shown in the form and sign in to SP Services (captcha + OTP).
+3. When the browser reaches `https://services.spservices.sg/callback?...`, copy
+   the **full** URL. It disappears quickly — if you miss it, open the browser's
+   developer tools **Network** tab, tick **Preserve log**, redo the login, and
+   copy the request URL for `services.spservices.sg/callback`.
+4. Paste it back into the form. It must contain both `code=` and `state=`.
+5. If several utility accounts are linked to the login, pick the one to track.
+
+The integration stores the refresh token SP returns and uses it to keep itself
+logged in; your username and password are never entered into Home Assistant.
+When the refresh token eventually dies, Home Assistant raises a **reauthentication**
+notification and you repeat the same paste-the-callback-URL steps.
+
+To stop tracking usage, open **Configure** on the entry and choose
+**Unlink SP Services account** — the stored token is deleted and the usage
+sensors are removed.
+
 ## Data sources
 
 | Source | Data | Refresh |
@@ -187,6 +243,7 @@ sensor.singapore_temperature:
 | [data.gov.sg / NEA (collection 1459)](https://data.gov.sg/collections/1459/view) | Realtime weather readings | Every 10 min |
 | [MOM](https://www.mom.gov.sg/employment-practices/public-holidays) | Public holidays | Every 24 h |
 | [mytransport.sg](https://www.mytransport.sg/trainstatus) | MRT/LRT train status | Every 5 min |
+| [SP Services](https://services.spservices.sg) (private endpoints, login required) | Household electricity and water usage | Every 30 min |
 
 ## Development
 

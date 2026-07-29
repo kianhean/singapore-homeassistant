@@ -5,16 +5,75 @@
         "title": "Singapore",
         "description": "Set up the Singapore integration.",
         "data": {
-          "name": "Integration Name"
+          "name": "Integration Name",
+          "link_sp_services": "Link my SP Services account (electricity and water usage)"
+        }
+      },
+      "sp_login": {
+        "title": "Link SP Services account",
+        "description": "SP Services requires a captcha and SMS OTP, so log in with your browser:\n\n1. Open this link and sign in: {authorize_url}\n2. Complete the captcha and OTP.\n3. When the browser reaches `services.spservices.sg/callback?...`, copy the full URL (use the browser's Network tab with 'Preserve log' if it redirects too fast).\n4. Paste it below — it must contain both `code=` and `state=`.",
+        "data": {
+          "callback_url": "Callback URL"
+        }
+      },
+      "sp_account": {
+        "title": "Choose SP Services account",
+        "description": "Several utility accounts are linked to this login. Pick the one to track.",
+        "data": {
+          "sp_account_no": "Account number"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-link SP Services account",
+        "description": "The SP Services session expired. Log in again with your browser:\n\n1. Open this link and sign in: {authorize_url}\n2. Complete the captcha and OTP.\n3. Copy the full `services.spservices.sg/callback?...` URL.\n4. Paste it below — it must contain both `code=` and `state=`.",
+        "data": {
+          "callback_url": "Callback URL"
         }
       }
     },
     "error": {
       "empty_name": "Name cannot be empty.",
-      "name_too_long": "Name must be 64 characters or fewer."
+      "name_too_long": "Name must be 64 characters or fewer.",
+      "invalid_callback": "That callback URL did not contain a valid authorization code for this login attempt. Open the new link below and try again.",
+      "cannot_connect": "Could not reach SP Services. Try again in a moment.",
+      "no_refresh_token": "SP Services did not return a refresh token, so the login cannot be kept alive. Open the new link below and try again.",
+      "no_accounts": "This SP Services login has no linked utility accounts."
     },
     "abort": {
-      "already_configured": "This integration is already configured."
+      "already_configured": "This integration is already configured.",
+      "reauth_successful": "The SP Services account was re-linked."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Singapore",
+        "description": "Manage the SP Services usage link.",
+        "menu_options": {
+          "sp_login": "Re-link SP Services account",
+          "sp_unlink": "Unlink SP Services account"
+        }
+      },
+      "sp_login": {
+        "title": "Link SP Services account",
+        "description": "SP Services requires a captcha and SMS OTP, so log in with your browser:\n\n1. Open this link and sign in: {authorize_url}\n2. Complete the captcha and OTP.\n3. When the browser reaches `services.spservices.sg/callback?...`, copy the full URL (use the browser's Network tab with 'Preserve log' if it redirects too fast).\n4. Paste it below — it must contain both `code=` and `state=`.",
+        "data": {
+          "callback_url": "Callback URL"
+        }
+      },
+      "sp_account": {
+        "title": "Choose SP Services account",
+        "description": "Several utility accounts are linked to this login. Pick the one to track.",
+        "data": {
+          "sp_account_no": "Account number"
+        }
+      }
+    },
+    "error": {
+      "invalid_callback": "That callback URL did not contain a valid authorization code for this login attempt. Open the new link below and try again.",
+      "cannot_connect": "Could not reach SP Services. Try again in a moment.",
+      "no_refresh_token": "SP Services did not return a refresh token, so the login cannot be kept alive. Open the new link below and try again.",
+      "no_accounts": "This SP Services login has no linked utility accounts."
     }
   },
   "entity": {
@@ -54,6 +113,21 @@
       },
       "train_line_status": {
         "name": "{line} Status"
+      },
+      "electricity_usage_today": {
+        "name": "Electricity Usage Today"
+      },
+      "electricity_usage_month": {
+        "name": "Electricity Usage This Month"
+      },
+      "electricity_usage_last_month": {
+        "name": "Electricity Usage Last Month"
+      },
+      "water_usage_month": {
+        "name": "Water Usage This Month"
+      },
+      "water_usage_last_month": {
+        "name": "Water Usage Last Month"
       }
     }
   }

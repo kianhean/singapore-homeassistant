@@ -13,6 +13,8 @@ custom_components/singapore/
 ├── holiday_coordinator.py  # PublicHolidayCoordinator: fetches + parses MOM holidays
 ├── weather_coordinator.py  # SingaporeWeatherCoordinator: 2-hour forecasts + collection 1459 readings
 ├── train_coordinator.py    # TrainStatusCoordinator: scrapes mytransport.sg MRT/LRT status
+├── sp_usage_client.py      # Vendored async SP Services client (auth + usage fetch/parsing)
+├── usage_coordinator.py    # SPUsageCoordinator: household electricity/water usage (opt-in)
 ├── calendar.py             # Calendar entity (Singapore public holidays)
 ├── weather.py              # Weather entities (one per Singapore forecast area)
 ├── config_flow.py          # UI config flow (name input)
@@ -31,6 +33,8 @@ tests/
 ├── test_holiday_coordinator.py  # MOM parser unit tests + coordinator HTTP mock tests
 ├── test_weather_coordinator.py  # Weather coordinator parser + HTTP mock tests
 ├── test_train_coordinator.py    # Train status parser + HTTP mock tests
+├── test_sp_usage_client.py      # SP Services auth/PKCE, CSV + payload parsing, HTTP mocks
+├── test_usage_coordinator.py    # Token refresh/rotation, reauth, error mapping
 ├── test_calendar.py             # Calendar event and range query tests
 ├── test_sensor.py               # Sensor value, unit, attributes, unique_id, None-safety
 ├── test_weather.py              # Weather entity condition mapping + forecast tests
@@ -49,6 +53,7 @@ class SingaporeData:
     weather: SingaporeWeatherCoordinator
     holiday: PublicHolidayCoordinator
     train: TrainStatusCoordinator
+    usage: SPUsageCoordinator | None = None  # only when an SP account is linked
 
 SingaporeConfigEntry: TypeAlias = ConfigEntry[SingaporeData]
 ```
@@ -253,6 +258,61 @@ Parser guidance used in this repo:
 - Prefer `forecast.text` over `forecast.summary` for condition mapping consistency.
 - Support both `relative_humidity` and `relativeHumidity` field names.
 
+## How the SP Services Usage Integration Works
+
+`sp_usage_client.py` is a vendored aiohttp port of
+[`kianhean/sp_api`](https://github.com/kianhean/sp_api) (`sp-services`). It is vendored
+rather than declared in `manifest.json` `requirements` because that package is not
+published on PyPI and uses blocking `requests` calls. **Port upstream fixes into this
+file** when SP changes its export shapes; do not add a git-URL requirement.
+
+### Login (browser-assisted only)
+
+SP enforces a captcha on the Auth0 `usernamepassword/login` endpoint, so headless
+username/password login is not usable. The config flow instead:
+
+1. builds a PKCE authorize URL locally (`LoginSession.create().authorize_url` — no HTTP
+   call needed; the browser does the Auth0 round trip),
+2. shows it via `description_placeholders={"authorize_url": ...}`,
+3. takes the pasted `https://services.spservices.sg/callback?code=…&state=…` URL,
+4. exchanges the code for a token set (`async_exchange_callback_url`).
+
+Every failed attempt regenerates the `LoginSession`, so a burnt PKCE state is never
+retried. `_code_from_url` requires the returned `state` to match — a code without a
+matching state is rejected rather than accepted.
+
+The flow refuses a login that returns no refresh token (`no_refresh_token` error):
+without one the integration would break at the first access-token expiry with no
+unattended way back.
+
+### Tokens
+
+Only the refresh token is persisted, in `entry.data[sp_refresh_token]` (plus
+`sp_account_no`). `SPUsageCoordinator` holds the access token in memory, refreshes it
+when `TokenSet.is_expired()` (60 s leeway), retries once on a mid-fetch 401, and writes
+the refresh token back to the entry if Auth0 rotates it. A dead refresh token raises
+`ConfigEntryAuthFailed`, which triggers HA's reauth flow (the coordinator is constructed
+with `config_entry=entry` so HA can start it).
+
+Note that the config entry is **not** given an update listener: the coordinator writes
+rotated tokens with `async_update_entry`, and an update listener would reload the entry
+on every rotation. The options flow reloads the entry explicitly instead.
+
+### Fetch
+
+`async_fetch_usage` polls every **30 minutes** (one call ≈ six upstream requests) and
+mirrors upstream's fallback chain:
+
+| Value | Primary source | Fallback |
+|-------|----------------|----------|
+| electricity today | `charts:hourly` payload | half-hourly CSV sum → daily CSV row |
+| electricity/water month | `charts:monthly` payload | monthly CSV section |
+| last month, history | monthly CSV sections | — |
+
+CSV exports are fetched with `_post_text_optional`: an upstream export failure degrades
+to `""` (fields become `None`) so one flaky endpoint cannot fail the whole update, but a
+401 still propagates as `SPUsageSessionExpired`.
+
 ## How the Train Status Coordinator Works
 
 `train_coordinator.py` POSTs to the AEM/LTA DataMall servlet every **5 minutes**:
@@ -277,6 +337,22 @@ Response shape: `{ "value": { "Status": int, "AffectedSegments": [...], "Message
 - `details` — all message content joined with ` | ` (empty string when normal); exposed as `details` attribute on `sensor.singapore_train_status`
 - `line_statuses` — dict mapping each line name to `"normal"`, `"planned"`, or `"disruption"`
 
+### SP Services Household Usage (opt-in)
+
+Only created when the config entry carries `sp_refresh_token` (see the config flow
+below). Values are `None`/unknown — never `0` — until SP publishes them.
+
+| Entity ID | Name | Unit |
+|-----------|------|------|
+| `sensor.singapore_electricity_usage_today` | Electricity Usage Today | kWh |
+| `sensor.singapore_electricity_usage_this_month` | Electricity Usage This Month | kWh |
+| `sensor.singapore_electricity_usage_last_month` | Electricity Usage Last Month | kWh |
+| `sensor.singapore_water_usage_this_month` | Water Usage This Month | m³ |
+| `sensor.singapore_water_usage_last_month` | Water Usage Last Month | m³ |
+
+There is deliberately no "water today" sensor: SP does not publish same-day water
+usage in any observed export.
+
 ### Calendar Entity
 
 | Entity ID | Name | Description |
@@ -295,6 +371,14 @@ Holiday data source: `https://www.mom.gov.sg/employment-practices/public-holiday
    ¢/kWh values or `_extract_by_keywords` as a fallback
 3. Add a new sensor class in `sensor.py`, register it in `async_setup_entry`
 4. Add tests in `tests/test_sensor.py` and `tests/test_coordinator.py`
+
+### SP Services usage sensor
+1. Add the field to `UsageData` in `sp_usage_client.py` and populate it in
+   `async_fetch_usage`
+2. Add a `_BaseUsageSensor` subclass in `sensor.py`, registered in the
+   `if data.usage is not None:` block of `async_setup_entry`
+3. Add strings to `strings.json` **and** `translations/en.json`
+4. Add tests in `tests/test_sp_usage_client.py` and `tests/test_sensor.py`
 
 ### COE sensor
 COE sensors are generated automatically for every category in `COE_CATEGORIES` in
