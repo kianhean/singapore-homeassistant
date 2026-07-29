@@ -22,6 +22,7 @@ from custom_components.singapore.usage_coordinator import (
     CONF_SP_ACCESS_TOKEN_EXPIRES_AT,
     CONF_SP_ACCOUNT_NO,
     CONF_SP_REFRESH_TOKEN,
+    CONF_SP_SESSION_COOKIE,
     SPUsageCoordinator,
     stored_token,
 )
@@ -331,5 +332,122 @@ async def test_network_error_raises_update_failed():
             AsyncMock(side_effect=aiohttp.ClientError("connection reset")),
         ),
         pytest.raises(UpdateFailed),
+    ):
+        await coordinator._async_update_data()
+
+
+@pytest.mark.asyncio
+async def test_expired_token_renews_with_session_cookie():
+    """No refresh token: the Auth0 session cookie keeps the entry alive."""
+    coordinator, _hass, _entry = _coordinator(
+        {
+            CONF_SP_ACCESS_TOKEN: "expired",
+            CONF_SP_ACCESS_TOKEN_EXPIRES_AT: (
+                datetime.now(timezone.utc) - timedelta(minutes=1)
+            ).isoformat(),
+            CONF_SP_SESSION_COOKIE: "auth0=stored",
+            CONF_SP_ACCOUNT_NO: "8949049293",
+        }
+    )
+    renew = AsyncMock(return_value=(TokenSet(access_token="renewed"), "auth0=rotated"))
+    fetch = AsyncMock(return_value=_USAGE)
+
+    with (
+        patch(
+            "custom_components.singapore.usage_coordinator.async_get_clientsession",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "custom_components.singapore.usage_coordinator."
+            "async_renew_with_session_cookie",
+            renew,
+        ),
+        patch("custom_components.singapore.usage_coordinator.async_fetch_usage", fetch),
+    ):
+        await coordinator.async_refresh()
+
+    assert coordinator.last_update_success is True
+    assert renew.await_args.args[1] == "auth0=stored"
+    assert fetch.await_args.args[1] == "renewed"
+
+
+@pytest.mark.asyncio
+async def test_rotated_session_cookie_is_persisted():
+    coordinator, hass, _entry = _coordinator(
+        {CONF_SP_SESSION_COOKIE: "auth0=stored", CONF_SP_ACCOUNT_NO: "8949049293"}
+    )
+
+    with (
+        patch(
+            "custom_components.singapore.usage_coordinator.async_get_clientsession",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "custom_components.singapore.usage_coordinator."
+            "async_renew_with_session_cookie",
+            AsyncMock(return_value=(TokenSet(access_token="renewed"), "auth0=rotated")),
+        ),
+        patch(
+            "custom_components.singapore.usage_coordinator.async_fetch_usage",
+            AsyncMock(return_value=_USAGE),
+        ),
+    ):
+        await coordinator.async_refresh()
+
+    stored = hass.config_entries.async_update_entry.call_args.kwargs["data"]
+    # Auth0 rolls the session cookie; dropping the new one would end the session.
+    assert stored[CONF_SP_SESSION_COOKIE] == "auth0=rotated"
+    assert stored[CONF_SP_ACCESS_TOKEN] == "renewed"
+
+
+@pytest.mark.asyncio
+async def test_refresh_token_is_preferred_over_session_cookie():
+    coordinator, _hass, _entry = _coordinator(
+        {
+            CONF_SP_REFRESH_TOKEN: "stored-refresh",
+            CONF_SP_SESSION_COOKIE: "auth0=stored",
+        }
+    )
+    renew = AsyncMock()
+
+    with (
+        patch(
+            "custom_components.singapore.usage_coordinator.async_get_clientsession",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "custom_components.singapore.usage_coordinator.async_refresh_token",
+            AsyncMock(return_value=TokenSet(access_token="at")),
+        ),
+        patch(
+            "custom_components.singapore.usage_coordinator."
+            "async_renew_with_session_cookie",
+            renew,
+        ),
+        patch(
+            "custom_components.singapore.usage_coordinator.async_fetch_usage",
+            AsyncMock(return_value=_USAGE),
+        ),
+    ):
+        await coordinator.async_refresh()
+
+    renew.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_dead_session_cookie_asks_for_reauth():
+    coordinator, _hass, _entry = _coordinator({CONF_SP_SESSION_COOKIE: "auth0=stale"})
+
+    with (
+        patch(
+            "custom_components.singapore.usage_coordinator.async_get_clientsession",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "custom_components.singapore.usage_coordinator."
+            "async_renew_with_session_cookie",
+            AsyncMock(side_effect=SPUsageSessionExpired("login_required")),
+        ),
+        pytest.raises(ConfigEntryAuthFailed),
     ):
         await coordinator._async_update_data()

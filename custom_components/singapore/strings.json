@@ -11,7 +11,7 @@
       },
       "sp_login": {
         "title": "Link SP Services account",
-        "description": "SP Services requires a captcha and SMS OTP, so log in with your browser:\n\n1. Open this link and sign in: {authorize_url}\n2. Complete the captcha and OTP.\n3. When the browser reaches `services.spservices.sg/callback?...`, copy the full URL (use the browser's Network tab with 'Preserve log' if it redirects too fast).\n4. Paste it below — it must contain both `code=` and `state=`.\n\nIf SP does not keep the session alive (some accounts get no refresh token), Home Assistant will ask you to sign in again when it expires.",
+        "description": "SP Services requires a captcha and SMS OTP, so log in with your browser:\n\n1. Open this link and sign in: {authorize_url}\n2. Complete the captcha and OTP.\n3. When the browser reaches `services.spservices.sg/callback?...`, copy the full URL (use the browser's Network tab with 'Preserve log' if it redirects too fast).\n4. Paste it below — it must contain both `code=` and `state=`.\n\nIf SP does not issue a refresh token for your account, the next step offers a way to keep the session alive.",
         "data": {
           "callback_url": "Callback URL"
         }
@@ -29,6 +29,13 @@
         "data": {
           "callback_url": "Callback URL"
         }
+      },
+      "sp_session": {
+        "title": "Keep the SP Services session alive",
+        "description": "SP did not issue a refresh token for this account, so the sign-in above expires on its own. Home Assistant can renew it the same way the SP web portal does — with your Auth0 session cookie:\n\n1. In the browser you just signed in with, open developer tools (F12) → **Application** (Chrome/Edge) or **Storage** (Firefox) → **Cookies** → `https://identity.spdigital.auth0.com`.\n2. Copy the **Value** of the cookie named `auth0`.\n3. Paste it below.\n\nThe cookie is stored in Home Assistant and refreshed automatically on every renewal, so the link lasts until SP ends the session (typically weeks). Leave the field empty to skip — usage still works, but you will be asked to sign in again when the access token expires.",
+        "data": {
+          "session_cookie": "Auth0 session cookie (`auth0`)"
+        }
       }
     },
     "error": {
@@ -36,7 +43,8 @@
       "name_too_long": "Name must be 64 characters or fewer.",
       "invalid_callback": "That callback URL did not contain a valid authorization code for this login attempt. Open the new link below and try again.",
       "cannot_connect": "Could not reach SP Services. Try again in a moment.",
-      "no_accounts": "This SP Services login has no linked utility accounts."
+      "no_accounts": "This SP Services login has no linked utility accounts.",
+      "invalid_session_cookie": "SP would not renew a session with that cookie. Copy the `auth0` cookie value again from the browser you signed in with, or leave the field empty to skip."
     },
     "abort": {
       "already_configured": "This integration is already configured.",
@@ -55,7 +63,7 @@
       },
       "sp_login": {
         "title": "Link SP Services account",
-        "description": "SP Services requires a captcha and SMS OTP, so log in with your browser:\n\n1. Open this link and sign in: {authorize_url}\n2. Complete the captcha and OTP.\n3. When the browser reaches `services.spservices.sg/callback?...`, copy the full URL (use the browser's Network tab with 'Preserve log' if it redirects too fast).\n4. Paste it below — it must contain both `code=` and `state=`.\n\nIf SP does not keep the session alive (some accounts get no refresh token), Home Assistant will ask you to sign in again when it expires.",
+        "description": "SP Services requires a captcha and SMS OTP, so log in with your browser:\n\n1. Open this link and sign in: {authorize_url}\n2. Complete the captcha and OTP.\n3. When the browser reaches `services.spservices.sg/callback?...`, copy the full URL (use the browser's Network tab with 'Preserve log' if it redirects too fast).\n4. Paste it below — it must contain both `code=` and `state=`.\n\nIf SP does not issue a refresh token for your account, the next step offers a way to keep the session alive.",
         "data": {
           "callback_url": "Callback URL"
         }
@@ -66,12 +74,20 @@
         "data": {
           "sp_account_no": "Account number"
         }
+      },
+      "sp_session": {
+        "title": "Keep the SP Services session alive",
+        "description": "SP did not issue a refresh token for this account, so the sign-in above expires on its own. Home Assistant can renew it the same way the SP web portal does — with your Auth0 session cookie:\n\n1. In the browser you just signed in with, open developer tools (F12) → **Application** (Chrome/Edge) or **Storage** (Firefox) → **Cookies** → `https://identity.spdigital.auth0.com`.\n2. Copy the **Value** of the cookie named `auth0`.\n3. Paste it below.\n\nThe cookie is stored in Home Assistant and refreshed automatically on every renewal, so the link lasts until SP ends the session (typically weeks). Leave the field empty to skip — usage still works, but you will be asked to sign in again when the access token expires.",
+        "data": {
+          "session_cookie": "Auth0 session cookie (`auth0`)"
+        }
       }
     },
     "error": {
       "invalid_callback": "That callback URL did not contain a valid authorization code for this login attempt. Open the new link below and try again.",
       "cannot_connect": "Could not reach SP Services. Try again in a moment.",
-      "no_accounts": "This SP Services login has no linked utility accounts."
+      "no_accounts": "This SP Services login has no linked utility accounts.",
+      "invalid_session_cookie": "SP would not renew a session with that cookie. Copy the `auth0` cookie value again from the browser you signed in with, or leave the field empty to skip."
     }
   },
   "entity": {

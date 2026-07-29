@@ -61,6 +61,15 @@ _HEADERS: dict[str, str] = {
     "Content-Type": "application/json",
 }
 
+_HTML_HEADERS: dict[str, str] = {
+    **{key: value for key, value in _HEADERS.items() if key != "Content-Type"},
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+}
+
+# Auth0 keeps its tenant session in these cookies; `auth0` is the session
+# itself, the `did` pair identifies the device for remembered MFA.
+_SESSION_COOKIE_NAMES = ("auth0", "auth0_compat", "did", "did_compat")
+
 _REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=30)
 
 SP_TIMEZONE = ZoneInfo("Asia/Singapore")
@@ -173,12 +182,10 @@ class LoginSession:
             code_verifier=secrets.token_urlsafe(48),
         )
 
-    @property
-    def authorize_url(self) -> str:
-        """Auth0 URL the user opens in a browser to log in."""
+    def _authorize_params(self) -> dict[str, str]:
         digest = hashlib.sha256(self.code_verifier.encode("utf-8")).digest()
         challenge = base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
-        params = {
+        return {
             "client_id": _AUTH0_CLIENT_ID,
             "redirect_uri": _AUTH0_REDIRECT_URI,
             "response_type": "code",
@@ -189,7 +196,24 @@ class LoginSession:
             "nonce": self.nonce,
             "state": self.state,
         }
-        return f"{_AUTH0_AUTHORIZE_URL}?{urlencode(params)}"
+
+    @property
+    def authorize_url(self) -> str:
+        """Auth0 URL the user opens in a browser to log in."""
+        return f"{_AUTH0_AUTHORIZE_URL}?{urlencode(self._authorize_params())}"
+
+    @property
+    def silent_authorize_url(self) -> str:
+        """Authorize URL for a non-interactive renewal (``prompt=none``).
+
+        Auth0 answers this with an authorization code when the tenant session
+        cookie sent alongside it is still valid, and with ``login_required``
+        when it is not. This is how SP's own web portal stays signed in.
+        """
+        return (
+            f"{_AUTH0_AUTHORIZE_URL}?"
+            f"{urlencode({**self._authorize_params(), 'prompt': 'none'})}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -206,13 +230,59 @@ async def async_exchange_callback_url(
         raise SPUsageAuthError(
             "callback URL did not contain a code matching the expected state"
         )
+    return await _async_exchange_code(session, code, login.code_verifier)
 
+
+async def async_renew_with_session_cookie(
+    session: aiohttp.ClientSession, cookie: str
+) -> tuple[TokenSet, str]:
+    """Mint a fresh token set from a stored Auth0 session cookie.
+
+    SP does not hand every account a refresh token, but its portal keeps itself
+    signed in through the Auth0 tenant session instead. Replaying that session
+    cookie against ``prompt=none`` gives the same unattended renewal, and
+    returns the (possibly rotated) cookie to store for next time.
+    """
+    if not cookie:
+        raise SPUsageAuthError("no SP session cookie stored")
+
+    login = LoginSession.create()
+    async with session.get(
+        login.silent_authorize_url,
+        headers={**_HTML_HEADERS, "Cookie": cookie},
+        allow_redirects=False,
+        timeout=_REQUEST_TIMEOUT,
+    ) as response:
+        location = response.headers.get("Location", "")
+        set_cookies = _response_set_cookies(response)
+        status = response.status
+
+    if status not in (301, 302, 303, 307, 308) or not location:
+        raise SPUsageSessionExpired(
+            f"SP Services did not return a renewal redirect (HTTP {status}); "
+            "the stored session cookie is no longer usable"
+        )
+
+    code = _code_from_url(location, login.state)
+    if not code:
+        raise SPUsageSessionExpired(
+            "SP Services rejected the stored session cookie "
+            f"({_error_from_url(location) or 'no authorization code returned'})"
+        )
+
+    token = await _async_exchange_code(session, code, login.code_verifier)
+    return token, _merged_session_cookie(cookie, set_cookies)
+
+
+async def _async_exchange_code(
+    session: aiohttp.ClientSession, code: str, code_verifier: str
+) -> TokenSet:
     body = await _post_json(
         session,
         _AUTH0_TOKEN_URL,
         {
             "client_id": _AUTH0_CLIENT_ID,
-            "code_verifier": login.code_verifier,
+            "code_verifier": code_verifier,
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": _AUTH0_REDIRECT_URI,
@@ -487,6 +557,75 @@ async def _post_text_optional(
 # ---------------------------------------------------------------------------
 # Parsing helpers
 # ---------------------------------------------------------------------------
+
+
+def normalize_session_cookie(raw: str) -> str:
+    """Turn whatever the user pasted into a Cookie header value.
+
+    Accepts a full cookie header, a devtools copy of several cookies, or just
+    the bare `auth0` value, and keeps only the cookies Auth0 needs so an
+    unrelated pasted cookie is not stored or replayed.
+    """
+    text = raw.strip().strip(";").strip()
+    if not text:
+        return ""
+    if "=" not in text:
+        return f"auth0={text}"
+
+    pairs: list[str] = []
+    for part in text.replace("\n", ";").split(";"):
+        candidate = part.strip()
+        if not candidate or "=" not in candidate:
+            continue
+        name = candidate.split("=", 1)[0].strip()
+        if name in _SESSION_COOKIE_NAMES:
+            pairs.append(f"{name}={candidate.split('=', 1)[1].strip()}")
+    return "; ".join(pairs)
+
+
+def _response_set_cookies(response: Any) -> list[str]:
+    headers = getattr(response, "headers", None)
+    if headers is None:
+        return []
+    getall = getattr(headers, "getall", None)
+    if getall is not None:
+        return list(getall("Set-Cookie", []))
+    value = headers.get("Set-Cookie")
+    return [value] if value else []
+
+
+def _merged_session_cookie(current: str, set_cookie_headers: list[str]) -> str:
+    """Apply any rotated session cookies Auth0 returned to the stored value.
+
+    Auth0 sessions are rolling: each renewal can hand back a new cookie, and
+    storing it is what keeps the session alive past its inactivity window.
+    """
+    cookies: dict[str, str] = {}
+    for pair in current.split(";"):
+        candidate = pair.strip()
+        if "=" in candidate:
+            name, value = candidate.split("=", 1)
+            cookies[name.strip()] = value.strip()
+
+    for header in set_cookie_headers:
+        first = str(header).split(";", 1)[0].strip()
+        if "=" not in first:
+            continue
+        name, value = first.split("=", 1)
+        name = name.strip()
+        if name in _SESSION_COOKIE_NAMES and value.strip():
+            cookies[name] = value.strip()
+
+    return "; ".join(f"{name}={value}" for name, value in cookies.items())
+
+
+def _error_from_url(url: str) -> str | None:
+    query = parse_qs(urlparse(url).query)
+    error = query.get("error", [None])[0]
+    if not error:
+        return None
+    description = query.get("error_description", [None])[0]
+    return f"{error}: {description}" if description else error
 
 
 def _code_from_url(url: str, expected_state: str) -> str | None:

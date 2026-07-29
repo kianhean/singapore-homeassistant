@@ -22,6 +22,7 @@ from .sp_usage_client import (
     UsageData,
     async_fetch_usage,
     async_refresh_token,
+    async_renew_with_session_cookie,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ _LOGGER = logging.getLogger(__name__)
 CONF_SP_REFRESH_TOKEN = "sp_refresh_token"
 CONF_SP_ACCESS_TOKEN = "sp_access_token"
 CONF_SP_ACCESS_TOKEN_EXPIRES_AT = "sp_access_token_expires_at"
+CONF_SP_SESSION_COOKIE = "sp_session_cookie"
 CONF_SP_ACCOUNT_NO = "sp_account_no"
 
 # One fetch makes up to six requests against private SP endpoints, and SP
@@ -75,7 +77,11 @@ def stored_token(data: Mapping[str, Any]) -> TokenSet | None:
 
 def has_sp_credentials(data: Mapping[str, Any]) -> bool:
     """Whether the entry carries anything usable to talk to SP Services."""
-    return bool(data.get(CONF_SP_REFRESH_TOKEN) or data.get(CONF_SP_ACCESS_TOKEN))
+    return bool(
+        data.get(CONF_SP_REFRESH_TOKEN)
+        or data.get(CONF_SP_ACCESS_TOKEN)
+        or data.get(CONF_SP_SESSION_COOKIE)
+    )
 
 
 class SPUsageCoordinator(DataUpdateCoordinator[UsageData]):
@@ -100,6 +106,7 @@ class SPUsageCoordinator(DataUpdateCoordinator[UsageData]):
         self._entry = entry
         self._account_no: str | None = entry.data.get(CONF_SP_ACCOUNT_NO)
         self._refresh_token: str | None = entry.data.get(CONF_SP_REFRESH_TOKEN)
+        self._session_cookie: str | None = entry.data.get(CONF_SP_SESSION_COOKIE)
         self._token: TokenSet | None = stored_token(entry.data)
 
     @property
@@ -140,23 +147,34 @@ class SPUsageCoordinator(DataUpdateCoordinator[UsageData]):
         return await self._async_refresh(session)
 
     async def _async_refresh(self, session: aiohttp.ClientSession) -> TokenSet:
-        if not self._refresh_token:
-            raise SPUsageAuthError(
-                "the SP Services session has expired and SP did not issue a "
-                "refresh token; sign in again to restore usage data"
+        if self._refresh_token:
+            token = await async_refresh_token(session, self._refresh_token)
+            self._refresh_token = token.refresh_token or self._refresh_token
+            self._token = token
+            # Persist the new access token too: without it a restart before the
+            # token expires would burn a refresh round trip, and in accounts
+            # where SP issues no refresh token it is the only thing keeping the
+            # entry alive across restarts.
+            self._async_persist(token)
+            return token
+
+        if self._session_cookie:
+            token, cookie = await async_renew_with_session_cookie(
+                session, self._session_cookie
             )
+            self._session_cookie = cookie
+            self._token = token
+            self._async_persist(token, cookie)
+            return token
 
-        token = await async_refresh_token(session, self._refresh_token)
-        self._token = token
-        # Persist the new access token too: without it a restart before the
-        # token expires would burn a refresh round trip, and in accounts where
-        # SP issues no refresh token it is the only thing keeping the entry
-        # alive across restarts.
-        self._refresh_token = token.refresh_token or self._refresh_token
-        self._async_persist(token)
-        return token
+        raise SPUsageAuthError(
+            "the SP Services session has expired and SP did not issue a "
+            "refresh token; sign in again to restore usage data"
+        )
 
-    def _async_persist(self, token: TokenSet) -> None:
+    def _async_persist(self, token: TokenSet, cookie: str | None = None) -> None:
         data = {**self._entry.data, **token_entry_data(token)}
+        if cookie is not None:
+            data[CONF_SP_SESSION_COOKIE] = cookie
         if data != dict(self._entry.data):
             self.hass.config_entries.async_update_entry(self._entry, data=data)

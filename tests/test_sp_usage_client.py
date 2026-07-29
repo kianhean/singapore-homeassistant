@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, urlparse
 
 import aiohttp
 import pytest
+from multidict import CIMultiDict
 
 from custom_components.singapore.sp_usage_client import (
     SP_TIMEZONE,
@@ -16,6 +17,7 @@ from custom_components.singapore.sp_usage_client import (
     UsagePoint,
     _code_from_url,
     _extract_accounts,
+    _merged_session_cookie,
     _monthly_summary_from_sections,
     _parse_daily_csv,
     _parse_daily_history_csv,
@@ -29,6 +31,8 @@ from custom_components.singapore.sp_usage_client import (
     async_exchange_callback_url,
     async_fetch_usage,
     async_refresh_token,
+    async_renew_with_session_cookie,
+    normalize_session_cookie,
 )
 
 _NOW = datetime(2026, 4, 12, 16, 42, tzinfo=SP_TIMEZONE)
@@ -510,3 +514,143 @@ async def test_refresh_token_rejected():
 async def test_refresh_token_requires_a_token():
     with pytest.raises(SPUsageAuthError):
         await async_refresh_token(_FakeSession(lambda url, payload: None), "")
+
+
+# ---------------------------------------------------------------------------
+# Session-cookie silent renewal
+# ---------------------------------------------------------------------------
+
+
+class _FakeRedirect:
+    def __init__(self, status=302, location="", set_cookies=()):
+        self.status = status
+        self.headers = CIMultiDict()
+        if location:
+            self.headers["Location"] = location
+        for cookie in set_cookies:
+            self.headers.add("Set-Cookie", cookie)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+
+class _FakeCookieSession(_FakeSession):
+    """Adds the GET used by the silent-authorize round trip."""
+
+    def __init__(self, redirect, handler=None):
+        super().__init__(
+            handler
+            or (
+                lambda url, payload: _FakeResponse(
+                    json_body={"access_token": "renewed", "expires_in": 3600}
+                )
+            )
+        )
+        self._redirect = redirect
+        self.get_headers: dict[str, str] = {}
+        self.get_url = ""
+
+    def get(self, url, headers=None, allow_redirects=None, timeout=None):
+        self.get_url = url
+        self.get_headers = headers or {}
+        assert allow_redirects is False, "the redirect must not be followed"
+        return self._redirect
+
+
+def test_normalize_session_cookie_accepts_bare_value():
+    assert normalize_session_cookie("  abc123 ") == "auth0=abc123"
+
+
+def test_normalize_session_cookie_keeps_only_auth0_cookies():
+    raw = "auth0=sess; did=device; _ga=tracking; other=nope"
+    assert normalize_session_cookie(raw) == "auth0=sess; did=device"
+
+
+def test_normalize_session_cookie_handles_base64_padding():
+    assert normalize_session_cookie("auth0=abc==") == "auth0=abc=="
+
+
+def test_normalize_session_cookie_empty():
+    assert normalize_session_cookie("   ") == ""
+
+
+def test_merged_session_cookie_applies_rotation():
+    merged = _merged_session_cookie(
+        "auth0=old; did=device",
+        ["auth0=new; Path=/; HttpOnly", "_csrf=irrelevant; Path=/"],
+    )
+    assert merged == "auth0=new; did=device"
+
+
+@pytest.mark.asyncio
+async def test_renew_with_session_cookie():
+    state_holder = {}
+
+    class _Session(_FakeCookieSession):
+        def get(self, url, headers=None, allow_redirects=None, timeout=None):
+            state_holder["state"] = parse_qs(urlparse(url).query)["state"][0]
+            state_holder["prompt"] = parse_qs(urlparse(url).query)["prompt"][0]
+            self._redirect = _FakeRedirect(
+                location=(
+                    "https://services.spservices.sg/callback?fromLogin=true"
+                    f"&code=fresh-code&state={state_holder['state']}"
+                ),
+                set_cookies=["auth0=rotated; Path=/; HttpOnly"],
+            )
+            return super().get(url, headers, allow_redirects, timeout)
+
+    session = _Session(None)
+
+    token, cookie = await async_renew_with_session_cookie(session, "auth0=stored")
+
+    assert state_holder["prompt"] == "none"
+    assert session.get_headers["Cookie"] == "auth0=stored"
+    assert token.access_token == "renewed"
+    # The rotated cookie must be kept or the rolling session dies with it.
+    assert cookie == "auth0=rotated"
+    assert session.requests[0][1]["code"] == "fresh-code"
+
+
+@pytest.mark.asyncio
+async def test_renew_with_session_cookie_login_required():
+    redirect = _FakeRedirect(
+        location=(
+            "https://services.spservices.sg/callback?error=login_required"
+            "&error_description=Login%20required"
+        )
+    )
+
+    with pytest.raises(SPUsageSessionExpired, match="login_required"):
+        await async_renew_with_session_cookie(
+            _FakeCookieSession(redirect), "auth0=stale"
+        )
+
+
+@pytest.mark.asyncio
+async def test_renew_with_session_cookie_non_redirect():
+    with pytest.raises(SPUsageSessionExpired, match="HTTP 200"):
+        await async_renew_with_session_cookie(
+            _FakeCookieSession(_FakeRedirect(status=200)), "auth0=stale"
+        )
+
+
+@pytest.mark.asyncio
+async def test_renew_without_cookie_raises():
+    with pytest.raises(SPUsageAuthError):
+        await async_renew_with_session_cookie(_FakeCookieSession(None), "")
+
+
+@pytest.mark.asyncio
+async def test_renew_rejects_code_with_mismatched_state():
+    """A redirect carrying someone else's state must not be exchanged."""
+    redirect = _FakeRedirect(
+        location="https://services.spservices.sg/callback?code=x&state=not-ours"
+    )
+
+    with pytest.raises(SPUsageSessionExpired):
+        await async_renew_with_session_cookie(
+            _FakeCookieSession(redirect), "auth0=stored"
+        )

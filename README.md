@@ -225,19 +225,32 @@ for the URL your browser lands on afterwards:
 5. If several utility accounts are linked to the login, pick the one to track.
 
 Your username and password are never entered into Home Assistant — only the
-tokens SP hands back are stored.
+credentials SP hands back are stored.
 
-**How long a link lasts depends on your account.** SP's Auth0 tenant does not
-always issue a refresh token:
+### Keeping the session alive
 
-- **With a refresh token** — the integration keeps itself signed in indefinitely.
-- **Without one** (SP simply does not return it for some accounts) — the access
-  token is used until it expires, typically hours. Home Assistant then raises a
-  **reauthentication** notification and you repeat the same
-  paste-the-callback-URL steps.
+SP's Auth0 tenant does not issue a refresh token for every account. What happens
+next depends on which case you are in:
 
-Either way the sensors work; only how often you have to sign in again differs.
-To see which one you got, enable debug logging for the integration and look for
+- **With a refresh token** — nothing to do; the integration stays signed in
+  indefinitely.
+- **Without one** — the access token expires on its own (often within hours), so
+  the flow offers an extra step: paste your **Auth0 session cookie** and Home
+  Assistant renews the login unattended, exactly the way the SP web portal does.
+
+To copy the cookie: in the browser you just signed in with, open developer tools
+(F12) → **Application** (Chrome/Edge) or **Storage** (Firefox) → **Cookies** →
+`https://identity.spdigital.auth0.com`, and copy the **Value** of the cookie
+named `auth0`. It is `HttpOnly`, so it will not show up in `document.cookie`.
+
+The cookie is stored in Home Assistant alongside the tokens and is refreshed on
+every renewal, so the link lasts until SP ends the session itself — typically
+weeks — and only then does Home Assistant raise a **reauthentication**
+notification.
+
+You can skip the cookie step. Usage sensors still work; you will just be asked
+to sign in again whenever the access token expires. To check which case your
+account is in, enable debug logging and look for
 `SP Services issued no refresh token`:
 
 ```yaml

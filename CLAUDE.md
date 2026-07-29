@@ -293,13 +293,38 @@ data at all. Both modes are supported:
 | SP returns | Behaviour |
 |------------|-----------|
 | refresh token | coordinator refreshes on expiry and keeps itself signed in |
+| access token only + session cookie | `prompt=none` renewal mints new tokens (see below) |
 | access token only | stored token is used until it expires, then `ConfigEntryAuthFailed` → reauth |
 
 `entry.data` therefore carries `sp_access_token`, `sp_access_token_expires_at`,
-`sp_refresh_token` (may be `None`), and `sp_account_no`. `token_entry_data()` always
-writes all three token fields — including `None` — because they are merged over
-existing entry data and a re-link that returned no refresh token must clear the stale
-one instead of leaving a dead token behind.
+`sp_refresh_token` (may be `None`), `sp_session_cookie` (may be `None`), and
+`sp_account_no`. `token_entry_data()` always writes all three token fields — including
+`None` — because they are merged over existing entry data and a re-link that returned no
+refresh token must clear the stale one instead of leaving a dead token behind.
+
+### Silent renewal with the Auth0 session cookie
+
+When SP issues no refresh token, the config flow's `sp_session` step asks for the Auth0
+tenant session cookie (`auth0`, copied from browser devtools — it is `HttpOnly`).
+`async_renew_with_session_cookie()` then replays it against
+`/authorize?…&prompt=none` with `allow_redirects=False`, reads the authorization code
+out of the `Location` header (state-checked, same as the pasted callback), and exchanges
+it — the same mechanism SP's own portal uses to stay signed in.
+
+- Auth0 sessions are **rolling**: each renewal can return a new cookie via `Set-Cookie`.
+  `_merged_session_cookie()` folds it into the stored value and the coordinator persists
+  it — dropping it would end the session at the inactivity timeout.
+- Only `auth0`, `auth0_compat`, `did`, `did_compat` are kept
+  (`normalize_session_cookie()`), so an unrelated pasted cookie is never stored or
+  replayed. A bare value is accepted and treated as `auth0=<value>`.
+- A non-redirect response or `error=login_required` means the session is gone →
+  `SPUsageSessionExpired` → reauth.
+- The step validates the cookie by performing a real renewal, and keeps that fresher
+  token, so a bad paste is rejected at setup rather than 30 minutes later.
+- The cookie step is skippable (empty input): the entry still works until the access
+  token expires.
+
+`_async_refresh()` order is refresh token → session cookie → `SPUsageAuthError`.
 
 `SPUsageCoordinator` rebuilds the token from the entry at startup (`stored_token()`),
 refreshes when `TokenSet.is_expired()` (60 s leeway), retries once on a mid-fetch 401,

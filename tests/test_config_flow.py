@@ -10,6 +10,7 @@ from homeassistant.const import CONF_NAME
 from custom_components.singapore.config_flow import (
     CONF_CALLBACK_URL,
     CONF_LINK_SP,
+    CONF_SESSION_COOKIE,
     STEP_USER_DATA_SCHEMA,
     SingaporeElectricityConfigFlow,
     SingaporeOptionsFlow,
@@ -23,6 +24,7 @@ from custom_components.singapore.usage_coordinator import (
     CONF_SP_ACCESS_TOKEN_EXPIRES_AT,
     CONF_SP_ACCOUNT_NO,
     CONF_SP_REFRESH_TOKEN,
+    CONF_SP_SESSION_COOKIE,
 )
 
 _CALLBACK_URL = "https://services.spservices.sg/callback?code=abc&state=xyz"
@@ -106,6 +108,7 @@ async def test_sp_login_single_account_creates_entry():
         CONF_SP_REFRESH_TOKEN: "rt",
         CONF_SP_ACCESS_TOKEN: "at",
         CONF_SP_ACCESS_TOKEN_EXPIRES_AT: None,
+        CONF_SP_SESSION_COOKIE: None,
         CONF_SP_ACCOUNT_NO: "8949049293",
     }
 
@@ -149,27 +152,95 @@ async def test_sp_login_bad_callback_url_restarts_login():
     assert result["description_placeholders"]["authorize_url"] != first_url
 
 
-@pytest.mark.asyncio
-async def test_sp_login_without_refresh_token_still_links():
-    """SP does not always issue a refresh token; the access token still works.
-
-    Rejecting the login would leave those accounts with no usage data at all;
-    instead the entry is created and reauth asks for a new sign-in on expiry.
-    """
-    flow = _flow()
-    await flow.async_step_user({CONF_NAME: "Singapore", CONF_LINK_SP: True})
-
+async def _login_without_refresh_token(flow):
+    """Run the callback step for a login SP gave no refresh token for."""
     expires_at = datetime.now(timezone.utc) + timedelta(hours=8)
     patches = _patch_login(
         token=TokenSet(access_token="at", refresh_token=None, expires_at=expires_at)
     )
     with patches[0], patches[1], patches[2]:
-        result = await flow.async_step_sp_login({CONF_CALLBACK_URL: _CALLBACK_URL})
+        return await flow.async_step_sp_login({CONF_CALLBACK_URL: _CALLBACK_URL}), (
+            expires_at
+        )
+
+
+def _patch_renewal(token=TokenSet(access_token="renewed"), rotated="auth0=rotated"):
+    return (
+        patch(
+            "custom_components.singapore.config_flow.async_get_clientsession",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "custom_components.singapore.config_flow.async_renew_with_session_cookie",
+            AsyncMock(return_value=(token, rotated)),
+        ),
+    )
+
+
+@pytest.mark.asyncio
+async def test_login_without_refresh_token_offers_session_cookie():
+    """SP does not always issue a refresh token; offer the renewal cookie."""
+    flow = _flow()
+    await flow.async_step_user({CONF_NAME: "Singapore", CONF_LINK_SP: True})
+
+    result, _expires_at = await _login_without_refresh_token(flow)
+
+    assert result["type"] == "form"
+    assert result["step_id"] == "sp_session"
+
+
+@pytest.mark.asyncio
+async def test_session_cookie_is_validated_and_stored():
+    flow = _flow()
+    await flow.async_step_user({CONF_NAME: "Singapore", CONF_LINK_SP: True})
+    await _login_without_refresh_token(flow)
+
+    patches = _patch_renewal()
+    with patches[0], patches[1]:
+        result = await flow.async_step_sp_session({CONF_SESSION_COOKIE: "cookie-value"})
+
+    assert result["type"] == "create_entry"
+    # The renewal proves the cookie works, so its fresher token is kept.
+    assert result["data"][CONF_SP_ACCESS_TOKEN] == "renewed"
+    assert result["data"][CONF_SP_SESSION_COOKIE] == "auth0=rotated"
+
+
+@pytest.mark.asyncio
+async def test_dead_session_cookie_is_rejected():
+    flow = _flow()
+    await flow.async_step_user({CONF_NAME: "Singapore", CONF_LINK_SP: True})
+    await _login_without_refresh_token(flow)
+
+    with (
+        patch(
+            "custom_components.singapore.config_flow.async_get_clientsession",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "custom_components.singapore.config_flow.async_renew_with_session_cookie",
+            AsyncMock(side_effect=SPUsageAuthError("login_required")),
+        ),
+    ):
+        result = await flow.async_step_sp_session({CONF_SESSION_COOKIE: "stale"})
+
+    assert result["step_id"] == "sp_session"
+    assert result["errors"]["base"] == "invalid_session_cookie"
+
+
+@pytest.mark.asyncio
+async def test_session_cookie_can_be_skipped():
+    """Skipping still links the account; it just expires with the token."""
+    flow = _flow()
+    await flow.async_step_user({CONF_NAME: "Singapore", CONF_LINK_SP: True})
+    _result, expires_at = await _login_without_refresh_token(flow)
+
+    result = await flow.async_step_sp_session({CONF_SESSION_COOKIE: "  "})
 
     assert result["type"] == "create_entry"
     assert result["data"][CONF_SP_ACCESS_TOKEN] == "at"
     assert result["data"][CONF_SP_ACCESS_TOKEN_EXPIRES_AT] == expires_at.isoformat()
     assert result["data"][CONF_SP_REFRESH_TOKEN] is None
+    assert result["data"][CONF_SP_SESSION_COOKIE] is None
 
 
 @pytest.mark.asyncio
@@ -311,6 +382,7 @@ async def test_relink_without_refresh_token_clears_the_stale_one():
     patches = _patch_login(token=TokenSet(access_token="fresh", refresh_token=None))
     with patches[0], patches[1], patches[2]:
         await flow.async_step_sp_login({CONF_CALLBACK_URL: _CALLBACK_URL})
+    await flow.async_step_sp_session({CONF_SESSION_COOKIE: ""})
 
     stored = flow.hass.config_entries.async_update_entry.call_args.kwargs["data"]
     assert stored[CONF_SP_REFRESH_TOKEN] is None
