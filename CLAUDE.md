@@ -361,6 +361,12 @@ on every rotation. The options flow reloads the entry explicitly instead.
 
 ### Fetch
 
+The coordinator refreshes once at setup and then every **30 minutes**. The setup
+refresh is an `entry.async_create_background_task` (not
+`async_config_entry_first_refresh`) so a slow or broken private SP endpoint cannot
+delay or fail setup of the public entities; a failure there just logs a warning and
+waits for the next interval.
+
 `async_fetch_usage` polls every **30 minutes** (one call ≈ six upstream requests) and
 mirrors upstream's fallback chain:
 

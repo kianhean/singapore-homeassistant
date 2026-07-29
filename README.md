@@ -127,6 +127,12 @@ This is opt-in: it only appears after you link your SP account (see
 | `sensor.singapore_water_usage_this_month` | Singapore Water Usage This Month | m³ | Water used in the current month |
 | `sensor.singapore_water_usage_last_month` | Singapore Water Usage Last Month | m³ | Last published monthly water total |
 
+Polling: once at Home Assistant startup, then every 30 minutes. The startup
+fetch runs in the background, so a slow SP endpoint never delays the rest of the
+integration; if it fails, the sensors stay unavailable until the next 30-minute
+cycle. One fetch makes about six requests to SP, and SP updates this data slowly,
+so polling faster gains nothing.
+
 SP publishes the in-progress month late, so the "this month" sensors stay
 `unknown` (not `0`) until SP publishes them. SP does not publish same-day water
 usage in any of its exports, so there is no "water today" sensor.
