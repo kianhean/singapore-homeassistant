@@ -112,6 +112,31 @@ Bukit Panjang LRT, Sengkang LRT, Punggol LRT.
   <img src="images/train-status.jpeg" alt="Singapore MRT/LRT device page showing overall and per-line train status sensors" width="320">
 </p>
 
+### SP Services household usage (optional, requires login)
+
+Your own electricity and water consumption from the
+[SP Services portal](https://services.spservices.sg), polled every **30 minutes**.
+This is opt-in: it only appears after you link your SP account (see
+[Linking your SP Services account](#linking-your-sp-services-account)).
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.singapore_electricity_usage_today` | Singapore Electricity Usage Today | kWh | Electricity used today |
+| `sensor.singapore_electricity_usage_this_month` | Singapore Electricity Usage This Month | kWh | Electricity used in the current month |
+| `sensor.singapore_electricity_usage_last_month` | Singapore Electricity Usage Last Month | kWh | Last published monthly electricity total |
+| `sensor.singapore_water_usage_this_month` | Singapore Water Usage This Month | m³ | Water used in the current month |
+| `sensor.singapore_water_usage_last_month` | Singapore Water Usage Last Month | m³ | Last published monthly water total |
+
+Polling: once at Home Assistant startup, then every 30 minutes. The startup
+fetch runs in the background, so a slow SP endpoint never delays the rest of the
+integration; if it fails, the sensors stay unavailable until the next 30-minute
+cycle. One fetch makes about six requests to SP, and SP updates this data slowly,
+so polling faster gains nothing.
+
+SP publishes the in-progress month late, so the "this month" sensors stay
+`unknown` (not `0`) until SP publishes them. SP does not publish same-day water
+usage in any of its exports, so there is no "water today" sensor.
+
 ### Public holidays
 
 Updated every 24 hours from [MOM](https://www.mom.gov.sg/employment-practices/public-holidays).
@@ -161,6 +186,14 @@ sensor.singapore_temperature:
   unit_of_measurement: °C
   attributes:
     source: data.gov.sg / NEA (collection 1459)
+
+sensor.singapore_electricity_usage_today:
+  state: 19.967
+  unit_of_measurement: kWh
+  attributes:
+    account_no: "8949049293"
+    last_updated: "2026-04-12T16:42:41+08:00"
+    source: SP Services
 ```
 
 ## Installation via HACS (manual custom repository)
@@ -175,7 +208,108 @@ sensor.singapore_temperature:
 
 1. Go to **Settings → Devices & Services → Add Integration**.
 2. Search for **Singapore**.
-3. Enter a name and click **Submit**.
+3. Enter a name.
+4. Optionally tick **Link my SP Services account** to add your own electricity
+   and water usage sensors — see
+   [Linking your SP Services account](#linking-your-sp-services-account) for the
+   browser sign-in that follows.
+5. Click **Submit**.
+
+All public data (tariffs, COE, weather, trains, holidays) works with no account,
+and the SP account can be linked later from **Configure** on the entry.
+
+## Linking your SP Services account
+
+Optional — only needed for your own electricity and water usage sensors.
+Everything else in the integration works without it.
+
+SP Services signs in through Auth0 with a captcha and an SMS OTP, so the
+integration cannot sign in for you. It hands you a login link instead and asks
+for the URL your browser lands on afterwards. Your username and password are
+never entered into Home Assistant.
+
+### 1. Start the link
+
+Tick **Link my SP Services account** while adding the integration, or open
+**Configure** on an existing Singapore entry and choose **Sign in to SP
+Services again**.
+
+### 2. Sign in and hand back the callback URL
+
+1. Open the link shown in the form and sign in to SP Services.
+2. Complete the captcha and the SMS OTP in the browser.
+3. The browser lands on `https://services.spservices.sg/callback?...` — copy
+   that **full** URL. It usually redirects away immediately; if you miss it,
+   open developer tools (F12) → **Network**, tick **Preserve log**, sign in
+   again, and copy the Request URL of the `callback` request.
+4. Paste it back into the form. It must contain both `code=` and `state=`, and
+   it has to come from the link currently shown — every attempt generates a new
+   one, and a callback from an earlier attempt is rejected.
+5. If several utility accounts are linked to the login, pick the premises to
+   track.
+
+### 3. Keep the session alive (only for some accounts)
+
+SP's Auth0 tenant does not issue a refresh token for every account:
+
+- **With a refresh token** — nothing more to do. The integration stays signed in
+  indefinitely.
+- **Without one** — the access token expires on its own, often within hours, so
+  the flow shows an extra step asking for your **Auth0 session cookie**. Home
+  Assistant then renews the sign-in unattended, exactly the way the SP web
+  portal does.
+
+To copy the cookie:
+
+1. In the same browser you signed in with, open developer tools (F12) →
+   **Application** (Chrome/Edge) or **Storage** (Firefox) → **Cookies** →
+   `https://identity.spdigital.auth0.com`.
+2. Copy the **Value** of the cookie named `auth0`. It is `HttpOnly`, so it does
+   not appear in `document.cookie` — devtools is the only way to read it.
+3. Paste it into the form (the value alone is enough).
+
+The cookie is stored with your tokens and replaced automatically on every
+renewal, so the link lasts until SP ends the session itself — typically weeks —
+and only then does Home Assistant raise a **reauthentication** notification.
+
+Leaving the field empty is fine: usage sensors still work, you will just be
+asked to sign in again whenever the access token expires. You can add or replace
+the cookie at any time from **Configure** → **Update the session cookie**.
+
+### Which case is my account in?
+
+Enable debug logging and look for `SP Services issued no refresh token` after a
+sign-in:
+
+```yaml
+logger:
+  logs:
+    custom_components.singapore: debug
+```
+
+### Unlinking
+
+**Configure** → **Unlink SP Services account** deletes the stored tokens and
+cookie and removes the usage sensors. The rest of the integration is unaffected.
+
+### What is stored, and where
+
+In the config entry (`.storage/core.config_entries`, same as every other
+integration's credentials): the SP access token and its expiry, the refresh
+token if SP issued one, the Auth0 session cookie if you provided one, and the
+account number being tracked. Only the cookies Auth0 needs (`auth0`,
+`auth0_compat`, `did`, `did_compat`) are kept from what you paste — anything
+else is discarded rather than stored.
+
+### Troubleshooting
+
+| Symptom | What it means |
+|---------|---------------|
+| "That callback URL did not contain a valid authorization code" | The URL came from an older attempt, or `state=` is missing. Use the link currently shown in the form and copy the whole callback URL. |
+| "SP would not renew a session with that cookie" | The `auth0` cookie is stale or was copied from a different browser/profile. Sign in again in that browser and copy it fresh. |
+| Usage sensors go unavailable and a **reauthentication** notice appears | The SP session ended. Complete the reauth prompt; add the session cookie at that step to make it last longer. |
+| Usage sensors show `unknown` | SP has not published that figure yet — the in-progress month lands late, and same-day water is never published. This is not an error. |
+| Everything else works but usage never appears | The entry has no SP account linked. Open **Configure** on the entry. |
 
 ## Data sources
 
@@ -187,6 +321,7 @@ sensor.singapore_temperature:
 | [data.gov.sg / NEA (collection 1459)](https://data.gov.sg/collections/1459/view) | Realtime weather readings | Every 10 min |
 | [MOM](https://www.mom.gov.sg/employment-practices/public-holidays) | Public holidays | Every 24 h |
 | [mytransport.sg](https://www.mytransport.sg/trainstatus) | MRT/LRT train status | Every 5 min |
+| [SP Services](https://services.spservices.sg) (private endpoints, login required) | Household electricity and water usage | Every 30 min |
 
 ## Development
 

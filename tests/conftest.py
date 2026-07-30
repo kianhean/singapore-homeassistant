@@ -25,6 +25,10 @@ class ConfigEntryNotReady(Exception):
     pass
 
 
+class ConfigEntryAuthFailed(Exception):
+    pass
+
+
 class DataUpdateCoordinator:
     """Minimal coordinator that drives _async_update_data.
 
@@ -37,19 +41,35 @@ class DataUpdateCoordinator:
     def __class_getitem__(cls, item):
         return cls
 
-    def __init__(self, hass, logger, name, update_interval):
+    def __init__(self, hass, logger, name, update_interval, config_entry=None):
         self.hass = hass
         self.name = name
         self.data = None
         self.last_update_success = True
+        self.last_exception = None
+        self.config_entry = config_entry
         self._logger = logger
 
     async def async_refresh(self):
+        # Real HA delegates through _async_refresh(log_failures=...). Mirror
+        # that call shape: a subclass that shadows _async_refresh with its own
+        # signature then fails here, instead of only in production.
+        await self._async_refresh(log_failures=True)
+
+    async def _async_refresh(
+        self,
+        log_failures: bool = True,
+        raise_on_auth_failed: bool = False,
+        scheduled: bool = False,
+        raise_on_entry_error: bool = False,
+    ):
         try:
             self.data = await self._async_update_data()
             self.last_update_success = True
         except Exception as err:
-            self._logger.warning("Update failed: %s", err)
+            if log_failures:
+                self._logger.warning("Update failed: %s", err)
+            self.last_exception = err
             self.last_update_success = False
 
     async def async_config_entry_first_refresh(self):
@@ -98,10 +118,14 @@ class SensorDeviceClass:
     HUMIDITY = "humidity"
     WIND_SPEED = "wind_speed"
     PRECIPITATION = "precipitation"
+    ENERGY = "energy"
+    WATER = "water"
 
 
 class SensorStateClass:
     MEASUREMENT = "measurement"
+    TOTAL = "total"
+    TOTAL_INCREASING = "total_increasing"
 
 
 class Platform:
@@ -118,8 +142,10 @@ class ConfigEntry:
     def __class_getitem__(cls, item):
         return cls
 
-    def __init__(self, entry_id: str = "test_entry"):
+    def __init__(self, entry_id: str = "test_entry", data: dict | None = None):
         self.entry_id = entry_id
+        self.data = data or {}
+        self.options: dict = {}
         self.runtime_data = None
         self._on_unload: list = []
 
@@ -132,9 +158,35 @@ class ConfigEntry:
         return asyncio.ensure_future(coro)
 
 
-class ConfigFlow:
+class _FlowBase:
+    """Shared form/menu/entry helpers used by both flow types."""
+
+    def async_show_form(self, **kwargs):
+        return {"type": "form", **kwargs}
+
+    def async_show_menu(self, **kwargs):
+        return {"type": "menu", **kwargs}
+
+    def async_create_entry(self, **kwargs):
+        return {"type": "create_entry", **kwargs}
+
+    def async_abort(self, **kwargs):
+        return {"type": "abort", **kwargs}
+
+
+class ConfigFlow(_FlowBase):
     def __init_subclass__(cls, domain=None, **kwargs):
         super().__init_subclass__(**kwargs)
+
+    async def async_set_unique_id(self, unique_id):
+        self.unique_id = unique_id
+
+    def _abort_if_unique_id_configured(self):
+        return None
+
+
+class OptionsFlow(_FlowBase):
+    pass
 
 
 class AddEntitiesCallback:
@@ -162,6 +214,14 @@ class UnitOfSpeed:
 
 class UnitOfPrecipitationDepth:
     MILLIMETERS = "mm"
+
+
+class UnitOfEnergy:
+    KILO_WATT_HOUR = "kWh"
+
+
+class UnitOfVolume:
+    CUBIC_METERS = "m³"
 
 
 PERCENTAGE = "%"
@@ -220,11 +280,15 @@ _HA_MODULES: dict[str, ModuleType] = {
         UnitOfTemperature=UnitOfTemperature,
         UnitOfSpeed=UnitOfSpeed,
         UnitOfPrecipitationDepth=UnitOfPrecipitationDepth,
+        UnitOfEnergy=UnitOfEnergy,
+        UnitOfVolume=UnitOfVolume,
         PERCENTAGE=PERCENTAGE,
         DEGREE=DEGREE,
     ),
     "homeassistant.exceptions": _mod(
-        "homeassistant.exceptions", ConfigEntryNotReady=ConfigEntryNotReady
+        "homeassistant.exceptions",
+        ConfigEntryNotReady=ConfigEntryNotReady,
+        ConfigEntryAuthFailed=ConfigEntryAuthFailed,
     ),
     "homeassistant.helpers": _mod("homeassistant.helpers"),
     "homeassistant.helpers.update_coordinator": _mod(
@@ -274,6 +338,7 @@ _HA_MODULES: dict[str, ModuleType] = {
         "homeassistant.config_entries",
         ConfigEntry=ConfigEntry,
         ConfigFlow=ConfigFlow,
+        OptionsFlow=OptionsFlow,
         ConfigFlowResult=dict,
         SOURCE_USER="user",
     ),

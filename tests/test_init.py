@@ -74,3 +74,67 @@ async def test_async_setup_entry_raises_and_does_not_orphan_siblings():
     # refresh despite the tariff coordinator failing.
     assert calls == {"weather": True, "holiday": True, "train": True}
     hass.config_entries.async_forward_entry_setups.assert_not_called()
+
+
+def _patch_all_coordinators():
+    """Make every coordinator's first refresh succeed."""
+    from datetime import datetime, timezone
+
+    from custom_components.singapore.sp_usage_client import UsageData
+    from custom_components.singapore.usage_coordinator import SPUsageCoordinator
+
+    ok = AsyncMock(return_value=MagicMock())
+    usage_ok = AsyncMock(
+        return_value=UsageData(
+            account_no="8949049293",
+            last_updated=datetime(2026, 4, 12, tzinfo=timezone.utc),
+            electricity_today_kwh=19.967,
+        )
+    )
+    return [
+        patch.object(SPGroupCoordinator, "_async_update_data", ok),
+        patch.object(SingaporeWeatherCoordinator, "_async_update_data", ok),
+        patch.object(PublicHolidayCoordinator, "_async_update_data", ok),
+        patch.object(TrainStatusCoordinator, "_async_update_data", ok),
+        patch.object(CoeCoordinator, "_async_update_data", ok),
+        patch.object(SPUsageCoordinator, "_async_update_data", usage_ok),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_setup_without_sp_credentials_skips_usage_coordinator():
+    hass = MagicMock()
+    hass.config_entries.async_forward_entry_setups = AsyncMock()
+    entry = ConfigEntry()
+
+    patches = _patch_all_coordinators()
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+        assert await async_setup_entry(hass, entry) is True
+
+    assert entry.runtime_data.usage is None
+
+
+@pytest.mark.asyncio
+async def test_setup_with_sp_credentials_creates_usage_coordinator():
+    import asyncio
+
+    from custom_components.singapore.usage_coordinator import (
+        CONF_SP_ACCOUNT_NO,
+        CONF_SP_REFRESH_TOKEN,
+        SPUsageCoordinator,
+    )
+
+    hass = MagicMock()
+    hass.config_entries.async_forward_entry_setups = AsyncMock()
+    entry = ConfigEntry(
+        data={CONF_SP_REFRESH_TOKEN: "rt", CONF_SP_ACCOUNT_NO: "8949049293"}
+    )
+
+    patches = _patch_all_coordinators()
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+        assert await async_setup_entry(hass, entry) is True
+        # Let the backgrounded first refresh run.
+        await asyncio.sleep(0)
+
+    assert isinstance(entry.runtime_data.usage, SPUsageCoordinator)
+    assert entry.runtime_data.usage.account_no == "8949049293"

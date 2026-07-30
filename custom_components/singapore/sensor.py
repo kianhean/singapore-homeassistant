@@ -12,9 +12,11 @@ from homeassistant.components.sensor import (
 from homeassistant.const import (
     DEGREE,
     PERCENTAGE,
+    UnitOfEnergy,
     UnitOfPrecipitationDepth,
     UnitOfSpeed,
     UnitOfTemperature,
+    UnitOfVolume,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
@@ -29,7 +31,9 @@ from .coe_coordinator import (
     CoeCoordinator,
 )
 from .coordinator import UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER, SPGroupCoordinator
+from .sp_usage_client import UsagePoint
 from .train_coordinator import TRAIN_LINES, TrainStatusCoordinator
+from .usage_coordinator import SPUsageCoordinator
 from .weather_coordinator import SingaporeWeatherCoordinator
 
 PARALLEL_UPDATES = 0
@@ -39,6 +43,11 @@ UNIT_HUMIDITY = PERCENTAGE
 UNIT_WIND_SPEED = UnitOfSpeed.KILOMETERS_PER_HOUR
 UNIT_WIND_BEARING = DEGREE
 UNIT_RAINFALL = UnitOfPrecipitationDepth.MILLIMETERS
+UNIT_ELECTRICITY_USAGE = UnitOfEnergy.KILO_WATT_HOUR
+UNIT_WATER_USAGE = UnitOfVolume.CUBIC_METERS
+
+# Keep attribute payloads bounded — the recorder stores them on every change.
+_MAX_HISTORY_ATTR_POINTS = 12
 
 
 async def async_setup_entry(
@@ -75,6 +84,17 @@ async def async_setup_entry(
     for line in TRAIN_LINES:
         entities.append(
             SingaporeTrainLineStatusSensor(train_coordinator, entry.entry_id, line)
+        )
+
+    if data.usage is not None:
+        entities.extend(
+            [
+                SingaporeElectricityUsageTodaySensor(data.usage, entry.entry_id),
+                SingaporeElectricityUsageMonthSensor(data.usage, entry.entry_id),
+                SingaporeElectricityUsageLastMonthSensor(data.usage, entry.entry_id),
+                SingaporeWaterUsageMonthSensor(data.usage, entry.entry_id),
+                SingaporeWaterUsageLastMonthSensor(data.usage, entry.entry_id),
+            ]
         )
 
     async_add_entities(entities)
@@ -419,6 +439,170 @@ class SingaporeTrainStatusSensor(
             entry_type=DeviceEntryType.SERVICE,
             configuration_url="https://www.mytransport.sg/trainstatus#",
         )
+
+
+class _BaseUsageSensor(CoordinatorEntity[SPUsageCoordinator], SensorEntity):
+    """Base class for SP Services household usage sensors."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self, coordinator: SPUsageCoordinator, entry_id: str, suffix: str
+    ) -> None:
+        super().__init__(coordinator)
+        self._entry_id = entry_id
+        self._attr_unique_id = f"{entry_id}_{suffix}"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs: dict = {"source": "SP Services"}
+        if self.coordinator.data is not None:
+            attrs["account_no"] = self.coordinator.data.account_no
+            attrs["last_updated"] = self.coordinator.data.last_updated.isoformat()
+        return attrs
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{self._entry_id}_sp_usage")},
+            name="SP Services Usage",
+            manufacturer="Singapore",
+            model="SP Services Household Usage",
+            entry_type=DeviceEntryType.SERVICE,
+            configuration_url="https://services.spservices.sg",
+        )
+
+
+def _history_attr(points: list[UsagePoint] | None) -> list[dict]:
+    """Render the most recent history points for a state attribute."""
+    if not points:
+        return []
+    return [
+        {"period": point.period, "value": point.value, "status": point.status}
+        for point in points[-_MAX_HISTORY_ATTR_POINTS:]
+    ]
+
+
+class SingaporeElectricityUsageTodaySensor(_BaseUsageSensor):
+    """Electricity consumed today (kWh)."""
+
+    _attr_translation_key = "electricity_usage_today"
+    _attr_icon = "mdi:home-lightning-bolt"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = UNIT_ELECTRICITY_USAGE
+
+    def __init__(self, coordinator: SPUsageCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "sp_electricity_usage_today")
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.electricity_today_kwh
+
+
+class SingaporeElectricityUsageMonthSensor(_BaseUsageSensor):
+    """Electricity consumed this month (kWh).
+
+    SP publishes the in-progress month late, so this stays ``None`` (unknown,
+    not zero) until it appears in the monthly export.
+    """
+
+    _attr_translation_key = "electricity_usage_month"
+    _attr_icon = "mdi:calendar-month"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = UNIT_ELECTRICITY_USAGE
+
+    def __init__(self, coordinator: SPUsageCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "sp_electricity_usage_month")
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.electricity_month_kwh
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs = super().extra_state_attributes
+        if self.coordinator.data is not None:
+            attrs["monthly_history"] = _history_attr(
+                self.coordinator.data.electricity_monthly_history
+            )
+        return attrs
+
+
+class SingaporeElectricityUsageLastMonthSensor(_BaseUsageSensor):
+    """Electricity consumed in the last published month (kWh)."""
+
+    _attr_translation_key = "electricity_usage_last_month"
+    _attr_icon = "mdi:calendar-arrow-left"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    # A backwards-looking snapshot, not a meter: no statistics/state class.
+    _attr_state_class = None
+    _attr_native_unit_of_measurement = UNIT_ELECTRICITY_USAGE
+
+    def __init__(self, coordinator: SPUsageCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "sp_electricity_usage_last_month")
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.electricity_last_month_kwh
+
+
+class SingaporeWaterUsageMonthSensor(_BaseUsageSensor):
+    """Water consumed this month (m³).
+
+    SP does not publish same-day water usage in any observed export, so only
+    monthly figures exist.
+    """
+
+    _attr_translation_key = "water_usage_month"
+    _attr_icon = "mdi:water"
+    _attr_device_class = SensorDeviceClass.WATER
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = UNIT_WATER_USAGE
+
+    def __init__(self, coordinator: SPUsageCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "sp_water_usage_month")
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.water_month_m3
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs = super().extra_state_attributes
+        if self.coordinator.data is not None:
+            attrs["monthly_history"] = _history_attr(
+                self.coordinator.data.water_monthly_history
+            )
+        return attrs
+
+
+class SingaporeWaterUsageLastMonthSensor(_BaseUsageSensor):
+    """Water consumed in the last published month (m³)."""
+
+    _attr_translation_key = "water_usage_last_month"
+    _attr_icon = "mdi:water-outline"
+    _attr_device_class = SensorDeviceClass.WATER
+    _attr_state_class = None
+    _attr_native_unit_of_measurement = UNIT_WATER_USAGE
+
+    def __init__(self, coordinator: SPUsageCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "sp_water_usage_last_month")
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.water_last_month_m3
 
 
 class SingaporeTrainLineStatusSensor(
