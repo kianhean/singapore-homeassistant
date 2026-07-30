@@ -324,7 +324,14 @@ it — the same mechanism SP's own portal uses to stay signed in.
 - The cookie step is skippable (empty input): the entry still works until the access
   token expires.
 
-`_async_refresh()` order is refresh token → session cookie → `SPUsageAuthError`.
+`_async_renew_token()` order is refresh token → session cookie → `SPUsageAuthError`.
+The name matters: `DataUpdateCoordinator` calls its own `_async_refresh(log_failures=…,
+scheduled=…)` on every poll, so a coordinator that defines a method by that name
+replaces it and every update dies with `TypeError` before any fetch happens. Only
+`_async_update_data`, `_async_setup` and `_async_refresh_finished` are safe to override
+— `tests/test_coordinator_api.py` enforces this for every coordinator in the package,
+and the fake coordinator in `conftest.py` routes `async_refresh()` through
+`_async_refresh(log_failures=True)` so the clash also breaks the normal tests.
 
 The options flow can update the cookie on its own (`init` menu → `sp_session`), because
 Auth0 sessions do eventually end and re-pasting a cookie beats redoing the whole login.

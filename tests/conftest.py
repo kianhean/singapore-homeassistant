@@ -51,11 +51,24 @@ class DataUpdateCoordinator:
         self._logger = logger
 
     async def async_refresh(self):
+        # Real HA delegates through _async_refresh(log_failures=...). Mirror
+        # that call shape: a subclass that shadows _async_refresh with its own
+        # signature then fails here, instead of only in production.
+        await self._async_refresh(log_failures=True)
+
+    async def _async_refresh(
+        self,
+        log_failures: bool = True,
+        raise_on_auth_failed: bool = False,
+        scheduled: bool = False,
+        raise_on_entry_error: bool = False,
+    ):
         try:
             self.data = await self._async_update_data()
             self.last_update_success = True
         except Exception as err:
-            self._logger.warning("Update failed: %s", err)
+            if log_failures:
+                self._logger.warning("Update failed: %s", err)
             self.last_exception = err
             self.last_update_success = False
 

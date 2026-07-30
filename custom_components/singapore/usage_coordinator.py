@@ -127,7 +127,7 @@ class SPUsageCoordinator(DataUpdateCoordinator[UsageData]):
                 # SP rejected an access token we believed was still valid;
                 # refresh once and retry before giving up on the session.
                 _LOGGER.debug("SP access token rejected mid-fetch; refreshing")
-                token = await self._async_refresh(session)
+                token = await self._async_renew_token(session)
                 return await self._async_fetch(session, token)
         except SPUsageAuthError as err:
             # Only a new browser login can fix this — trigger HA's reauth flow.
@@ -163,9 +163,9 @@ class SPUsageCoordinator(DataUpdateCoordinator[UsageData]):
     async def _async_valid_token(self, session: aiohttp.ClientSession) -> TokenSet:
         if self._token is not None and not self._token.is_expired():
             return self._token
-        return await self._async_refresh(session)
+        return await self._async_renew_token(session)
 
-    async def _async_refresh(self, session: aiohttp.ClientSession) -> TokenSet:
+    async def _async_renew_token(self, session: aiohttp.ClientSession) -> TokenSet:
         if self._refresh_token:
             token = await async_refresh_token(session, self._refresh_token)
             self._refresh_token = token.refresh_token or self._refresh_token
