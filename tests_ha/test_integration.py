@@ -54,6 +54,31 @@ async def test_setup_creates_entities_and_unloads(
 
     assert hass.states.get("calendar.public_holidays") is not None
 
+    psi = hass.states.get("sensor.air_quality_psi")
+    assert psi is not None
+    assert float(psi.state) == 52
+    assert psi.attributes["device_class"] == "aqi"
+    assert psi.attributes["band"] == "moderate"
+
+    # Regional PSI sensors carry a location so they render on a Map card.
+    east = hass.states.get("sensor.air_quality_psi_east")
+    assert east is not None
+    assert float(east.state) == 52
+    assert east.attributes["latitude"] == 1.35735
+    assert east.attributes["longitude"] == 103.94
+    assert east.attributes["pm25_twenty_four_hourly"] == 14
+
+    pm25 = hass.states.get("sensor.air_quality_pm2_5")
+    assert pm25 is not None
+    assert float(pm25.state) == 14
+    assert pm25.attributes["device_class"] == "pm25"
+    assert pm25.attributes["unit_of_measurement"] == "µg/m³"
+
+    co = hass.states.get("sensor.air_quality_carbon_monoxide")
+    assert co is not None
+    assert float(co.state) == 0.6
+    assert co.attributes["unit_of_measurement"] == "mg/m³"
+
     # Every entity must use a stable, entry-scoped unique ID.
     registry = er.async_get(hass)
     entities = er.async_entries_for_config_entry(registry, entry.entry_id)
@@ -110,3 +135,5 @@ async def test_diagnostics(hass: HomeAssistant, hass_client, mock_sources) -> No
 
     assert diag["coordinators"]["tariff"]["data"]["electricity_price"] == 29.29
     assert diag["coordinators"]["train"]["data"]["status"] == "disruption"
+    psi = diag["coordinators"]["psi"]["data"]
+    assert psi["national"]["psi_twenty_four_hourly"] == 52

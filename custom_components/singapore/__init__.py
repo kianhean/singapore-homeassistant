@@ -1,4 +1,4 @@
-"""Singapore integration: tariffs, COE, weather, train status and holidays."""
+"""Singapore integration: tariffs, COE, weather, PSI, train status and holidays."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from .coe_coordinator import CoeCoordinator
 from .const import DOMAIN
 from .coordinator import SPGroupCoordinator
 from .holiday_coordinator import PublicHolidayCoordinator
+from .psi_coordinator import PsiCoordinator
 from .train_coordinator import TrainStatusCoordinator
 from .weather_coordinator import SingaporeWeatherCoordinator
 
@@ -38,6 +39,7 @@ class SingaporeData:
     weather: SingaporeWeatherCoordinator
     holiday: PublicHolidayCoordinator
     train: TrainStatusCoordinator
+    psi: PsiCoordinator
 
 
 type SingaporeConfigEntry = ConfigEntry[SingaporeData]
@@ -50,6 +52,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
     holiday_coordinator = PublicHolidayCoordinator(hass, entry)
     train_coordinator = TrainStatusCoordinator(hass, entry)
     coe_coordinator = CoeCoordinator(hass, entry)
+    psi_coordinator = PsiCoordinator(hass, entry)
 
     # Fetch independent data sources concurrently to speed up setup.
     # return_exceptions=True lets every coordinator finish its first refresh
@@ -78,6 +81,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
         hass, _initial_refresh_coe(), "singapore_coe_initial_refresh"
     )
 
+    async def _initial_refresh_psi() -> None:
+        await psi_coordinator.async_refresh()
+        if not psi_coordinator.last_update_success:
+            _LOGGER.warning(
+                "Initial PSI refresh failed; continuing setup and retrying later"
+            )
+
+    # PSI is supplementary; don't fail the whole integration if it's unavailable.
+    entry.async_create_background_task(
+        hass, _initial_refresh_psi(), "singapore_psi_initial_refresh"
+    )
+
     async def _refresh_coe(_now) -> None:
         await coe_coordinator.async_refresh()
 
@@ -96,6 +111,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
         weather=weather_coordinator,
         holiday=holiday_coordinator,
         train=train_coordinator,
+        psi=psi_coordinator,
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

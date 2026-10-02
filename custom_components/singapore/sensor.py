@@ -1,4 +1,4 @@
-"""Sensor platform for Singapore tariffs, COE, weather readings and train status."""
+"""Sensor platform for Singapore tariffs, COE, weather, PSI and train status."""
 
 from __future__ import annotations
 
@@ -10,6 +10,10 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
+    ATTR_LATITUDE,
+    ATTR_LONGITUDE,
+    CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+    CONCENTRATION_MILLIGRAMS_PER_CUBIC_METER,
     DEGREE,
     PERCENTAGE,
     UnitOfPrecipitationDepth,
@@ -30,6 +34,12 @@ from .coe_coordinator import (
 )
 from .const import DOMAIN
 from .coordinator import UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER, SPGroupCoordinator
+from .psi_coordinator import (
+    DEFAULT_REGION_LOCATIONS,
+    PSI_REGIONS,
+    PsiCoordinator,
+    psi_band,
+)
 from .train_coordinator import TRAIN_LINES, TrainStatusCoordinator
 from .weather_coordinator import SingaporeWeatherCoordinator
 
@@ -43,6 +53,49 @@ UNIT_RAINFALL = UnitOfPrecipitationDepth.MILLIMETERS
 
 TRAIN_STATUS_OPTIONS = ["normal", "planned", "disruption"]
 
+PSI_DATASET_URL = "https://data.gov.sg/datasets/d_fe37906a0182569d891506e815e819b7/view"
+
+# (reading key, translation key, device class, unit) for pollutant sensors.
+PSI_POLLUTANT_SENSORS: tuple[tuple[str, str, str | None, str], ...] = (
+    (
+        "pm25_twenty_four_hourly",
+        "pm25",
+        SensorDeviceClass.PM25,
+        CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+    ),
+    (
+        "pm10_twenty_four_hourly",
+        "pm10",
+        SensorDeviceClass.PM10,
+        CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+    ),
+    (
+        "o3_eight_hour_max",
+        "ozone",
+        SensorDeviceClass.OZONE,
+        CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+    ),
+    (
+        "no2_one_hour_max",
+        "nitrogen_dioxide",
+        SensorDeviceClass.NITROGEN_DIOXIDE,
+        CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+    ),
+    (
+        "so2_twenty_four_hourly",
+        "sulphur_dioxide",
+        SensorDeviceClass.SULPHUR_DIOXIDE,
+        CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+    ),
+    # HA's CO device class only accepts ppm on older releases, so no device class.
+    (
+        "co_eight_hour_max",
+        "carbon_monoxide",
+        None,
+        CONCENTRATION_MILLIGRAMS_PER_CUBIC_METER,
+    ),
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -55,6 +108,7 @@ async def async_setup_entry(
     coe_coordinator = data.coe
     weather_coordinator = data.weather
     train_coordinator = data.train
+    psi_coordinator = data.psi
 
     entities: list[SensorEntity] = [
         SingaporeElectricityTariffSensor(tariff_coordinator, entry.entry_id),
@@ -78,6 +132,23 @@ async def async_setup_entry(
     for line in TRAIN_LINES:
         entities.append(
             SingaporeTrainLineStatusSensor(train_coordinator, entry.entry_id, line)
+        )
+
+    entities.append(SingaporePsiSensor(psi_coordinator, entry.entry_id))
+    for region in PSI_REGIONS:
+        entities.append(
+            SingaporeRegionalPsiSensor(psi_coordinator, entry.entry_id, region)
+        )
+    for reading_key, translation_key, device_class, unit in PSI_POLLUTANT_SENSORS:
+        entities.append(
+            SingaporePollutantSensor(
+                psi_coordinator,
+                entry.entry_id,
+                reading_key,
+                translation_key,
+                device_class,
+                unit,
+            )
         )
 
     async_add_entities(entities)
@@ -467,3 +538,140 @@ class SingaporeTrainLineStatusSensor(
             entry_type=DeviceEntryType.SERVICE,
             configuration_url="https://www.mytransport.sg/trainstatus#",
         )
+
+
+class _BasePsiSensor(CoordinatorEntity[PsiCoordinator], SensorEntity):
+    """Shared base for NEA PSI / air quality sensors."""
+
+    _attr_has_entity_name = True
+    _attr_attribution = "Data provided by NEA via data.gov.sg"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, coordinator: PsiCoordinator, entry_id: str, suffix: str) -> None:
+        super().__init__(coordinator)
+        self._entry_id = entry_id
+        self._attr_unique_id = f"{entry_id}_{suffix}"
+
+    def _common_attrs(self) -> dict:
+        attrs: dict = {"source": "data.gov.sg / NEA"}
+        if self.coordinator.data and self.coordinator.data.timestamp is not None:
+            attrs["reading_time"] = self.coordinator.data.timestamp.isoformat()
+        return attrs
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{self._entry_id}_air_quality")},
+            name="Air Quality",
+            manufacturer="Singapore",
+            model="NEA PSI",
+            entry_type=DeviceEntryType.SERVICE,
+            configuration_url=PSI_DATASET_URL,
+        )
+
+
+class SingaporePsiSensor(_BasePsiSensor):
+    """Singapore-wide 24-hour PSI (highest regional value)."""
+
+    _attr_translation_key = "psi"
+    _attr_device_class = SensorDeviceClass.AQI
+
+    def __init__(self, coordinator: PsiCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "psi")
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.national.get("psi_twenty_four_hourly")
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs = self._common_attrs()
+        attrs["band"] = psi_band(self.native_value)
+        if self.coordinator.data is not None:
+            attrs["regions"] = self.coordinator.data.readings.get(
+                "psi_twenty_four_hourly", {}
+            )
+        return attrs
+
+
+class SingaporeRegionalPsiSensor(_BasePsiSensor):
+    """24-hour PSI for one Singapore region (north/south/east/west/central).
+
+    Carries latitude/longitude and every pollutant reading for its region as
+    attributes, so a Map card renders one marker per region with all stats.
+    """
+
+    _attr_translation_key = "psi_region"
+    _attr_device_class = SensorDeviceClass.AQI
+
+    def __init__(self, coordinator: PsiCoordinator, entry_id: str, region: str) -> None:
+        super().__init__(coordinator, entry_id, f"psi_{region}")
+        self._region = region
+        self._attr_translation_placeholders = {"region": region.title()}
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.readings.get("psi_twenty_four_hourly", {}).get(
+            self._region
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """All readings for this region, plus a location so it shows on the map."""
+        attrs = self._common_attrs()
+        attrs["region"] = self._region
+        attrs["band"] = psi_band(self.native_value)
+        data = self.coordinator.data
+        location = (
+            data.region_locations.get(self._region)
+            if data is not None
+            else DEFAULT_REGION_LOCATIONS.get(self._region)
+        )
+        if location is not None:
+            attrs[ATTR_LATITUDE], attrs[ATTR_LONGITUDE] = location
+        if data is not None:
+            for key in sorted(data.readings):
+                value = data.readings[key].get(self._region)
+                if value is not None:
+                    attrs[key] = value
+        return attrs
+
+
+class SingaporePollutantSensor(_BasePsiSensor):
+    """Singapore-wide pollutant concentration (highest regional value)."""
+
+    def __init__(
+        self,
+        coordinator: PsiCoordinator,
+        entry_id: str,
+        reading_key: str,
+        translation_key: str,
+        device_class: str | None,
+        unit: str,
+    ) -> None:
+        super().__init__(coordinator, entry_id, translation_key)
+        self._reading_key = reading_key
+        self._attr_translation_key = translation_key
+        self._attr_device_class = device_class
+        self._attr_native_unit_of_measurement = unit
+        if reading_key == "co_eight_hour_max":
+            self._attr_suggested_display_precision = 2
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.national.get(self._reading_key)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs = self._common_attrs()
+        attrs["reading"] = self._reading_key
+        if self.coordinator.data is not None:
+            attrs["regions"] = self.coordinator.data.readings.get(self._reading_key, {})
+        return attrs

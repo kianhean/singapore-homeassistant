@@ -14,11 +14,12 @@ custom_components/singapore/
 ├── holiday_coordinator.py  # PublicHolidayCoordinator: fetches + parses MOM holidays
 ├── weather_coordinator.py  # SingaporeWeatherCoordinator: 2-hour forecasts + collection 1459 readings
 ├── train_coordinator.py    # TrainStatusCoordinator: scrapes mytransport.sg MRT/LRT status
+├── psi_coordinator.py      # PsiCoordinator: NEA PSI + pollutant readings per region
 ├── calendar.py             # Calendar entity (Singapore public holidays)
 ├── weather.py              # Weather entities (one per Singapore forecast area)
 ├── config_flow.py          # UI config flow (name input; single instance via manifest)
 ├── diagnostics.py          # "Download diagnostics": coordinator status + parsed data
-├── sensor.py               # Sensor entities (tariff + COE + weather readings + train status)
+├── sensor.py               # Sensor entities (tariff + COE + weather + PSI + train status)
 ├── manifest.json           # Integration metadata; declares beautifulsoup4 dep, single_config_entry
 ├── icons.json              # Icon translations (entity icons live here, not in _attr_icon)
 ├── strings.json            # Config flow UI strings + entity names + enum state names
@@ -34,6 +35,7 @@ tests/
 ├── test_holiday_coordinator.py  # MOM parser unit tests + coordinator HTTP mock tests
 ├── test_weather_coordinator.py  # Weather coordinator parser + HTTP mock tests
 ├── test_train_coordinator.py    # Train status parser + HTTP mock tests
+├── test_psi_coordinator.py      # PSI parser, band mapping + HTTP mock tests
 ├── test_calendar.py             # Calendar event and range query tests
 ├── test_sensor.py               # Sensor value, unit, attributes, unique_id, None-safety
 ├── test_weather.py              # Weather entity condition mapping + forecast tests
@@ -57,6 +59,7 @@ class SingaporeData:
     weather: SingaporeWeatherCoordinator
     holiday: PublicHolidayCoordinator
     train: TrainStatusCoordinator
+    psi: PsiCoordinator
 
 type SingaporeConfigEntry = ConfigEntry[SingaporeData]
 ```
@@ -99,6 +102,19 @@ Platforms read it via `entry.runtime_data.<coordinator>` (see `sensor.py`, `weat
 | `sensor.singapore_wind_speed` | Singapore Wind Speed | km/h | Aggregated wind speed |
 | `sensor.singapore_wind_bearing` | Singapore Wind Bearing | ° | Aggregated wind direction |
 | `sensor.singapore_rainfall` | Singapore Rainfall | mm | Aggregated rainfall |
+
+### NEA Air Quality / PSI
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.air_quality_psi` | PSI | — (`AQI`) | 24-hour PSI, highest region; `band` + `regions` attributes |
+| `sensor.air_quality_psi_<region>` | PSI \<Region\> | — (`AQI`) | Per-region 24-hour PSI; carries `latitude`/`longitude` + every reading for the region (map card) |
+| `sensor.air_quality_pm2_5` | PM2.5 | µg/m³ | 24-hour PM2.5, highest region |
+| `sensor.air_quality_pm10` | PM10 | µg/m³ | 24-hour PM10, highest region |
+| `sensor.air_quality_ozone` | Ozone | µg/m³ | 8-hour max O3, highest region |
+| `sensor.air_quality_nitrogen_dioxide` | Nitrogen Dioxide | µg/m³ | 1-hour max NO2, highest region |
+| `sensor.air_quality_sulphur_dioxide` | Sulphur Dioxide | µg/m³ | 24-hour SO2, highest region |
+| `sensor.air_quality_carbon_monoxide` | Carbon Monoxide | mg/m³ | 8-hour max CO, highest region (no device class: HA 2025.4 CO only accepts ppm) |
 
 ### Weather Entities (collection 1456)
 
@@ -298,6 +314,27 @@ Response shape: `{ "value": { "Status": int, "AffectedSegments": [...], "Message
 - `status` — `"normal"`, `"planned"`, or `"disruption"` (overall network)
 - `details` — all message content joined with ` | ` (empty string when normal); exposed as `details` attribute on `sensor.singapore_train_status`
 - `line_statuses` — dict mapping each line name to `"normal"`, `"planned"`, or `"disruption"`
+
+## How the PSI Coordinator Works
+
+`psi_coordinator.py` GETs `https://api-open.data.gov.sg/v2/real-time/api/psi` every
+**30 minutes** (NEA publishes hourly). Payload shape (v2):
+
+```
+{"code": 0, "data": {"regionMetadata": [{"name": "West", "labelLocation": {...}}],
+  "items": [{"timestamp": "...", "readings": {"psi_twenty_four_hourly": {"north": 3, ...}, ...}}]}}
+```
+
+- Every numeric reading key is kept in `PsiData.readings[key][region]` (regions:
+  north/south/east/west/central; region names are lowercase in `readings`).
+- `PsiData.national[key]` = the API's `national` value if present (v1 shape), else the max
+  across regions (NEA headlines the highest regional PSI).
+- `PsiData.region_locations` comes from `regionMetadata` (names are capitalised there,
+  lowercase-matched) with `DEFAULT_REGION_LOCATIONS` fallbacks; the regional PSI sensors
+  expose these as `latitude`/`longitude` so they render on HA Map cards.
+- A payload with no `psi_twenty_four_hourly` raises `UpdateFailed`.
+- The first refresh runs as a background task (like COE) so a PSI outage never blocks
+  integration setup.
 
 ### Calendar Entity
 

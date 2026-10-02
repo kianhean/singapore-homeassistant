@@ -70,6 +70,30 @@
           "planned": "Planned works",
           "disruption": "Disruption"
         }
+      },
+      "psi": {
+        "name": "PSI"
+      },
+      "psi_region": {
+        "name": "PSI {region}"
+      },
+      "pm25": {
+        "name": "PM2.5"
+      },
+      "pm10": {
+        "name": "PM10"
+      },
+      "ozone": {
+        "name": "Ozone"
+      },
+      "nitrogen_dioxide": {
+        "name": "Nitrogen Dioxide"
+      },
+      "sulphur_dioxide": {
+        "name": "Sulphur Dioxide"
+      },
+      "carbon_monoxide": {
+        "name": "Carbon Monoxide"
       }
     }
   }

@@ -9,6 +9,7 @@ from custom_components.singapore import DOMAIN, PLATFORMS, async_setup_entry
 from custom_components.singapore.coe_coordinator import CoeCoordinator
 from custom_components.singapore.coordinator import SPGroupCoordinator
 from custom_components.singapore.holiday_coordinator import PublicHolidayCoordinator
+from custom_components.singapore.psi_coordinator import PsiCoordinator
 from custom_components.singapore.train_coordinator import TrainStatusCoordinator
 from custom_components.singapore.weather_coordinator import (
     SingaporeWeatherCoordinator,
@@ -65,6 +66,9 @@ async def test_async_setup_entry_raises_and_does_not_orphan_siblings():
         patch.object(TrainStatusCoordinator, "_async_update_data", _train_ok),
         patch.object(
             CoeCoordinator, "_async_update_data", AsyncMock(return_value=MagicMock())
+        ),
+        patch.object(
+            PsiCoordinator, "_async_update_data", AsyncMock(return_value=MagicMock())
         ),
     ):
         with pytest.raises(Exception, match="first refresh failed"):
