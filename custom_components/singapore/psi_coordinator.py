@@ -16,9 +16,8 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 _LOGGER = logging.getLogger(__name__)
 
 PSI_URL = "https://api-open.data.gov.sg/v2/real-time/api/psi"
-# NEA publishes PSI hourly; polling every 30 minutes picks up a new hour promptly
-# without hammering data.gov.sg.
-UPDATE_INTERVAL = timedelta(minutes=30)
+# data.gov.sg refreshes PSI readings every 15 minutes.
+UPDATE_INTERVAL = timedelta(minutes=15)
 
 PSI_REGIONS: Final[tuple[str, ...]] = ("north", "south", "east", "west", "central")
 

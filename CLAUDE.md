@@ -318,7 +318,7 @@ Response shape: `{ "value": { "Status": int, "AffectedSegments": [...], "Message
 ## How the PSI Coordinator Works
 
 `psi_coordinator.py` GETs `https://api-open.data.gov.sg/v2/real-time/api/psi` every
-**30 minutes** (NEA publishes hourly). Payload shape (v2):
+**15 minutes** (matching the data.gov.sg refresh rate). Payload shape (v2):
 
 ```
 {"code": 0, "data": {"regionMetadata": [{"name": "West", "labelLocation": {...}}],
