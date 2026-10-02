@@ -1,0 +1,55 @@
+{
+  "entity": {
+    "calendar": {
+      "public_holidays": {
+        "default": "mdi:calendar-star"
+      }
+    },
+    "sensor": {
+      "electricity_tariff": {
+        "default": "mdi:lightning-bolt"
+      },
+      "solar_export_price": {
+        "default": "mdi:solar-power"
+      },
+      "gas_tariff": {
+        "default": "mdi:gas-burner"
+      },
+      "water_tariff": {
+        "default": "mdi:water"
+      },
+      "coe_category": {
+        "default": "mdi:car"
+      },
+      "temperature": {
+        "default": "mdi:thermometer"
+      },
+      "humidity": {
+        "default": "mdi:water-percent"
+      },
+      "wind_speed": {
+        "default": "mdi:weather-windy"
+      },
+      "wind_bearing": {
+        "default": "mdi:compass-outline"
+      },
+      "rainfall": {
+        "default": "mdi:weather-rainy"
+      },
+      "train_status": {
+        "default": "mdi:train",
+        "state": {
+          "planned": "mdi:wrench-clock",
+          "disruption": "mdi:alert"
+        }
+      },
+      "train_line_status": {
+        "default": "mdi:train",
+        "state": {
+          "planned": "mdi:wrench-clock",
+          "disruption": "mdi:alert"
+        }
+      }
+    }
+  }
+}

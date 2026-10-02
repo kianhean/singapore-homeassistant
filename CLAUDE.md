@@ -8,6 +8,7 @@ The integration domain is `singapore`.
 ```
 custom_components/singapore/
 ├── __init__.py             # Entry setup/teardown; creates and stores coordinators
+├── const.py                # DOMAIN constant (imported by config_flow without pulling in coordinators)
 ├── coordinator.py          # SPGroupCoordinator: fetches + parses SP Group tariff page
 ├── coe_coordinator.py      # CoeCoordinator: fetches COE results from data.gov.sg API
 ├── holiday_coordinator.py  # PublicHolidayCoordinator: fetches + parses MOM holidays
@@ -15,10 +16,12 @@ custom_components/singapore/
 ├── train_coordinator.py    # TrainStatusCoordinator: scrapes mytransport.sg MRT/LRT status
 ├── calendar.py             # Calendar entity (Singapore public holidays)
 ├── weather.py              # Weather entities (one per Singapore forecast area)
-├── config_flow.py          # UI config flow (name input)
+├── config_flow.py          # UI config flow (name input; single instance via manifest)
+├── diagnostics.py          # "Download diagnostics": coordinator status + parsed data
 ├── sensor.py               # Sensor entities (tariff + COE + weather readings + train status)
-├── manifest.json           # Integration metadata; declares beautifulsoup4 dep
-├── strings.json            # Config flow UI strings
+├── manifest.json           # Integration metadata; declares beautifulsoup4 dep, single_config_entry
+├── icons.json              # Icon translations (entity icons live here, not in _attr_icon)
+├── strings.json            # Config flow UI strings + entity names + enum state names
 └── translations/
     └── en.json             # English translations (mirrors strings.json)
 
@@ -34,9 +37,14 @@ tests/
 ├── test_calendar.py             # Calendar event and range query tests
 ├── test_sensor.py               # Sensor value, unit, attributes, unique_id, None-safety
 ├── test_weather.py              # Weather entity condition mapping + forecast tests
+├── test_diagnostics.py          # Diagnostics serialization
 └── test_e2e.py                  # Live scrape tests (run with -m e2e, skipped in CI by default)
 
-.github/workflows/tests.yml   # CI: three jobs — unit tests, e2e scrape, ruff lint
+tests_ha/                        # Runs against a REAL Home Assistant (no module mocks)
+├── conftest.py                  # pytest-homeassistant-custom-component + canned HTTP responses
+└── test_integration.py          # Full entry setup/unload, config flow, diagnostics
+
+.github/workflows/tests.yml   # CI: unit tests, real-HA compat matrix, e2e scrape, ruff lint
 ```
 
 Entry data is stored on `entry.runtime_data` as a `SingaporeData` dataclass (not
@@ -50,8 +58,12 @@ class SingaporeData:
     holiday: PublicHolidayCoordinator
     train: TrainStatusCoordinator
 
-SingaporeConfigEntry: TypeAlias = ConfigEntry[SingaporeData]
+type SingaporeConfigEntry = ConfigEntry[SingaporeData]
 ```
+Every coordinator takes the config entry (`Coordinator(hass, entry)`) and passes
+`config_entry=` to `DataUpdateCoordinator`. This is required, not cosmetic:
+`SingleCoordinatorWeatherEntity` uses `coordinator.config_entry` to schedule forecast
+updates, and HA otherwise falls back to a deprecated ContextVar lookup.
 Platforms read it via `entry.runtime_data.<coordinator>` (see `sensor.py`, `weather.py`,
 `calendar.py`). The COE refresh-time unsubscribe callable is registered with
 `entry.async_on_unload(unsub_coe)` instead of being stored manually and unsubscribed in
@@ -98,8 +110,13 @@ from NEA's 2-hour periods.
 
 | Entity ID | Name | Description |
 |-----------|------|-------------|
-| `sensor.singapore_train_status` | Singapore Train Status | Overall MRT/LRT network status (`normal` / `disrupted`) |
+| `sensor.singapore_train_status` | Singapore Train Status | Overall MRT/LRT network status (`normal` / `planned` / `disruption`) |
 | `sensor.singapore_<line>_status` | Singapore \<Line\> Status | Per-line status for NSL, EWL, NEL, CCL, DTL, TEL, BPLRT, SKLRT, PGLRT |
+
+Train status sensors are `SensorDeviceClass.ENUM` with `options = TRAIN_STATUS_OPTIONS`;
+state display names live under `entity.sensor.<key>.state` in `strings.json`, state
+icons in `icons.json`. A sensor value outside `options` is an error in HA, so return
+`None` rather than ad-hoc strings like `"unknown"`.
 
 Train status data is fetched every **5 minutes** via a POST to the LTA DataMall AEM servlet
 (the page itself is JS-rendered and returns only a "Loading…" shell when scraped as HTML).
@@ -117,7 +134,7 @@ python3 -m pytest tests/ -v -m "not e2e"
 
 ## Running Tests
 
-Unit tests (no network, always fast):
+Unit tests (no network, always fast; HA is fully stubbed by `tests/conftest.py`):
 
 ```bash
 pytest tests/ -v -m "not e2e"
@@ -128,6 +145,20 @@ Live e2e tests (hit real external APIs — run locally when a scraper may have b
 ```bash
 pytest tests/test_e2e.py -v -s -m e2e
 ```
+
+Real Home Assistant compatibility tests (`tests_ha/`). These catch HA API changes the
+stubbed unit tests cannot. Each `pytest-homeassistant-custom-component` release pins an
+exact HA version; CI runs the minimum (`0.13.232` → HA 2025.4.0, Python 3.13), current
+stable (`0.13.367` → HA 2026.9.4, Python 3.14) and newest (non-blocking) harness:
+
+```bash
+uv venv --python 3.14 .venv-ha
+uv pip install --python .venv-ha/bin/python pytest-homeassistant-custom-component==0.13.367 "beautifulsoup4>=4.12.3"
+.venv-ha/bin/python -m pytest tests_ha -v
+```
+
+When bumping the minimum HA version, update `hacs.json` and the "minimum" matrix entry in
+`.github/workflows/tests.yml` together. Bump the "stable" entry as new HA releases ship.
 
 With coverage:
 
@@ -208,19 +239,10 @@ for Home Assistant (`t` and `t+1h`) with mapped HA conditions.
 ### Forecast Subscription Pattern
 
 In HA 2024.3+, weather forecast data is subscription-based. `SingaporeAreaWeatherEntity`
-overrides `_handle_coordinator_update` to call `async_update_listeners()` after every
-coordinator refresh — without this, forecast subscribers (the HA frontend weather card)
-never receive updated data and the spinner stays permanently. `async_update_listeners`
-takes a required `forecast_types` argument (a tuple of the forecast types this entity
-supports, e.g. `("daily",)` since this entity only declares `FORECAST_DAILY`) — omitting
-it raises `TypeError` on every coordinator refresh:
-
-```python
-@callback
-def _handle_coordinator_update(self) -> None:
-    super()._handle_coordinator_update()
-    self.hass.async_create_task(self.async_update_listeners(("daily",)))
-```
+subclasses HA's `SingleCoordinatorWeatherEntity`, which calls `async_update_listeners`
+after every coordinator refresh so forecast subscribers (the frontend weather card) get
+new data. Implement forecasts as the synchronous `@callback _async_forecast_daily()`;
+do not override `_handle_coordinator_update` to push listeners manually.
 
 ### Collection 1456 — Not Yet Integrated
 
@@ -317,8 +339,8 @@ assets there, the local fallback files can be removed at that point, not before.
 After every code change, always run and fix before committing:
 
 ```bash
-ruff check custom_components/ tests/ --fix
-ruff format custom_components/ tests/
+ruff check custom_components/ tests/ tests_ha/ --fix
+ruff format custom_components/ tests/ tests_ha/
 ```
 
 Both commands must exit cleanly — CI will fail otherwise.
@@ -332,6 +354,9 @@ Both commands must exit cleanly — CI will fail otherwise.
   `_fetch_with_retry()` (3 retries, respects `Retry-After` header, exponential backoff)
   and an `asyncio.Semaphore` capping concurrent readings requests at 2
 - Entity unique IDs must be stable: `{entry_id}_{suffix}`
+- Entities use `_attr_attribution` for data credit, and icons come from `icons.json`
+  (icon translations) keyed by translation key — do not set `_attr_icon`
+- Platforms use `AddConfigEntryEntitiesCallback` (not the legacy `AddEntitiesCallback`)
 - Entities use `_attr_has_entity_name = True` with `_attr_translation_key`
   (+ `_attr_translation_placeholders` where dynamic) and `DeviceInfo` (not a raw dict) with
   `entry_type=DeviceEntryType.SERVICE`. Entity strings live under `entity.sensor.<key>` in

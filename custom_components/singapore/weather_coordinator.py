@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 
 import aiohttp
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -110,12 +111,17 @@ class WeatherData:
 class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
     """Fetches and caches Singapore 2-hour area weather forecasts."""
 
-    def __init__(self, hass: HomeAssistant) -> None:
+    def __init__(
+        self, hass: HomeAssistant, config_entry: ConfigEntry | None = None
+    ) -> None:
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=config_entry,
             name="Singapore NEA Weather",
             update_interval=UPDATE_INTERVAL,
+            # Parsed data is a dataclass, so unchanged polls skip state writes.
+            always_update=False,
         )
         self._readings_sem = asyncio.Semaphore(_READINGS_CONCURRENCY)
 

@@ -52,30 +52,6 @@ def test_weather_condition_mapping_and_attrs():
     assert attrs["humidity"] == 74.0
 
 
-async def test_weather_hourly_forecast_is_unsupported():
-    data = WeatherData(
-        areas={
-            "Bedok": WeatherAreaData(
-                area="Bedok",
-                condition_text="Partly Cloudy",
-                valid_start=datetime.fromisoformat("2026-04-05T08:00:00+08:00"),
-                valid_end=datetime.fromisoformat("2026-04-05T10:00:00+08:00"),
-            )
-        },
-        updated_at=None,
-        readings=WeatherReadings(
-            temperature=30.0,
-            humidity=80.0,
-            wind_speed=10.0,
-            wind_bearing=225.0,
-            precipitation=1.2,
-        ),
-    )
-    ent = SingaporeAreaWeatherEntity(_coordinator(data), "entry1", "Bedok")
-
-    assert await ent.async_forecast_hourly() is None
-
-
 # ---------------------------------------------------------------------------
 # native_temperature tests
 # ---------------------------------------------------------------------------
@@ -224,12 +200,12 @@ async def test_weather_daily_forecast_none_when_no_data():
 
 
 @pytest.mark.asyncio
-async def test_weather_entity_handle_coordinator_update_passes_forecast_types():
-    """Regression test: async_update_listeners requires a forecast_types arg.
+async def test_weather_entity_coordinator_update_notifies_forecast_listeners():
+    """Coordinator refreshes must push new forecasts to subscribers.
 
-    Calling it with no arguments (the original bug) raises TypeError before
-    a coroutine object is even constructed, so _handle_coordinator_update
-    would blow up on every coordinator refresh.
+    Without this the frontend weather card spinner never resolves. The base
+    SingleCoordinatorWeatherEntity schedules async_update_listeners on the
+    coordinator's config entry, so the coordinator must be given one.
     """
     data = WeatherData(
         areas={
@@ -243,22 +219,21 @@ async def test_weather_entity_handle_coordinator_update_passes_forecast_types():
         updated_at=None,
         readings=WeatherReadings(),
     )
-    ent = SingaporeAreaWeatherEntity(_coordinator(data), "entry1", "Bedok")
+    coordinator = _coordinator(data)
+    ent = SingaporeAreaWeatherEntity(coordinator, "entry1", "Bedok")
     ent.hass = MagicMock()
 
     captured = {}
 
-    def _capture(coro):
+    def _capture(hass, coro, name=None):
         captured["coro"] = coro
         return MagicMock()
 
-    ent.hass.async_create_task = MagicMock(side_effect=_capture)
+    coordinator.config_entry.async_create_task = MagicMock(side_effect=_capture)
 
     ent._handle_coordinator_update()
 
     assert "coro" in captured
-    # Awaiting must not raise; a missing forecast_types argument would have
-    # already raised TypeError above, before this point.
     await captured["coro"]
 
 

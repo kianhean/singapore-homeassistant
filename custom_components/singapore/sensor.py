@@ -1,4 +1,4 @@
-"""Sensor platform for Singapore SP Group tariffs and COE results."""
+"""Sensor platform for Singapore tariffs, COE, weather readings and train status."""
 
 from __future__ import annotations
 
@@ -18,16 +18,17 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import DOMAIN, SingaporeConfigEntry
+from . import SingaporeConfigEntry
 from .coe_coordinator import (
     _CATEGORY_DESCRIPTIONS,
     COE_CATEGORIES,
     UNIT_COE,
     CoeCoordinator,
 )
+from .const import DOMAIN
 from .coordinator import UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER, SPGroupCoordinator
 from .train_coordinator import TRAIN_LINES, TrainStatusCoordinator
 from .weather_coordinator import SingaporeWeatherCoordinator
@@ -40,11 +41,13 @@ UNIT_WIND_SPEED = UnitOfSpeed.KILOMETERS_PER_HOUR
 UNIT_WIND_BEARING = DEGREE
 UNIT_RAINFALL = UnitOfPrecipitationDepth.MILLIMETERS
 
+TRAIN_STATUS_OPTIONS = ["normal", "planned", "disruption"]
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: SingaporeConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up SP Group tariff and COE sensors."""
     data = entry.runtime_data
@@ -90,8 +93,10 @@ class _BaseTariffSensor(CoordinatorEntity[SPGroupCoordinator], SensorEntity):
     """
 
     _attr_has_entity_name = True
+    _attr_attribution = "Data provided by SP Group"
     _attr_device_class = None  # custom price-rate units; no HA device class applies
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 2
 
     def __init__(self, coordinator: SPGroupCoordinator, entry_id: str) -> None:
         super().__init__(coordinator)
@@ -127,7 +132,6 @@ class SingaporeElectricityTariffSensor(_BaseTariffSensor):
     """Total residential electricity tariff (¢/kWh)."""
 
     _attr_translation_key = "electricity_tariff"
-    _attr_icon = "mdi:lightning-bolt"
     _attr_native_unit_of_measurement = UNIT_ELECTRICITY
 
     def __init__(self, coordinator: SPGroupCoordinator, entry_id: str) -> None:
@@ -149,7 +153,6 @@ class SingaporeSolarExportPriceSensor(_BaseTariffSensor):
     """Solar export price = electricity tariff minus network costs (¢/kWh)."""
 
     _attr_translation_key = "solar_export_price"
-    _attr_icon = "mdi:solar-power"
     _attr_native_unit_of_measurement = UNIT_ELECTRICITY
 
     def __init__(self, coordinator: SPGroupCoordinator, entry_id: str) -> None:
@@ -175,7 +178,6 @@ class SingaporeGasTariffSensor(_BaseTariffSensor):
     """Piped natural gas tariff (¢/kWh)."""
 
     _attr_translation_key = "gas_tariff"
-    _attr_icon = "mdi:gas-burner"
     _attr_native_unit_of_measurement = UNIT_GAS
 
     def __init__(self, coordinator: SPGroupCoordinator, entry_id: str) -> None:
@@ -195,7 +197,6 @@ class SingaporeWaterTariffSensor(_BaseTariffSensor):
     """Water tariff (SGD/m³)."""
 
     _attr_translation_key = "water_tariff"
-    _attr_icon = "mdi:water"
     _attr_native_unit_of_measurement = UNIT_WATER
 
     def __init__(self, coordinator: SPGroupCoordinator, entry_id: str) -> None:
@@ -216,10 +217,10 @@ class SingaporeCoeResultSensor(CoordinatorEntity[CoeCoordinator], SensorEntity):
 
     _attr_has_entity_name = True
     _attr_translation_key = "coe_category"
+    _attr_attribution = "Data provided by LTA via data.gov.sg"
     _attr_device_class = None
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = UNIT_COE
-    _attr_icon = "mdi:car"
 
     def __init__(
         self, coordinator: CoeCoordinator, entry_id: str, category: str
@@ -271,7 +272,9 @@ class _BaseWeatherReadingSensor(
     """Base class for realtime weather reading sensors from data.gov.sg collection 1459."""
 
     _attr_has_entity_name = True
+    _attr_attribution = "Data provided by NEA via data.gov.sg"
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 1
 
     def __init__(
         self, coordinator: SingaporeWeatherCoordinator, entry_id: str, suffix: str
@@ -298,7 +301,6 @@ class _BaseWeatherReadingSensor(
 
 class SingaporeTemperatureSensor(_BaseWeatherReadingSensor):
     _attr_translation_key = "temperature"
-    _attr_icon = "mdi:thermometer"
     _attr_device_class = SensorDeviceClass.TEMPERATURE
     _attr_native_unit_of_measurement = UNIT_TEMP
 
@@ -314,7 +316,6 @@ class SingaporeTemperatureSensor(_BaseWeatherReadingSensor):
 
 class SingaporeHumiditySensor(_BaseWeatherReadingSensor):
     _attr_translation_key = "humidity"
-    _attr_icon = "mdi:water-percent"
     _attr_device_class = SensorDeviceClass.HUMIDITY
     _attr_native_unit_of_measurement = UNIT_HUMIDITY
 
@@ -330,7 +331,6 @@ class SingaporeHumiditySensor(_BaseWeatherReadingSensor):
 
 class SingaporeWindSpeedSensor(_BaseWeatherReadingSensor):
     _attr_translation_key = "wind_speed"
-    _attr_icon = "mdi:weather-windy"
     _attr_device_class = SensorDeviceClass.WIND_SPEED
     _attr_native_unit_of_measurement = UNIT_WIND_SPEED
 
@@ -346,8 +346,10 @@ class SingaporeWindSpeedSensor(_BaseWeatherReadingSensor):
 
 class SingaporeWindBearingSensor(_BaseWeatherReadingSensor):
     _attr_translation_key = "wind_bearing"
-    _attr_icon = "mdi:compass-outline"
-    _attr_device_class = None  # no standard HA device class for wind bearing sensors
+    _attr_device_class = SensorDeviceClass.WIND_DIRECTION
+    # Angles wrap at 360°, so long-term statistics use a circular mean.
+    _attr_state_class = SensorStateClass.MEASUREMENT_ANGLE
+    _attr_suggested_display_precision = 0
     _attr_native_unit_of_measurement = UNIT_WIND_BEARING
 
     def __init__(self, coordinator: SingaporeWeatherCoordinator, entry_id: str) -> None:
@@ -362,7 +364,6 @@ class SingaporeWindBearingSensor(_BaseWeatherReadingSensor):
 
 class SingaporeRainfallSensor(_BaseWeatherReadingSensor):
     _attr_translation_key = "rainfall"
-    _attr_icon = "mdi:weather-rainy"
     _attr_device_class = SensorDeviceClass.PRECIPITATION
     _attr_native_unit_of_measurement = UNIT_RAINFALL
 
@@ -383,9 +384,9 @@ class SingaporeTrainStatusSensor(
 
     _attr_has_entity_name = True
     _attr_translation_key = "train_status"
-    _attr_icon = "mdi:train"
-    _attr_device_class = None
-    _attr_state_class = None
+    _attr_attribution = "Data provided by LTA via mytransport.sg"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = TRAIN_STATUS_OPTIONS
 
     def __init__(self, coordinator: TrainStatusCoordinator, entry_id: str) -> None:
         super().__init__(coordinator)
@@ -428,9 +429,9 @@ class SingaporeTrainLineStatusSensor(
 
     _attr_has_entity_name = True
     _attr_translation_key = "train_line_status"
-    _attr_icon = "mdi:train"
-    _attr_device_class = None
-    _attr_state_class = None
+    _attr_attribution = "Data provided by LTA via mytransport.sg"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = TRAIN_STATUS_OPTIONS
 
     def __init__(
         self, coordinator: TrainStatusCoordinator, entry_id: str, line_name: str
@@ -446,7 +447,7 @@ class SingaporeTrainLineStatusSensor(
     def native_value(self) -> str | None:
         if self.coordinator.data is None:
             return None
-        return self.coordinator.data.line_statuses.get(self._line_name, "unknown")
+        return self.coordinator.data.line_statuses.get(self._line_name)
 
     @property
     def extra_state_attributes(self) -> dict:

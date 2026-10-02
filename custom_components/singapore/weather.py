@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from homeassistant.components.weather import (
     Forecast,
-    WeatherEntity,
+    SingleCoordinatorWeatherEntity,
     WeatherEntityFeature,
 )
 from homeassistant.const import UnitOfSpeed, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from . import DOMAIN, SingaporeConfigEntry
+from . import SingaporeConfigEntry
+from .const import DOMAIN
 from .weather_coordinator import SingaporeWeatherCoordinator, _wind_direction_to_degrees
 
 PARALLEL_UPDATES = 0
@@ -42,7 +42,7 @@ _CONDITION_MAP = {
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: SingaporeConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up weather entities for each forecast area."""
     coordinator = entry.runtime_data.weather
@@ -59,11 +59,17 @@ async def async_setup_entry(
 
 
 class SingaporeAreaWeatherEntity(
-    CoordinatorEntity[SingaporeWeatherCoordinator], WeatherEntity
+    SingleCoordinatorWeatherEntity[SingaporeWeatherCoordinator]
 ):
-    """One weather entity per Singapore forecast area."""
+    """One weather entity per Singapore forecast area.
+
+    SingleCoordinatorWeatherEntity notifies forecast subscribers (e.g. the
+    frontend weather card) after every coordinator refresh, so no manual
+    async_update_listeners call is needed.
+    """
 
     _attr_has_entity_name = True
+    _attr_attribution = "Data provided by NEA via data.gov.sg"
     _attr_supported_features = WeatherEntityFeature.FORECAST_DAILY
     _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_native_wind_speed_unit = UnitOfSpeed.KILOMETERS_PER_HOUR
@@ -79,12 +85,6 @@ class SingaporeAreaWeatherEntity(
         # Area names are dynamic Singapore place names, not translatable
         # strings, so this uses a raw name rather than a translation_key.
         self._attr_name = area
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        super()._handle_coordinator_update()
-        self.hass.async_create_task(self.async_update_listeners(("daily",)))
 
     @property
     def native_temperature(self) -> float | None:
@@ -132,11 +132,9 @@ class SingaporeAreaWeatherEntity(
             "precipitation": readings.precipitation,
         }
 
-    async def async_forecast_hourly(self) -> list[Forecast] | None:
-        """Hourly forecasts are intentionally unsupported for this integration."""
-        return None
-
-    async def async_forecast_daily(self) -> list[Forecast] | None:
+    @callback
+    def _async_forecast_daily(self) -> list[Forecast] | None:
+        """Return the 4-day outlook as daily forecasts in native units."""
         if self.coordinator.data is None:
             return None
         fc = self.coordinator.data.four_day_forecast

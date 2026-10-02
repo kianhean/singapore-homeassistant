@@ -14,10 +14,16 @@
       "name_too_long": "Name must be 64 characters or fewer."
     },
     "abort": {
-      "already_configured": "This integration is already configured."
+      "already_configured": "This integration is already configured.",
+      "single_instance_allowed": "Singapore is already configured. Only a single configuration is possible."
     }
   },
   "entity": {
+    "calendar": {
+      "public_holidays": {
+        "name": "Public holidays"
+      }
+    },
     "sensor": {
       "electricity_tariff": {
         "name": "Electricity Tariff"
@@ -50,10 +56,20 @@
         "name": "Rainfall"
       },
       "train_status": {
-        "name": "Status"
+        "name": "Status",
+        "state": {
+          "normal": "Normal",
+          "planned": "Planned works",
+          "disruption": "Disruption"
+        }
       },
       "train_line_status": {
-        "name": "{line} Status"
+        "name": "{line} Status",
+        "state": {
+          "normal": "Normal",
+          "planned": "Planned works",
+          "disruption": "Disruption"
+        }
       }
     }
   }
