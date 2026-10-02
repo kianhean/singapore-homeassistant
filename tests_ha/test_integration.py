@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.const import CONCENTRATION_MICROGRAMS_PER_CUBIC_METER
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
@@ -72,7 +73,11 @@ async def test_setup_creates_entities_and_unloads(
     assert pm25 is not None
     assert float(pm25.state) == 14
     assert pm25.attributes["device_class"] == "pm25"
-    assert pm25.attributes["unit_of_measurement"] == "µg/m³"
+    # Compare against HA's own constant: newer HA spells it with Greek mu (μ).
+    assert (
+        pm25.attributes["unit_of_measurement"]
+        == CONCENTRATION_MICROGRAMS_PER_CUBIC_METER
+    )
 
     co = hass.states.get("sensor.air_quality_carbon_monoxide")
     assert co is not None
