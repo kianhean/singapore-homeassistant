@@ -409,3 +409,89 @@ def test_wind_bearing_uses_wind_direction_angle_statistics():
     sensor = SingaporeWindBearingSensor(_weather_coordinator(), "entry1")
     assert sensor.device_class == "wind_direction"
     assert sensor._attr_state_class == "measurement_angle"
+
+
+def _psi_coordinator(data=None):
+    from custom_components.singapore.psi_coordinator import _parse_psi
+    from tests.test_psi_coordinator import SAMPLE_V2
+
+    coordinator = MagicMock()
+    coordinator.data = _parse_psi(SAMPLE_V2) if data is None else data
+    return coordinator
+
+
+def test_psi_sensor_value_band_and_regions():
+    from custom_components.singapore.sensor import SingaporePsiSensor
+
+    sensor = SingaporePsiSensor(_psi_coordinator(), "entry1")
+    assert sensor.unique_id == "entry1_psi"
+    assert sensor.device_class == "aqi"
+    assert sensor.native_value == 39.0
+    attrs = sensor.extra_state_attributes
+    assert attrs["band"] == "good"
+    assert attrs["regions"]["east"] == 39.0
+    assert attrs["reading_time"] == "2024-07-17T14:00:00+00:00"
+    assert sensor.device_info["identifiers"] == {("singapore", "entry1_air_quality")}
+
+
+def test_regional_psi_sensor_has_map_location_and_all_readings():
+    from custom_components.singapore.sensor import SingaporeRegionalPsiSensor
+
+    sensor = SingaporeRegionalPsiSensor(_psi_coordinator(), "entry1", "central")
+    assert sensor.unique_id == "entry1_psi_central"
+    assert sensor._attr_translation_placeholders == {"region": "Central"}
+    assert sensor.native_value == 10.0
+    attrs = sensor.extra_state_attributes
+    assert (attrs["latitude"], attrs["longitude"]) == (1.35735, 103.82)
+    assert attrs["region"] == "central"
+    assert attrs["band"] == "good"
+    assert attrs["psi_twenty_four_hourly"] == 10.0
+    assert attrs["psi_three_hourly"] == 39.0
+    assert attrs["pm25_twenty_four_hourly"] == 12.0
+    assert attrs["so2_twenty_four_hourly"] == 39.0
+    assert attrs["co_sub_index"] == 39.0
+
+
+def test_regional_psi_sensor_keeps_location_without_data():
+    from custom_components.singapore.psi_coordinator import PsiData
+    from custom_components.singapore.sensor import SingaporeRegionalPsiSensor
+
+    coordinator = MagicMock()
+    coordinator.data = None
+    sensor = SingaporeRegionalPsiSensor(coordinator, "entry1", "west")
+    assert sensor.native_value is None
+    attrs = sensor.extra_state_attributes
+    assert (attrs["latitude"], attrs["longitude"]) == (1.35735, 103.7)
+    assert attrs["band"] is None
+
+    sensor = SingaporeRegionalPsiSensor(_psi_coordinator(PsiData()), "entry1", "west")
+    assert sensor.native_value is None
+
+
+def test_pollutant_sensors():
+    from custom_components.singapore.sensor import (
+        PSI_POLLUTANT_SENSORS,
+        SingaporePollutantSensor,
+    )
+
+    coordinator = _psi_coordinator()
+    sensors = {
+        translation_key: SingaporePollutantSensor(
+            coordinator, "entry1", key, translation_key, device_class, unit
+        )
+        for key, translation_key, device_class, unit in PSI_POLLUTANT_SENSORS
+    }
+    pm25 = sensors["pm25"]
+    assert pm25.unique_id == "entry1_pm25"
+    assert pm25.device_class == "pm25"
+    assert pm25.native_unit_of_measurement == "µg/m³"
+    assert pm25.native_value == 12.0
+    assert pm25.extra_state_attributes["regions"]["central"] == 12.0
+
+    co = sensors["carbon_monoxide"]
+    assert co.device_class is None
+    assert co.native_unit_of_measurement == "mg/m³"
+    assert co.native_value == 19.0
+
+    # Readings absent from the payload report None rather than raising.
+    assert sensors["ozone"].native_value is None

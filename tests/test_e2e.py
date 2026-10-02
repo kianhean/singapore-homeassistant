@@ -44,6 +44,7 @@ _COE_URL = (
 _WEATHER_URL = "https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast"
 _FOUR_DAY_URL = "https://api-open.data.gov.sg/v2/real-time/api/four-day-outlook"
 _WEATHER_READING_URL = "https://api.data.gov.sg/v1/environment/air-temperature"
+_PSI_URL = "https://api-open.data.gov.sg/v2/real-time/api/psi"
 _HOLIDAY_URL = "https://www.mom.gov.sg/employment-practices/public-holidays"
 _TRAIN_URL = "https://www.mytransport.sg/trainstatus#"
 
@@ -208,6 +209,21 @@ def test_e2e_weather_reading_api_shape():
 
     assert rows, "No reading rows parsed from live air-temperature payload"
     assert any("value" in row for row in rows), "No 'value' key found in readings rows"
+
+
+def test_e2e_psi_api_fetch_and_parse():
+    """Fetch live PSI endpoint and assert all regions parse with sane values."""
+    from custom_components.singapore.psi_coordinator import PSI_REGIONS, _parse_psi
+
+    payload = _fetch_json(_PSI_URL)
+    data = _parse_psi(payload)
+
+    psi = data.readings.get("psi_twenty_four_hourly")
+    assert psi, "No 24-hour PSI readings parsed from live payload"
+    assert set(psi) == set(PSI_REGIONS), f"Unexpected PSI regions: {sorted(psi)}"
+    assert all(0 <= v <= 500 for v in psi.values()), f"PSI out of range: {psi}"
+    assert data.national["psi_twenty_four_hourly"] == max(psi.values())
+    assert data.timestamp is not None, "PSI payload has no parseable timestamp"
 
 
 def test_e2e_holiday_page_fetch_and_parse():

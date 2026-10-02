@@ -17,6 +17,7 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 from custom_components.singapore.coe_coordinator import COE_API_URL
 from custom_components.singapore.coordinator import TARIFF_URL
 from custom_components.singapore.holiday_coordinator import PUBLIC_HOLIDAYS_URL
+from custom_components.singapore.psi_coordinator import PSI_URL
 from custom_components.singapore.train_coordinator import TRAIN_STATUS_URL
 from custom_components.singapore.weather_coordinator import (
     _READINGS_ENDPOINTS,
@@ -80,6 +81,45 @@ _TRAIN_PAYLOAD = {
 }
 
 
+_PSI_PAYLOAD = {
+    "code": 0,
+    "errorMsg": "",
+    "data": {
+        "regionMetadata": [
+            {"name": "West", "labelLocation": {"latitude": 1.35735, "longitude": 103.7}}
+        ],
+        "items": [
+            {
+                "timestamp": "2026-04-05T08:00:00+08:00",
+                "readings": {
+                    "psi_twenty_four_hourly": {
+                        "north": 40,
+                        "south": 45,
+                        "east": 52,
+                        "west": 48,
+                        "central": 50,
+                    },
+                    "pm25_twenty_four_hourly": {
+                        "north": 10,
+                        "south": 12,
+                        "east": 14,
+                        "west": 11,
+                        "central": 13,
+                    },
+                    "co_eight_hour_max": {
+                        "north": 0.4,
+                        "south": 0.5,
+                        "east": 0.6,
+                        "west": 0.3,
+                        "central": 0.5,
+                    },
+                },
+            }
+        ],
+    },
+}
+
+
 def _holiday_html() -> str:
     year = dt_util.now().year
     return f"""
@@ -111,4 +151,5 @@ def mock_sources(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
         )
     aioclient_mock.get(PUBLIC_HOLIDAYS_URL, text=_holiday_html())
     aioclient_mock.post(TRAIN_STATUS_URL, json=_TRAIN_PAYLOAD)
+    aioclient_mock.get(PSI_URL, json=_PSI_PAYLOAD)
     return aioclient_mock

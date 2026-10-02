@@ -115,6 +115,12 @@ class SensorDeviceClass:
     WIND_DIRECTION = "wind_direction"
     WIND_SPEED = "wind_speed"
     PRECIPITATION = "precipitation"
+    AQI = "aqi"
+    PM25 = "pm25"
+    PM10 = "pm10"
+    OZONE = "ozone"
+    NITROGEN_DIOXIDE = "nitrogen_dioxide"
+    SULPHUR_DIOXIDE = "sulphur_dioxide"
 
 
 class SensorStateClass:
@@ -201,6 +207,10 @@ class UnitOfPrecipitationDepth:
 
 PERCENTAGE = "%"
 DEGREE = "°"
+ATTR_LATITUDE = "latitude"
+ATTR_LONGITUDE = "longitude"
+CONCENTRATION_MICROGRAMS_PER_CUBIC_METER = "µg/m³"
+CONCENTRATION_MILLIGRAMS_PER_CUBIC_METER = "mg/m³"
 
 
 class Forecast(dict):
@@ -257,6 +267,10 @@ _HA_MODULES: dict[str, ModuleType] = {
         UnitOfPrecipitationDepth=UnitOfPrecipitationDepth,
         PERCENTAGE=PERCENTAGE,
         DEGREE=DEGREE,
+        ATTR_LATITUDE=ATTR_LATITUDE,
+        ATTR_LONGITUDE=ATTR_LONGITUDE,
+        CONCENTRATION_MICROGRAMS_PER_CUBIC_METER=CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+        CONCENTRATION_MILLIGRAMS_PER_CUBIC_METER=CONCENTRATION_MILLIGRAMS_PER_CUBIC_METER,
     ),
     "homeassistant.exceptions": _mod(
         "homeassistant.exceptions", ConfigEntryNotReady=ConfigEntryNotReady

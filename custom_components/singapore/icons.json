@@ -49,6 +49,30 @@
           "planned": "mdi:wrench-clock",
           "disruption": "mdi:alert"
         }
+      },
+      "psi": {
+        "default": "mdi:air-filter"
+      },
+      "psi_region": {
+        "default": "mdi:air-filter"
+      },
+      "pm25": {
+        "default": "mdi:blur"
+      },
+      "pm10": {
+        "default": "mdi:blur"
+      },
+      "ozone": {
+        "default": "mdi:molecule"
+      },
+      "nitrogen_dioxide": {
+        "default": "mdi:molecule"
+      },
+      "sulphur_dioxide": {
+        "default": "mdi:molecule"
+      },
+      "carbon_monoxide": {
+        "default": "mdi:molecule-co"
       }
     }
   }

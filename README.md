@@ -5,7 +5,7 @@
 # Singapore Home Assistant custom integration
 
 A [HACS](https://hacs.xyz) custom integration for Singapore-specific data: utility
-tariffs, COE bidding results, live weather, train status, and public holidays.
+tariffs, COE bidding results, live weather, air quality (PSI), train status, and public holidays.
 
 ### HACS installation (manual, pre-merge)
 
@@ -112,6 +112,48 @@ Bukit Panjang LRT, Sengkang LRT, Punggol LRT.
   <img src="images/train-status.jpeg" alt="Singapore MRT/LRT device page showing overall and per-line train status sensors" width="320">
 </p>
 
+### Air quality (PSI)
+
+Updated every **15 minutes** from [data.gov.sg / NEA](https://data.gov.sg/datasets/d_fe37906a0182569d891506e815e819b7/view).
+Grouped under an **Air Quality** device.
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.air_quality_psi` | Air Quality PSI | — | Singapore-wide 24-hour PSI (highest region); `band` attribute: `good` / `moderate` / `unhealthy` / `very_unhealthy` / `hazardous` |
+| `sensor.air_quality_psi_<region>` | e.g. Air Quality PSI North | — | 24-hour PSI for north, south, east, west, central — **with map location and every reading for that region** |
+| `sensor.air_quality_pm2_5` | Air Quality PM2.5 | µg/m³ | 24-hour PM2.5 (highest region) |
+| `sensor.air_quality_pm10` | Air Quality PM10 | µg/m³ | 24-hour PM10 (highest region) |
+| `sensor.air_quality_ozone` | Air Quality Ozone | µg/m³ | 8-hour max O₃ (highest region) |
+| `sensor.air_quality_nitrogen_dioxide` | Air Quality Nitrogen Dioxide | µg/m³ | 1-hour max NO₂ (highest region) |
+| `sensor.air_quality_sulphur_dioxide` | Air Quality Sulphur Dioxide | µg/m³ | 24-hour SO₂ (highest region) |
+| `sensor.air_quality_carbon_monoxide` | Air Quality Carbon Monoxide | mg/m³ | 8-hour max CO (highest region) |
+
+The Singapore-wide pollutant sensors also expose a `regions` attribute with each region's value.
+
+#### PSI on the map
+
+Each regional PSI sensor has `latitude`/`longitude` attributes (NEA's region label
+locations), so it shows up as one circle per region on a Map card. Use `label_mode: state`
+to show the PSI number inside each circle; tap a circle to see every reading for that
+region (3-hour and 24-hour PSI, PM2.5, PM10, O₃, NO₂, SO₂, CO and the sub-indices):
+
+```yaml
+type: map
+title: Singapore PSI
+default_zoom: 11
+entities:
+  - entity: sensor.air_quality_psi_north
+    label_mode: state
+  - entity: sensor.air_quality_psi_south
+    label_mode: state
+  - entity: sensor.air_quality_psi_east
+    label_mode: state
+  - entity: sensor.air_quality_psi_west
+    label_mode: state
+  - entity: sensor.air_quality_psi_central
+    label_mode: state
+```
+
 ### Public holidays
 
 Updated every 24 hours from [MOM](https://www.mom.gov.sg/employment-practices/public-holidays).
@@ -161,6 +203,24 @@ sensor.singapore_temperature:
   unit_of_measurement: °C
   attributes:
     source: data.gov.sg / NEA (collection 1459)
+
+sensor.air_quality_psi_east:
+  state: 39
+  attributes:
+    region: east
+    band: good
+    latitude: 1.35735
+    longitude: 103.94
+    psi_twenty_four_hourly: 39
+    psi_three_hourly: 0
+    pm25_twenty_four_hourly: 0
+    pm10_twenty_four_hourly: 3
+    o3_eight_hour_max: 9
+    no2_one_hour_max: 12
+    so2_twenty_four_hourly: 5
+    co_eight_hour_max: 19
+    reading_time: "2024-07-17T14:00:00+00:00"
+    source: data.gov.sg / NEA
 ```
 
 ## Installation via HACS (manual custom repository)
@@ -185,6 +245,7 @@ sensor.singapore_temperature:
 | [data.gov.sg / LTA](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view) | COE bidding results | Daily at 19:30 |
 | [data.gov.sg / NEA (collection 1456)](https://data.gov.sg/collections/1456/view) | 2-hour area weather forecasts | Every 10 min |
 | [data.gov.sg / NEA (collection 1459)](https://data.gov.sg/collections/1459/view) | Realtime weather readings | Every 10 min |
+| [data.gov.sg / NEA](https://data.gov.sg/datasets/d_fe37906a0182569d891506e815e819b7/view) | PSI and pollutant readings | Every 15 min |
 | [MOM](https://www.mom.gov.sg/employment-practices/public-holidays) | Public holidays | Every 24 h |
 | [mytransport.sg](https://www.mytransport.sg/trainstatus) | MRT/LRT train status | Every 5 min |
 

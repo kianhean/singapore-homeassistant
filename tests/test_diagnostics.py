@@ -10,6 +10,7 @@ from custom_components.singapore.diagnostics import (
     async_get_config_entry_diagnostics,
 )
 from custom_components.singapore.holiday_coordinator import PublicHoliday
+from custom_components.singapore.psi_coordinator import PsiData
 from custom_components.singapore.train_coordinator import TrainStatusData
 
 
@@ -31,12 +32,13 @@ async def test_diagnostics_serializes_all_coordinators():
         train=_coordinator(
             TrainStatusData(status="normal", details="", line_statuses={})
         ),
+        psi=_coordinator(PsiData(national={"psi_twenty_four_hourly": 39.0})),
     )
 
     result = await async_get_config_entry_diagnostics(MagicMock(), entry)
 
     coordinators = result["coordinators"]
-    assert set(coordinators) == {"tariff", "coe", "weather", "holiday", "train"}
+    assert set(coordinators) == {"tariff", "coe", "weather", "holiday", "train", "psi"}
     assert coordinators["tariff"]["last_update_success"] is False
     assert "boom" in coordinators["tariff"]["last_exception"]
     assert coordinators["holiday"]["data"] == [
@@ -44,3 +46,4 @@ async def test_diagnostics_serializes_all_coordinators():
     ]
     assert coordinators["train"]["data"]["status"] == "normal"
     assert coordinators["coe"]["data"] is None
+    assert coordinators["psi"]["data"]["national"]["psi_twenty_four_hourly"] == 39.0

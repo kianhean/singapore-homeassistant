@@ -28,6 +28,7 @@ async def async_get_config_entry_diagnostics(
             "weather": _coordinator_diagnostics(data.weather),
             "holiday": _coordinator_diagnostics(data.holiday),
             "train": _coordinator_diagnostics(data.train),
+            "psi": _coordinator_diagnostics(data.psi),
         },
     }
 
