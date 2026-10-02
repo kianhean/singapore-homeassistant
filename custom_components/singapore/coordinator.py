@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 import aiohttp
 from bs4 import BeautifulSoup
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -113,10 +114,13 @@ class TariffData:
 class SPGroupCoordinator(DataUpdateCoordinator[TariffData]):
     """Fetches and caches SP Group tariff data (electricity, gas, water)."""
 
-    def __init__(self, hass: HomeAssistant) -> None:
+    def __init__(
+        self, hass: HomeAssistant, config_entry: ConfigEntry | None = None
+    ) -> None:
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=config_entry,
             name="SP Group Tariffs",
             update_interval=UPDATE_INTERVAL,
         )

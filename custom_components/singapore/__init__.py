@@ -1,11 +1,10 @@
-"""Singapore electricity tariff integration."""
+"""Singapore integration: tariffs, COE, weather, train status and holidays."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import TypeAlias
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -13,6 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_track_time_change
 
 from .coe_coordinator import CoeCoordinator
+from .const import DOMAIN
 from .coordinator import SPGroupCoordinator
 from .holiday_coordinator import PublicHolidayCoordinator
 from .train_coordinator import TrainStatusCoordinator
@@ -20,7 +20,8 @@ from .weather_coordinator import SingaporeWeatherCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-DOMAIN = "singapore"
+__all__ = ["DOMAIN", "SingaporeConfigEntry", "SingaporeData"]
+
 PLATFORMS = [Platform.SENSOR, Platform.WEATHER, Platform.CALENDAR]
 
 # COE results are published after each bidding exercise; refresh daily at 19:30.
@@ -39,16 +40,16 @@ class SingaporeData:
     train: TrainStatusCoordinator
 
 
-SingaporeConfigEntry: TypeAlias = ConfigEntry[SingaporeData]
+type SingaporeConfigEntry = ConfigEntry[SingaporeData]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) -> bool:
     """Set up the integration and kick off the first data fetch."""
-    tariff_coordinator = SPGroupCoordinator(hass)
-    weather_coordinator = SingaporeWeatherCoordinator(hass)
-    holiday_coordinator = PublicHolidayCoordinator(hass)
-    train_coordinator = TrainStatusCoordinator(hass)
-    coe_coordinator = CoeCoordinator(hass)
+    tariff_coordinator = SPGroupCoordinator(hass, entry)
+    weather_coordinator = SingaporeWeatherCoordinator(hass, entry)
+    holiday_coordinator = PublicHolidayCoordinator(hass, entry)
+    train_coordinator = TrainStatusCoordinator(hass, entry)
+    coe_coordinator = CoeCoordinator(hass, entry)
 
     # Fetch independent data sources concurrently to speed up setup.
     # return_exceptions=True lets every coordinator finish its first refresh

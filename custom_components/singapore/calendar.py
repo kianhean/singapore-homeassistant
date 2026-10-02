@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
-from . import DOMAIN, SingaporeConfigEntry
+from . import SingaporeConfigEntry
+from .const import DOMAIN
 from .holiday_coordinator import PublicHoliday, PublicHolidayCoordinator
 
 PARALLEL_UPDATES = 0
@@ -19,7 +21,7 @@ PARALLEL_UPDATES = 0
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: SingaporeConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up public holiday calendar."""
     coordinator = entry.runtime_data.holiday
@@ -33,7 +35,8 @@ class SingaporePublicHolidayCalendar(
 
     _attr_has_entity_name = True
     _attr_name = None
-    _attr_icon = "mdi:calendar"
+    _attr_translation_key = "public_holidays"
+    _attr_attribution = "Data provided by the Ministry of Manpower"
 
     def __init__(self, coordinator: PublicHolidayCoordinator, entry_id: str) -> None:
         super().__init__(coordinator)
@@ -46,7 +49,7 @@ class SingaporePublicHolidayCalendar(
         if self.coordinator.data is None:
             return None
 
-        today = date.today()
+        today = dt_util.now().date()
         for holiday in self.coordinator.data:
             if holiday.day >= today:
                 return _to_event(holiday)

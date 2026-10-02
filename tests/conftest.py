@@ -37,20 +37,35 @@ class DataUpdateCoordinator:
     def __class_getitem__(cls, item):
         return cls
 
-    def __init__(self, hass, logger, name, update_interval):
+    def __init__(
+        self,
+        hass,
+        logger,
+        *,
+        config_entry=None,
+        name,
+        update_interval=None,
+        always_update=True,
+    ):
         self.hass = hass
+        self.config_entry = config_entry
         self.name = name
+        self.update_interval = update_interval
+        self.always_update = always_update
         self.data = None
         self.last_update_success = True
+        self.last_exception = None
         self._logger = logger
 
     async def async_refresh(self):
         try:
             self.data = await self._async_update_data()
             self.last_update_success = True
+            self.last_exception = None
         except Exception as err:
             self._logger.warning("Update failed: %s", err)
             self.last_update_success = False
+            self.last_exception = err
 
     async def async_config_entry_first_refresh(self):
         await self.async_refresh()
@@ -94,14 +109,17 @@ class SensorEntity:
 
 
 class SensorDeviceClass:
+    ENUM = "enum"
     TEMPERATURE = "temperature"
     HUMIDITY = "humidity"
+    WIND_DIRECTION = "wind_direction"
     WIND_SPEED = "wind_speed"
     PRECIPITATION = "precipitation"
 
 
 class SensorStateClass:
     MEASUREMENT = "measurement"
+    MEASUREMENT_ANGLE = "measurement_angle"
 
 
 class Platform:
@@ -120,6 +138,8 @@ class ConfigEntry:
 
     def __init__(self, entry_id: str = "test_entry"):
         self.entry_id = entry_id
+        self.title = "Singapore"
+        self.version = 1
         self.runtime_data = None
         self._on_unload: list = []
 
@@ -131,20 +151,35 @@ class ConfigEntry:
 
         return asyncio.ensure_future(coro)
 
+    def async_create_task(self, hass, coro, name=None):
+        import asyncio
+
+        return asyncio.ensure_future(coro)
+
 
 class ConfigFlow:
     def __init_subclass__(cls, domain=None, **kwargs):
         super().__init_subclass__(**kwargs)
 
 
-class AddEntitiesCallback:
+class AddConfigEntryEntitiesCallback:
     pass
 
 
-class WeatherEntity:
+class SingleCoordinatorWeatherEntity(CoordinatorEntity):
+    """Mirrors HA: forecast listeners are notified on every coordinator update."""
+
+    def _handle_coordinator_update(self):
+        super()._handle_coordinator_update()
+        self.coordinator.config_entry.async_create_task(
+            self.hass, self.async_update_listeners(None)
+        )
+
     async def async_update_listeners(self, forecast_types):
-        """Real HA requires forecast_types; enforce the same signature."""
         return None
+
+    async def async_forecast_daily(self):
+        return self._async_forecast_daily()
 
 
 class WeatherEntityFeature:
@@ -239,7 +274,7 @@ _HA_MODULES: dict[str, ModuleType] = {
     ),
     "homeassistant.helpers.entity_platform": _mod(
         "homeassistant.helpers.entity_platform",
-        AddEntitiesCallback=AddEntitiesCallback,
+        AddConfigEntryEntitiesCallback=AddConfigEntryEntitiesCallback,
     ),
     "homeassistant.helpers.event": _mod(
         "homeassistant.helpers.event",
@@ -255,7 +290,7 @@ _HA_MODULES: dict[str, ModuleType] = {
     "homeassistant.components": _mod("homeassistant.components"),
     "homeassistant.components.weather": _mod(
         "homeassistant.components.weather",
-        WeatherEntity=WeatherEntity,
+        SingleCoordinatorWeatherEntity=SingleCoordinatorWeatherEntity,
         WeatherEntityFeature=WeatherEntityFeature,
         Forecast=Forecast,
     ),

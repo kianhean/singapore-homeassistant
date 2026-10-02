@@ -376,7 +376,7 @@ def test_train_line_status_sensor_value_and_id():
     assert sensor.unique_id == "entry1_train_east_west_line_status"
 
 
-def test_train_line_status_sensor_unknown_when_line_missing():
+def test_train_line_status_sensor_none_when_line_missing():
     sensor = SingaporeTrainLineStatusSensor(
         _train_coordinator(
             data=TrainStatusData(
@@ -388,4 +388,24 @@ def test_train_line_status_sensor_unknown_when_line_missing():
         "entry1",
         "East-West Line",
     )
-    assert sensor.native_value == "unknown"
+    # ENUM sensors may only report declared options; None renders as unknown.
+    assert sensor.native_value is None
+
+
+def test_train_sensors_are_enum_with_all_statuses_as_options():
+    from custom_components.singapore.sensor import TRAIN_STATUS_OPTIONS
+
+    overall = SingaporeTrainStatusSensor(_train_coordinator(), "entry1")
+    line = SingaporeTrainLineStatusSensor(
+        _train_coordinator(), "entry1", "East-West Line"
+    )
+    for sensor in (overall, line):
+        assert sensor.device_class == "enum"
+        assert sensor._attr_options == TRAIN_STATUS_OPTIONS
+    assert set(TRAIN_STATUS_OPTIONS) == {"normal", "planned", "disruption"}
+
+
+def test_wind_bearing_uses_wind_direction_angle_statistics():
+    sensor = SingaporeWindBearingSensor(_weather_coordinator(), "entry1")
+    assert sensor.device_class == "wind_direction"
+    assert sensor._attr_state_class == "measurement_angle"

@@ -9,6 +9,7 @@ from datetime import timedelta
 from typing import Final
 
 import aiohttp
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -72,12 +73,17 @@ class TrainStatusData:
 class TrainStatusCoordinator(DataUpdateCoordinator[TrainStatusData]):
     """Fetches and caches train-status data from mytransport.sg."""
 
-    def __init__(self, hass: HomeAssistant) -> None:
+    def __init__(
+        self, hass: HomeAssistant, config_entry: ConfigEntry | None = None
+    ) -> None:
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=config_entry,
             name="Singapore MRT/LRT Train Status",
             update_interval=UPDATE_INTERVAL,
+            # Parsed data is a dataclass, so unchanged polls skip state writes.
+            always_update=False,
         )
 
     async def _async_update_data(self) -> TrainStatusData:

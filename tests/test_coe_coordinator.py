@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiohttp
 import pytest
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
@@ -208,7 +209,7 @@ async def test_coe_coordinator_network_error():
 
     hass = MagicMock()
     mock_session = MagicMock()
-    mock_session.get = MagicMock(side_effect=Exception("Connection refused"))
+    mock_session.get = MagicMock(side_effect=aiohttp.ClientError("Connection refused"))
 
     coordinator = CoeCoordinator(hass)
 

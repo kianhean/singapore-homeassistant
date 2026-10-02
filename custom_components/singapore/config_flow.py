@@ -8,7 +8,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_NAME
 
-from . import DOMAIN
+from .const import DOMAIN
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {

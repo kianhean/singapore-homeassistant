@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 import aiohttp
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -58,10 +59,13 @@ class CoeData:
 class CoeCoordinator(DataUpdateCoordinator[CoeData]):
     """Fetches and caches the latest COE bidding results from data.gov.sg."""
 
-    def __init__(self, hass: HomeAssistant) -> None:
+    def __init__(
+        self, hass: HomeAssistant, config_entry: ConfigEntry | None = None
+    ) -> None:
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=config_entry,
             name="COE Bidding Results",
             update_interval=None,  # Refreshed daily at 19:30 via async_track_time_change
         )
@@ -81,15 +85,16 @@ class CoeCoordinator(DataUpdateCoordinator[CoeData]):
                             f"data.gov.sg returned HTTP {response.status}"
                         )
                     payload = await response.json()
+            except UpdateFailed as err:
+                last_error = err
+            except (aiohttp.ClientError, TimeoutError) as err:
+                last_error = UpdateFailed(f"Error fetching COE results: {err}")
+            else:
+                # Parse failures (API shape changed) are not transient: let
+                # them propagate rather than retrying or serving stale data.
                 result = _parse_coe(payload)
                 self.last_updated = datetime.now(timezone.utc)
                 return result
-            except asyncio.CancelledError:
-                raise
-            except UpdateFailed as err:
-                last_error = err
-            except Exception as err:
-                last_error = UpdateFailed(f"Error fetching COE results: {err}")
 
             if attempt == _MAX_FETCH_ATTEMPTS:
                 break

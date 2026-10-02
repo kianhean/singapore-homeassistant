@@ -4,6 +4,10 @@ on:
   pull_request:
   push:
     branches: [main]
+  schedule:
+    # Weekly, so new Home Assistant releases are checked even without pushes.
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
 
 jobs:
   tests:
@@ -38,6 +42,52 @@ jobs:
         with:
           files: coverage.xml
           fail_ci_if_error: false
+
+  ha-compat:
+    # tests/ stubs out Home Assistant entirely, so it cannot catch HA API
+    # changes. tests_ha/ loads the integration into a real HA instance
+    # (via pytest-homeassistant-custom-component, which pins an exact HA
+    # release) at the minimum supported version and the current stable one.
+    name: Home Assistant ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Keep in sync with "homeassistant" in hacs.json.
+          - name: "2025.4.0 (minimum)"
+            python-version: "3.13"
+            phcc: "pytest-homeassistant-custom-component==0.13.232"
+            experimental: false
+          - name: "2026.9.4 (stable)"
+            python-version: "3.14"
+            phcc: "pytest-homeassistant-custom-component==0.13.367"
+            experimental: false
+          # Newest release of the test harness, often an HA beta: an early
+          # warning for upcoming breakage that does not block merges.
+          - name: "latest (incl. beta)"
+            python-version: "3.14"
+            phcc: "pytest-homeassistant-custom-component"
+            experimental: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Home Assistant test harness
+        run: pip install "${{ matrix.phcc }}" "beautifulsoup4>=4.12.3"
+
+      - name: Show Home Assistant version
+        run: python -c "from homeassistant.const import __version__; print(__version__)"
+
+      - name: Run tests against real Home Assistant
+        run: pytest tests_ha -v
 
   e2e:
     name: E2E (live scrape)
@@ -83,7 +133,7 @@ jobs:
         run: ruff --version
 
       - name: Ruff lint
-        run: ruff check custom_components/ tests/
+        run: ruff check custom_components/ tests/ tests_ha/
 
       - name: Ruff format check
-        run: ruff format --check custom_components/ tests/
+        run: ruff format --check custom_components/ tests/ tests_ha/
