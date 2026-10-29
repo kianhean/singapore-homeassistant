@@ -165,3 +165,55 @@ async def test_skipped_without_recorder():
     add = await _run_import(_hass(recorder_loaded=False), {}, _usage(hourly=hourly))
 
     add.assert_not_called()
+
+
+def test_daily_points_skip_bad_dates_and_trailing_zero_days():
+    # Shape of a live export: an impossible date, a negative correction and
+    # unpublished days at the end filled with 0.
+    points = [
+        UsagePoint("2026-06-27", -9.487),
+        UsagePoint("2026-06-30", 38.274),
+        UsagePoint("2026-06-31", 0.0),
+        UsagePoint("2026-07-01", 0.0),
+        UsagePoint("2026-07-29", 13.192),
+        UsagePoint("2026-07-30", 0.0),
+        UsagePoint("2026-07-31", 0.0),
+    ]
+
+    assert sp_statistics.daily_electricity(points) == [
+        (_utc(2026, 6, 27, 0), -9.487),
+        (_utc(2026, 6, 30, 0), 38.274),
+        (_utc(2026, 7, 1, 0), 0.0),
+        (_utc(2026, 7, 29, 0), 13.192),
+    ]
+
+
+def test_electricity_uses_daily_history_without_half_hourly_data():
+    usage = _usage(hourly=[])
+    usage.electricity_daily_history = [
+        UsagePoint("2026-07-28", 44.519),
+        UsagePoint("2026-07-29", 13.192),
+    ]
+
+    assert sp_statistics.electricity_points(usage) == [
+        (_utc(2026, 7, 28, 0), 44.519),
+        (_utc(2026, 7, 29, 0), 13.192),
+    ]
+
+
+def test_daily_history_only_fills_days_before_half_hourly_data():
+    usage = _usage(
+        hourly=[
+            UsagePoint("2026-07-29 00:00:00", 0.5),
+            UsagePoint("2026-07-29 00:30:00", 0.5),
+        ]
+    )
+    usage.electricity_daily_history = [
+        UsagePoint("2026-07-28", 44.519),
+        UsagePoint("2026-07-29", 13.192),
+    ]
+
+    assert sp_statistics.electricity_points(usage) == [
+        (_utc(2026, 7, 28, 0), 44.519),
+        (_utc(2026, 7, 29, 0), 1.0),
+    ]

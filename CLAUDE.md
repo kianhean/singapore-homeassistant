@@ -376,7 +376,10 @@ via `git+https`.
   or day-first period labels. A month SP hasn't published yet is `None`, never 0.
 - **Statistics** (`sp_statistics.py`, only when the subentry's `import_statistics` is on and
   `recorder` is loaded; `recorder` is an `after_dependencies`): half-hourly electricity summed
-  into hours → `singapore:sp_<account>_electricity` (kWh); completed months of water →
+  into hours → `singapore:sp_<account>_electricity` (kWh), with the daily history (one
+  value at local midnight) for days before the first half-hourly point (some accounts get no
+  half-hourly export at all; trailing 0.0 days are SP's "not published yet" and held back,
+  impossible dates such as `2026-06-31` are skipped); completed months of water →
   `singapore:sp_<account>_water` (m³). Each import reads `get_last_statistics` and only appends
   hours after it, continuing the running `sum`. The newest hour is held back until both
   half-hours are present and the in-progress water month is skipped, because a period is never

@@ -190,7 +190,7 @@ two long-term statistics to Home Assistant:
 
 | Statistic | What it contains |
 |---|---|
-| **SP Services \<account\> electricity** (`singapore:sp_<account>_electricity`) | Hourly electricity use (kWh), built from SP's half-hourly meter data |
+| **SP Services \<account\> electricity** (`singapore:sp_<account>_electricity`) | Electricity use (kWh): hourly where SP provides half-hourly meter data, otherwise one value per day |
 | **SP Services \<account\> water** (`singapore:sp_<account>_water`) | Monthly water use (m³), one value per completed month |
 
 They show up a few minutes after you add the account. All the history SP
