@@ -96,7 +96,8 @@ async def test_add_account_creates_sensors_on_its_own_device(
         for d in devices
         if (DOMAIN, f"{entry.entry_id}_sp_{SP_ACCOUNT}") in d.identifiers
     )
-    assert subentry.subentry_id in device.config_entries_subentries[entry.entry_id]
+    # The subentry's entities (which carry config_subentry_id) live on it.
+    assert {e.device_id for e in sp_entities} == {device.id}
 
     # The same account cannot be added twice.
     result = await _add_account(hass, entry)
