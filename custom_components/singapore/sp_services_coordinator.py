@@ -30,6 +30,7 @@ from .sp_statistics import (
     SP_TIMEZONE,
     async_import_usage_statistics,
     parse_period_date,
+    parse_period_day,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ def _now() -> datetime:
 
 def _value_for_day(points: list[UsagePoint] | None, day: date) -> float | None:
     for point in points or []:
-        if point.value is not None and parse_period_date(point.period) == day:
+        if point.value is not None and parse_period_day(point.period) == day:
             return point.value
     return None
 
@@ -88,7 +89,7 @@ def _sum_for_day(points: list[UsagePoint] | None, day: date) -> float | None:
     values = [
         point.value
         for point in points or []
-        if point.value is not None and parse_period_date(point.period) == day
+        if point.value is not None and parse_period_day(point.period) == day
     ]
     return round(sum(values), 3) if values else None
 
@@ -99,7 +100,7 @@ def _sum_daily_for_month(
     """Sum daily points for a month, only when every day up to ``last_day`` is there."""
     by_day: dict[date, float] = {}
     for point in points or []:
-        parsed = parse_period_date(point.period)
+        parsed = parse_period_day(point.period)
         if (
             point.value is not None
             and parsed

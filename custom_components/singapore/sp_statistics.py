@@ -33,7 +33,21 @@ _LOGGER = logging.getLogger(__name__)
 
 SP_TIMEZONE: Final = ZoneInfo("Asia/Singapore")
 
-_DATE_FORMATS: Final = ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d", "%d-%m-%Y")
+_DATE_FORMATS: Final = ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d", "%d-%m-%Y", "%Y%m%d")
+# Month-only labels SP uses in some exports (e.g. "Apr 2026", "Apr-26"); they
+# parse to the first of the month.
+_MONTH_FORMATS: Final = (
+    "%b %Y",
+    "%B %Y",
+    "%b-%y",
+    "%b-%Y",
+    "%b %y",
+    "%Y-%m",
+    "%Y/%m",
+    "%m/%Y",
+    "%m-%Y",
+    "%Y%m",
+)
 _DATETIME_FORMATS: Final = (
     "%Y-%m-%d %H:%M:%S",
     "%Y-%m-%d %H:%M",
@@ -43,12 +57,25 @@ _DATETIME_FORMATS: Final = (
 )
 
 
-def parse_period_date(period: str) -> date | None:
-    """Parse the date part of an SP period label (ISO or day-first)."""
-    head = period.strip().split(" ")[0].split("T")[0]
+def parse_period_day(period: str) -> date | None:
+    """Parse a day label (ISO or day-first, optionally with a time)."""
+    head = period.strip().strip('"').split(" ")[0].split("T")[0]
     for fmt in _DATE_FORMATS:
         try:
             return datetime.strptime(head, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def parse_period_date(period: str) -> date | None:
+    """Parse a day or month-only label; a month gives its first day."""
+    if (day := parse_period_day(period)) is not None:
+        return day
+    text = period.strip().strip('"')
+    for fmt in _MONTH_FORMATS:
+        try:
+            return datetime.strptime(text, fmt).date()
         except ValueError:
             continue
     return None

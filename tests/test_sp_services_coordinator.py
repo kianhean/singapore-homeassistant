@@ -325,3 +325,20 @@ async def test_subentry_update_with_new_session_rebuilds_client():
     old_client.close.assert_awaited_once()
     assert coordinator._client is not old_client
     coordinator.async_request_refresh.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    "label", ["Sep 2026", "September 2026", "Sep-26", "2026-09", "09/2026", "202609"]
+)
+def test_derive_matches_month_only_labels(label):
+    usage = _usage(electricity_monthly_history=[UsagePoint(label, 572.0, "Actual")])
+
+    assert derive_usage(usage, NOW).electricity_last_month == 572.0
+
+
+def test_month_label_does_not_count_as_a_day():
+    # "Oct 2026" is a month total, never today's usage, even on the 1st.
+    usage = _usage(electricity_daily_history=[UsagePoint("Oct 2026", 410.0)])
+    first = datetime(2026, 10, 1, 12, tzinfo=SP_TIMEZONE)
+
+    assert derive_usage(usage, first).electricity_today is None

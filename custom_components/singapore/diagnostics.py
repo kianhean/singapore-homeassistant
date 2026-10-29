@@ -11,6 +11,14 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from . import SingaporeConfigEntry
 from .sp_services_coordinator import SpServicesCoordinator
 
+_HISTORY_SERIES = (
+    "electricity_hourly_history",
+    "electricity_daily_history",
+    "electricity_monthly_history",
+    "water_monthly_history",
+)
+_SAMPLE_POINTS = 3
+
 
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: SingaporeConfigEntry
@@ -59,14 +67,19 @@ def _sp_account_diagnostics(coordinator: SpServicesCoordinator) -> dict[str, Any
         }
         if data
         else None,
+        # The newest few points of each series show which period labels SP
+        # sends, which is what breaks first when SP changes its exports.
+        "history_samples": {
+            name: [
+                {"period": p.period, "value": p.value, "status": p.status}
+                for p in (getattr(usage, name) or [])[-_SAMPLE_POINTS:]
+            ]
+            for name in _HISTORY_SERIES
+        }
+        if usage
+        else None,
         "history_points": {
-            name: len(getattr(usage, name) or [])
-            for name in (
-                "electricity_hourly_history",
-                "electricity_daily_history",
-                "electricity_monthly_history",
-                "water_monthly_history",
-            )
+            name: len(getattr(usage, name) or []) for name in _HISTORY_SERIES
         }
         if usage
         else None,
