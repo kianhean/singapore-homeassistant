@@ -196,6 +196,14 @@ two long-term statistics to Home Assistant:
 They show up a few minutes after you add the account. All the history SP
 provides is imported, not just new data from today onwards.
 
+> **Pick the statistic, not a sensor.** The *Electricity today / this month*
+> and *Water this month* sensors are running totals that reset, so the Energy
+> dashboard doesn't list them, and searching for `sensor.sp_services_…` finds
+> nothing. In the Energy settings, choose the entries named
+> **SP Services \<account\> electricity** and **SP Services \<account\> water**.
+> To check they exist, open **Developer tools → Statistics** and search for
+> `sp_`.
+
 ### Electricity
 
 1. Go to **Settings → Dashboards → Energy**. On older versions it's
@@ -351,6 +359,15 @@ and paste the new string straight away.
 
 **"Could not reach SP Services"**
 SP's site is down or slow. Try again in a few minutes.
+
+**I can't find the SP sensor in the Energy dashboard's picker**
+That's expected: the dashboard uses the imported statistics, not the sensors
+(see [Step 4](#step-4--show-your-usage-in-the-energy-dashboard)). Pick
+**SP Services \<account\> electricity** or **… water**. If they aren't listed,
+check that **Import usage history into statistics** is ticked: use
+**Reconfigure** on the account and wait up to 30 minutes for the next update.
+The water statistic only has completed months, so it appears once SP has
+published at least one full month.
 
 **The Energy dashboard shows no electricity for today**
 SP publishes readings with a delay (see [What to expect](#what-to-expect)),
