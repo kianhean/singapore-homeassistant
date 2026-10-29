@@ -153,3 +153,112 @@ def mock_sources(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
     aioclient_mock.post(TRAIN_STATUS_URL, json=_TRAIN_PAYLOAD)
     aioclient_mock.get(PSI_URL, json=_PSI_PAYLOAD)
     return aioclient_mock
+
+
+SP_ACCOUNT = "8949049293"
+
+
+class FakeSpClient:
+    """Stands in for ``sp_services.SpServicesClient`` (no network)."""
+
+    renew_error: Exception | None = None
+    session_value = "rolled"
+    instances: list[FakeSpClient] = []
+
+    def __init__(self, *, session_state=None, debug=False) -> None:
+        self.session_state = session_state
+        self.token_set = None
+        self.renew_calls = 0
+        FakeSpClient.instances.append(self)
+
+    async def renew_silently(self):
+        from datetime import UTC, datetime, timedelta
+
+        from sp_services import TokenSet
+
+        self.renew_calls += 1
+        if FakeSpClient.renew_error is not None:
+            raise FakeSpClient.renew_error
+        self.token_set = TokenSet(
+            access_token="token",
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+        )
+        return self.token_set
+
+    def export_session(self):
+        from sp_services import SessionCookie, SessionState
+
+        return SessionState(
+            cookies=[
+                SessionCookie(
+                    name="auth0",
+                    value=FakeSpClient.session_value,
+                    domain="identity.spdigital.auth0.com",
+                )
+            ]
+        )
+
+    async def fetch_usage(self, token, account_no=None):
+        from datetime import datetime, timedelta
+
+        from sp_services import UsageData, UsagePoint
+
+        from custom_components.singapore.sp_statistics import SP_TIMEZONE
+
+        now = datetime.now(SP_TIMEZONE)
+        yesterday = (now - timedelta(days=1)).date()
+        last_month = now.replace(day=1) - timedelta(days=1)
+        return UsageData(
+            electricity_today_kwh=None,
+            electricity_month_kwh=None,
+            water_today_m3=None,
+            water_month_m3=None,
+            account_no=SP_ACCOUNT,
+            last_updated=now,
+            electricity_daily_history=[UsagePoint(now.date().isoformat(), 9.5)],
+            electricity_monthly_history=[
+                UsagePoint(last_month.replace(day=1).isoformat(), 572.0, "Actual")
+            ],
+            water_monthly_history=[
+                UsagePoint(last_month.replace(day=1).isoformat(), 33.9, "Actual")
+            ],
+            electricity_hourly_history=[
+                UsagePoint(f"{yesterday.isoformat()} 10:00:00", 0.5),
+                UsagePoint(f"{yesterday.isoformat()} 10:30:00", 0.25),
+                UsagePoint(f"{yesterday.isoformat()} 11:00:00", 0.4),
+                UsagePoint(f"{yesterday.isoformat()} 11:30:00", 0.4),
+            ],
+        )
+
+    async def close(self) -> None:
+        return None
+
+
+def sp_session(value: str = "pasted") -> str:
+    from sp_services import SessionCookie, SessionState
+
+    return SessionState(
+        cookies=[
+            SessionCookie(
+                name="auth0", value=value, domain="identity.spdigital.auth0.com"
+            )
+        ]
+    ).to_string()
+
+
+@pytest.fixture
+def fake_sp_client():
+    """Patch the SP Services client used by the config flow and coordinator."""
+    from unittest.mock import patch
+
+    FakeSpClient.renew_error = None
+    FakeSpClient.session_value = "rolled"
+    FakeSpClient.instances = []
+    with (
+        patch("custom_components.singapore.config_flow.SpServicesClient", FakeSpClient),
+        patch(
+            "custom_components.singapore.sp_services_coordinator.SpServicesClient",
+            FakeSpClient,
+        ),
+    ):
+        yield FakeSpClient

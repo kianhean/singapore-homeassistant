@@ -15,9 +15,11 @@ custom_components/singapore/
 ├── weather_coordinator.py  # SingaporeWeatherCoordinator: 2-hour forecasts + collection 1459 readings
 ├── train_coordinator.py    # TrainStatusCoordinator: scrapes mytransport.sg MRT/LRT status
 ├── psi_coordinator.py      # PsiCoordinator: NEA PSI + pollutant readings per region
+├── sp_services_coordinator.py  # SpServicesCoordinator: one per SP account subentry (sp_api)
+├── sp_statistics.py        # Imports SP usage history into external long-term statistics
 ├── calendar.py             # Calendar entity (Singapore public holidays)
 ├── weather.py              # Weather entities (one per Singapore forecast area)
-├── config_flow.py          # UI config flow (name input; single instance via manifest)
+├── config_flow.py          # UI config flow (name input; single instance) + SP account subentry flow
 ├── diagnostics.py          # "Download diagnostics": coordinator status + parsed data
 ├── sensor.py               # Sensor entities (tariff + COE + weather + PSI + train status)
 ├── manifest.json           # Integration metadata; declares beautifulsoup4 dep, single_config_entry
@@ -36,6 +38,8 @@ tests/
 ├── test_weather_coordinator.py  # Weather coordinator parser + HTTP mock tests
 ├── test_train_coordinator.py    # Train status parser + HTTP mock tests
 ├── test_psi_coordinator.py      # PSI parser, band mapping + HTTP mock tests
+├── test_sp_services_coordinator.py  # SP usage derivation, silent renewal, repair issue
+├── test_sp_statistics.py        # Half-hour → hour buckets, running sum continuation
 ├── test_calendar.py             # Calendar event and range query tests
 ├── test_sensor.py               # Sensor value, unit, attributes, unique_id, None-safety
 ├── test_weather.py              # Weather entity condition mapping + forecast tests
@@ -44,7 +48,11 @@ tests/
 
 tests_ha/                        # Runs against a REAL Home Assistant (no module mocks)
 ├── conftest.py                  # pytest-homeassistant-custom-component + canned HTTP responses
-└── test_integration.py          # Full entry setup/unload, config flow, diagnostics
+├── test_integration.py          # Full entry setup/unload, config flow, diagnostics
+├── test_sp_services.py          # SP account subentry add/reconfigure, repair, write-back
+└── test_sp_statistics.py        # SP statistics land in a real recorder (no double count)
+
+docs/sp_services.md              # End-user guide: uv install, login, Energy dashboard
 
 .github/workflows/tests.yml   # CI: unit tests, real-HA compat matrix, e2e scrape, ruff lint
 ```
@@ -60,6 +68,7 @@ class SingaporeData:
     holiday: PublicHolidayCoordinator
     train: TrainStatusCoordinator
     psi: PsiCoordinator
+    sp_accounts: dict[str, SpServicesCoordinator]  # keyed by config subentry id
 
 type SingaporeConfigEntry = ConfigEntry[SingaporeData]
 ```
@@ -335,6 +344,49 @@ Response shape: `{ "value": { "Status": int, "AffectedSegments": [...], "Message
 - A payload with no `psi_twenty_four_hourly` raises `UpdateFailed`.
 - The first refresh runs as a background task (like COE) so a PSI outage never blocks
   integration setup.
+
+## How SP Services Accounts Work
+
+Household usage comes from the user's own SP Services account through the
+[`sp_api`](https://github.com/kianhean/sp_api) library (`sp_services` package), pinned in
+`manifest.json` as a **tag archive URL** (`SP_SERVICES_REQUIREMENT` in `const.py`; keep
+the two in sync, a unit test checks it). The archive form avoids needing `git` inside the
+HA container or on the user's computer. CI and `requirements_test.txt` install the same tag
+via `git+https`.
+
+- Each account is a **config subentry** (`sp_account`) of the single `singapore` entry, not a
+  separate config entry (`single_config_entry` stays true). Entities are added with
+  `config_subentry_id=` and get their own device.
+- **Auth:** SP's Auth0 tenant issues **no refresh token**. The subentry stores a
+  *session string* (`SessionState.to_string()`, the Auth0 session cookies) which the user gets
+  by running `sp-services-e2e --export-session` on a computer with Chrome (captcha + OTP happen
+  there). The coordinator calls `renew_silently()` (`/authorize?prompt=none`) whenever the
+  1-hour access token has expired, and writes the re-exported session back with
+  `async_update_subentry` when it changed (each renewal moves the 3-day session expiry forward).
+- **Update listener:** that hourly write-back fires the entry's update listener. The listener
+  reloads **only** when the set of SP subentry ids changed; otherwise it hands each subentry to
+  `SpServicesCoordinator.async_subentry_updated`, which rebuilds the client only when the
+  session differs (i.e. a Reconfigure with a new login).
+- **Session ended** (`SessionExpiredError` from renewal, typically HA offline >3 days): create
+  repair issue `sp_session_expired_<subentry_id>` and raise `UpdateFailed`. Do **not** raise
+  `ConfigEntryAuthFailed`: that would start a reauth of the parent entry, which has no
+  credentials. The user fixes it with the subentry's **Reconfigure** step.
+- **Derived values:** SP's summary fields are often null, so today / this month / last month
+  come from the history lists (`derive_usage`), using `Asia/Singapore` dates and accepting ISO
+  or day-first period labels. A month SP hasn't published yet is `None`, never 0.
+- **Statistics** (`sp_statistics.py`, only when the subentry's `import_statistics` is on and
+  `recorder` is loaded; `recorder` is an `after_dependencies`): half-hourly electricity summed
+  into hours → `singapore:sp_<account>_electricity` (kWh), with the daily history (one
+  value at local midnight) for days before the first half-hourly point (some accounts get no
+  half-hourly export at all; trailing 0.0 days are SP's "not published yet" and held back,
+  impossible dates such as `2026-06-31` are skipped); completed months of water →
+  `singapore:sp_<account>_water` (m³). Each import reads `get_last_statistics` and only appends
+  hours after it, continuing the running `sum`. The newest hour is held back until both
+  half-hours are present and the in-progress water month is skipped, because a period is never
+  re-imported once behind the last statistic. Do not pass `unit_class` in the metadata: HA
+  2025.4 rejects unknown keys and newer HA derives it from the unit.
+- Diagnostics never include the session, tokens or account number.
+- The user-facing guide is `docs/sp_services.md`; the subentry form links to it.
 
 ### Calendar Entity
 

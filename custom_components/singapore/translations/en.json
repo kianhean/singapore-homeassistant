@@ -94,7 +94,72 @@
       },
       "carbon_monoxide": {
         "name": "Carbon Monoxide"
+      },
+      "sp_electricity_today": {
+        "name": "Electricity today"
+      },
+      "sp_electricity_this_month": {
+        "name": "Electricity this month"
+      },
+      "sp_electricity_last_month": {
+        "name": "Electricity last month"
+      },
+      "sp_water_this_month": {
+        "name": "Water this month"
+      },
+      "sp_water_last_month": {
+        "name": "Water last month"
       }
+    }
+  },
+  "config_subentries": {
+    "sp_account": {
+      "entry_type": "SP Services account",
+      "initiate_flow": {
+        "user": "Add SP Services account"
+      },
+      "step": {
+        "user": {
+          "title": "Add SP Services account",
+          "description": "Log in to SP Services once on a computer with Chrome, Edge or Brave, then paste the session it prints here. New to this? Follow the step-by-step guide (Windows and Mac): {guide_url}\n\nCommand to run:\n`{command}`",
+          "data": {
+            "session": "Session string",
+            "import_statistics": "Import usage history into statistics (Energy dashboard)"
+          },
+          "data_description": {
+            "session": "The long line printed by the command above. It works like a password: keep it private.",
+            "import_statistics": "Turn off if you already track usage with your own smart meter and only want the sensors."
+          }
+        },
+        "reconfigure": {
+          "title": "Log in to SP Services again",
+          "description": "Log in to SP Services once on a computer with Chrome, Edge or Brave, then paste the session it prints here. New to this? Follow the step-by-step guide (Windows and Mac): {guide_url}\n\nCommand to run:\n`{command}`",
+          "data": {
+            "session": "Session string",
+            "import_statistics": "Import usage history into statistics (Energy dashboard)"
+          },
+          "data_description": {
+            "session": "The long line printed by the command above. It works like a password: keep it private.",
+            "import_statistics": "Turn off if you already track usage with your own smart meter and only want the sensors."
+          }
+        }
+      },
+      "error": {
+        "invalid_session": "That is not a valid session string. Copy the whole line the command printed.",
+        "session_expired": "This session has already ended. Run the command again and paste the new session.",
+        "cannot_connect": "Could not reach SP Services. Try again in a few minutes."
+      },
+      "abort": {
+        "already_configured": "This SP Services account is already added.",
+        "reconfigure_successful": "Logged in again. Usage updates will resume shortly.",
+        "wrong_account": "That session belongs to a different SP Services account. Add it as a new account instead."
+      }
+    }
+  },
+  "issues": {
+    "sp_session_expired": {
+      "title": "SP Services account {account_no} needs you to log in again",
+      "description": "The saved SP Services login for account {account_no} has ended. This happens when Home Assistant could not reach SP for more than 3 days, or when SP ends the session. Usage sensors stay unavailable until you log in again.\n\nTo fix it: run the login command again on your computer, then go to Settings > Devices & services > Singapore, find the SP Services account and choose Reconfigure. Paste the new session string. Usage history missed in the meantime is filled in automatically."
     }
   }
 }

@@ -1,4 +1,4 @@
-"""Sensor platform for Singapore tariffs, COE, weather, PSI and train status."""
+"""Sensor platform for Singapore tariffs, COE, weather, PSI, trains and SP usage."""
 
 from __future__ import annotations
 
@@ -16,9 +16,11 @@ from homeassistant.const import (
     CONCENTRATION_MILLIGRAMS_PER_CUBIC_METER,
     DEGREE,
     PERCENTAGE,
+    UnitOfEnergy,
     UnitOfPrecipitationDepth,
     UnitOfSpeed,
     UnitOfTemperature,
+    UnitOfVolume,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
@@ -40,6 +42,7 @@ from .psi_coordinator import (
     PsiCoordinator,
     psi_band,
 )
+from .sp_services_coordinator import SpServicesCoordinator, SpUsageData
 from .train_coordinator import TRAIN_LINES, TrainStatusCoordinator
 from .weather_coordinator import SingaporeWeatherCoordinator
 
@@ -52,6 +55,42 @@ UNIT_WIND_BEARING = DEGREE
 UNIT_RAINFALL = UnitOfPrecipitationDepth.MILLIMETERS
 
 TRAIN_STATUS_OPTIONS = ["normal", "planned", "disruption"]
+
+SP_SERVICES_URL = "https://services.spservices.sg/"
+
+# (translation key, SpUsageData field, device class, unit) for SP usage sensors.
+SP_USAGE_SENSORS: tuple[tuple[str, str, str, str], ...] = (
+    (
+        "sp_electricity_today",
+        "electricity_today",
+        SensorDeviceClass.ENERGY,
+        UnitOfEnergy.KILO_WATT_HOUR,
+    ),
+    (
+        "sp_electricity_this_month",
+        "electricity_this_month",
+        SensorDeviceClass.ENERGY,
+        UnitOfEnergy.KILO_WATT_HOUR,
+    ),
+    (
+        "sp_electricity_last_month",
+        "electricity_last_month",
+        SensorDeviceClass.ENERGY,
+        UnitOfEnergy.KILO_WATT_HOUR,
+    ),
+    (
+        "sp_water_this_month",
+        "water_this_month",
+        SensorDeviceClass.WATER,
+        UnitOfVolume.CUBIC_METERS,
+    ),
+    (
+        "sp_water_last_month",
+        "water_last_month",
+        SensorDeviceClass.WATER,
+        UnitOfVolume.CUBIC_METERS,
+    ),
+)
 
 PSI_DATASET_URL = "https://data.gov.sg/datasets/d_fe37906a0182569d891506e815e819b7/view"
 
@@ -152,6 +191,15 @@ async def async_setup_entry(
         )
 
     async_add_entities(entities)
+
+    for subentry_id, sp_coordinator in data.sp_accounts.items():
+        async_add_entities(
+            [
+                SpUsageSensor(sp_coordinator, entry.entry_id, description)
+                for description in SP_USAGE_SENSORS
+            ],
+            config_subentry_id=subentry_id,
+        )
 
 
 class _BaseTariffSensor(CoordinatorEntity[SPGroupCoordinator], SensorEntity):
@@ -675,3 +723,51 @@ class SingaporePollutantSensor(_BasePsiSensor):
         if self.coordinator.data is not None:
             attrs["regions"] = self.coordinator.data.readings.get(self._reading_key, {})
         return attrs
+
+
+class SpUsageSensor(CoordinatorEntity[SpServicesCoordinator], SensorEntity):
+    """Household usage for one SP Services account.
+
+    These are period totals, so there is no state_class: the Energy dashboard
+    uses the external statistics imported by ``sp_statistics`` instead.
+    """
+
+    _attr_has_entity_name = True
+    _attr_attribution = "Data provided by SP Services"
+
+    def __init__(
+        self,
+        coordinator: SpServicesCoordinator,
+        entry_id: str,
+        description: tuple[str, str, str, str],
+    ) -> None:
+        super().__init__(coordinator)
+        translation_key, field, device_class, unit = description
+        self._field = field
+        self._account_no = coordinator.account_no
+        self._entry_id = entry_id
+        self._attr_translation_key = translation_key
+        self._attr_device_class = device_class
+        self._attr_native_unit_of_measurement = unit
+        self._attr_suggested_display_precision = (
+            2 if unit == UnitOfEnergy.KILO_WATT_HOUR else 1
+        )
+        self._attr_unique_id = f"{entry_id}_sp_{self._account_no}_{field}"
+
+    @property
+    def native_value(self) -> float | None:
+        data: SpUsageData | None = self.coordinator.data
+        if data is None:
+            return None
+        return getattr(data, self._field)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{self._entry_id}_sp_{self._account_no}")},
+            name=f"SP Services {self._account_no}",
+            manufacturer="SP Group",
+            model="SP Services account",
+            entry_type=DeviceEntryType.SERVICE,
+            configuration_url=SP_SERVICES_URL,
+        )

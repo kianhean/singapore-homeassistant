@@ -5,7 +5,8 @@
 # Singapore Home Assistant custom integration
 
 A [HACS](https://hacs.xyz) custom integration for Singapore-specific data: utility
-tariffs, COE bidding results, live weather, air quality (PSI), train status, and public holidays.
+tariffs, COE bidding results, live weather, air quality (PSI), train status, public holidays,
+and (optionally) your own household electricity and water usage from SP Services.
 
 ### HACS installation (manual, pre-merge)
 
@@ -167,6 +168,30 @@ Shows up as a Home Assistant calendar with all-day events from the current year 
   <img src="images/public-holidays-calendar.jpeg" alt="Singapore public holidays calendar showing Good Friday and Saturday as all-day events" width="320">
 </p>
 
+### Your household usage (SP Services, optional)
+
+Connect your own [SP Services](https://services.spservices.sg/) account to get your
+electricity and water usage, including **half-hourly electricity history and monthly water
+history in the Energy dashboard**.
+
+**👉 Step-by-step guide (Windows & Mac, no technical knowledge needed):
+[docs/sp_services.md](docs/sp_services.md)**
+
+In short: you log in to SP once on your computer (captcha + SMS OTP in a normal browser
+window), paste the resulting session string into **Settings → Devices & services → Singapore →
+Add SP Services account**, and Home Assistant stays logged in from then on.
+
+| Sensor | Unit |
+|--------|------|
+| Electricity today / this month / last month | kWh |
+| Water this month / last month | m³ |
+
+Statistics `singapore:sp_<account>_electricity` (hourly) and `singapore:sp_<account>_water`
+(monthly) can be picked as the grid consumption and water source in the Energy dashboard. They are
+separate from any smart-meter sensors you already have, and nothing is added to the Energy
+dashboard unless you choose it. Untick **Import usage history into statistics** if you only
+want the sensors.
+
 ## Example sensor states
 
 ```yaml
@@ -236,6 +261,7 @@ sensor.air_quality_psi_east:
 1. Go to **Settings → Devices & Services → Add Integration**.
 2. Search for **Singapore**.
 3. Enter a name and click **Submit**.
+4. *(Optional)* To add your SP Services usage, follow [docs/sp_services.md](docs/sp_services.md).
 
 ## Data sources
 
@@ -248,6 +274,7 @@ sensor.air_quality_psi_east:
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_fe37906a0182569d891506e815e819b7/view) | PSI and pollutant readings | Every 15 min |
 | [MOM](https://www.mom.gov.sg/employment-practices/public-holidays) | Public holidays | Every 24 h |
 | [mytransport.sg](https://www.mytransport.sg/trainstatus) | MRT/LRT train status | Every 5 min |
+| [SP Services](https://services.spservices.sg/) (your account, via [`sp_api`](https://github.com/kianhean/sp_api)) | Household electricity and water usage | Every 30 min |
 
 ## Development
 

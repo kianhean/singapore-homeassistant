@@ -121,6 +121,8 @@ class SensorDeviceClass:
     OZONE = "ozone"
     NITROGEN_DIOXIDE = "nitrogen_dioxide"
     SULPHUR_DIOXIDE = "sulphur_dioxide"
+    ENERGY = "energy"
+    WATER = "water"
 
 
 class SensorStateClass:
@@ -138,16 +140,38 @@ class HomeAssistant:
     pass
 
 
+class ConfigSubentry:
+    def __init__(
+        self,
+        *,
+        data,
+        subentry_type,
+        title,
+        unique_id=None,
+        subentry_id="test_subentry",
+    ):
+        self.data = data
+        self.subentry_type = subentry_type
+        self.title = title
+        self.unique_id = unique_id
+        self.subentry_id = subentry_id
+
+
 class ConfigEntry:
     def __class_getitem__(cls, item):
         return cls
 
-    def __init__(self, entry_id: str = "test_entry"):
+    def __init__(self, entry_id: str = "test_entry", subentries=None):
         self.entry_id = entry_id
         self.title = "Singapore"
         self.version = 1
         self.runtime_data = None
+        self.subentries = {s.subentry_id: s for s in subentries or []}
         self._on_unload: list = []
+
+    def add_update_listener(self, listener):
+        self._update_listener = listener
+        return MagicMock()
 
     def async_on_unload(self, func):
         self._on_unload.append(func)
@@ -166,6 +190,27 @@ class ConfigEntry:
 class ConfigFlow:
     def __init_subclass__(cls, domain=None, **kwargs):
         super().__init_subclass__(**kwargs)
+
+
+class ConfigSubentryFlow:
+    pass
+
+
+class _Selector:
+    def __init__(self, config=None):
+        self.config = config
+
+
+class TextSelectorType:
+    PASSWORD = "password"
+
+
+class IssueSeverity:
+    ERROR = "error"
+
+
+class StatisticMeanType:
+    NONE = 0
 
 
 class AddConfigEntryEntitiesCallback:
@@ -191,6 +236,14 @@ class SingleCoordinatorWeatherEntity(CoordinatorEntity):
 class WeatherEntityFeature:
     FORECAST_HOURLY = 1
     FORECAST_DAILY = 2
+
+
+class UnitOfEnergy:
+    KILO_WATT_HOUR = "kWh"
+
+
+class UnitOfVolume:
+    CUBIC_METERS = "m³"
 
 
 class UnitOfTemperature:
@@ -263,6 +316,8 @@ _HA_MODULES: dict[str, ModuleType] = {
         Platform=Platform,
         CONF_NAME="name",
         UnitOfTemperature=UnitOfTemperature,
+        UnitOfEnergy=UnitOfEnergy,
+        UnitOfVolume=UnitOfVolume,
         UnitOfSpeed=UnitOfSpeed,
         UnitOfPrecipitationDepth=UnitOfPrecipitationDepth,
         PERCENTAGE=PERCENTAGE,
@@ -299,6 +354,32 @@ _HA_MODULES: dict[str, ModuleType] = {
         DeviceInfo=DeviceInfo,
         DeviceEntryType=DeviceEntryType,
     ),
+    "homeassistant.helpers.selector": _mod(
+        "homeassistant.helpers.selector",
+        TextSelector=_Selector,
+        TextSelectorConfig=dict,
+        TextSelectorType=TextSelectorType,
+    ),
+    "homeassistant.helpers.issue_registry": _mod(
+        "homeassistant.helpers.issue_registry",
+        IssueSeverity=IssueSeverity,
+        async_create_issue=MagicMock(),
+        async_delete_issue=MagicMock(),
+    ),
+    "homeassistant.components.recorder": _mod(
+        "homeassistant.components.recorder", get_instance=MagicMock()
+    ),
+    "homeassistant.components.recorder.models": _mod(
+        "homeassistant.components.recorder.models",
+        StatisticData=dict,
+        StatisticMeanType=StatisticMeanType,
+        StatisticMetaData=dict,
+    ),
+    "homeassistant.components.recorder.statistics": _mod(
+        "homeassistant.components.recorder.statistics",
+        async_add_external_statistics=MagicMock(),
+        get_last_statistics=MagicMock(),
+    ),
     "homeassistant.util": _mod("homeassistant.util"),
     "homeassistant.util.dt": _mod("homeassistant.util.dt", now=_dt_now),
     "homeassistant.components": _mod("homeassistant.components"),
@@ -324,6 +405,9 @@ _HA_MODULES: dict[str, ModuleType] = {
         ConfigEntry=ConfigEntry,
         ConfigFlow=ConfigFlow,
         ConfigFlowResult=dict,
+        ConfigSubentry=ConfigSubentry,
+        ConfigSubentryFlow=ConfigSubentryFlow,
+        SubentryFlowResult=dict,
         SOURCE_USER="user",
     ),
 }
