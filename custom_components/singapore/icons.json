@@ -73,6 +73,21 @@
       },
       "carbon_monoxide": {
         "default": "mdi:molecule-co"
+      },
+      "sp_electricity_today": {
+        "default": "mdi:home-lightning-bolt"
+      },
+      "sp_electricity_this_month": {
+        "default": "mdi:home-lightning-bolt-outline"
+      },
+      "sp_electricity_last_month": {
+        "default": "mdi:calendar-month"
+      },
+      "sp_water_this_month": {
+        "default": "mdi:water-pump"
+      },
+      "sp_water_last_month": {
+        "default": "mdi:calendar-month"
       }
     }
   }

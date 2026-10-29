@@ -47,3 +47,56 @@ async def test_diagnostics_serializes_all_coordinators():
     assert coordinators["train"]["data"]["status"] == "normal"
     assert coordinators["coe"]["data"] is None
     assert coordinators["psi"]["data"]["national"]["psi_twenty_four_hourly"] == 39.0
+    assert result["sp_accounts"] == []
+
+
+async def test_diagnostics_never_include_sp_session_or_account():
+    from datetime import UTC, datetime
+
+    from custom_components.singapore.sp_services_coordinator import SpUsageData
+
+    usage = MagicMock()
+    usage.electricity_hourly_history = [MagicMock()] * 3
+    usage.electricity_daily_history = None
+    usage.electricity_monthly_history = []
+    usage.water_monthly_history = [MagicMock()]
+    sp = _coordinator(
+        SpUsageData(
+            account_no="8949049293",
+            electricity_today=9.5,
+            electricity_this_month=None,
+            electricity_last_month=572.0,
+            water_this_month=31.0,
+            water_last_month=33.9,
+            usage=usage,
+        )
+    )
+    sp.import_statistics = True
+    sp.token_expires_at = datetime(2026, 10, 29, 8, tzinfo=UTC)
+    sp.account_no = "8949049293"
+    sp._session = "SECRET-SESSION"
+    entry = ConfigEntry()
+    entry.runtime_data = SingaporeData(
+        tariff=_coordinator(None),
+        coe=_coordinator(None),
+        weather=_coordinator(None),
+        holiday=_coordinator(None),
+        train=_coordinator(None),
+        psi=_coordinator(None),
+        sp_accounts={"sub1": sp},
+    )
+
+    result = await async_get_config_entry_diagnostics(MagicMock(), entry)
+
+    (account,) = result["sp_accounts"]
+    assert account["values"]["electricity_last_month"] == 572.0
+    assert account["history_points"] == {
+        "electricity_hourly_history": 3,
+        "electricity_daily_history": 0,
+        "electricity_monthly_history": 0,
+        "water_monthly_history": 1,
+    }
+    assert account["token_expires_at"] == "2026-10-29T08:00:00+00:00"
+    text = repr(result)
+    assert "SECRET-SESSION" not in text
+    assert "8949049293" not in text

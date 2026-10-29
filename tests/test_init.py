@@ -78,3 +78,46 @@ async def test_async_setup_entry_raises_and_does_not_orphan_siblings():
     # refresh despite the tariff coordinator failing.
     assert calls == {"weather": True, "holiday": True, "train": True}
     hass.config_entries.async_forward_entry_setups.assert_not_called()
+
+
+def _sp_entry(subentry_ids):
+    from homeassistant.config_entries import ConfigSubentry
+
+    from custom_components.singapore.const import SUBENTRY_SP_ACCOUNT
+
+    return ConfigEntry(
+        subentries=[
+            ConfigSubentry(
+                data={},
+                subentry_type=SUBENTRY_SP_ACCOUNT,
+                title=sid,
+                subentry_id=sid,
+            )
+            for sid in subentry_ids
+        ]
+    )
+
+
+async def test_update_listener_reloads_only_when_accounts_change():
+    from custom_components.singapore import SingaporeData, _async_entry_updated
+
+    hass = MagicMock()
+    coordinator = MagicMock()
+    coordinator.async_subentry_updated = AsyncMock()
+    entry = _sp_entry(["sub1"])
+    entry.runtime_data = SingaporeData(
+        *(MagicMock() for _ in range(6)), sp_accounts={"sub1": coordinator}
+    )
+
+    # Session write-back or reconfigure: hand the subentry to its coordinator.
+    await _async_entry_updated(hass, entry)
+    hass.config_entries.async_schedule_reload.assert_not_called()
+    coordinator.async_subentry_updated.assert_awaited_once_with(
+        entry.subentries["sub1"]
+    )
+
+    # A second account was added: reload to create its coordinator/entities.
+    added = _sp_entry(["sub1", "sub2"])
+    added.runtime_data = entry.runtime_data
+    await _async_entry_updated(hass, added)
+    hass.config_entries.async_schedule_reload.assert_called_once_with(added.entry_id)

@@ -495,3 +495,67 @@ def test_pollutant_sensors():
 
     # Readings absent from the payload report None rather than raising.
     assert sensors["ozone"].native_value is None
+
+
+# ---------------------------------------------------------------------------
+# SP Services usage
+# ---------------------------------------------------------------------------
+
+
+def _sp_coordinator(data=None):
+    from custom_components.singapore.sp_services_coordinator import SpUsageData
+
+    coordinator = MagicMock()
+    coordinator.account_no = "8949049293"
+    coordinator.data = data
+    if data is None:
+        coordinator.data = SpUsageData(
+            account_no="8949049293",
+            electricity_today=9.5,
+            electricity_this_month=None,
+            electricity_last_month=572.0,
+            water_this_month=31.0,
+            water_last_month=33.9,
+            usage=MagicMock(),
+        )
+    return coordinator
+
+
+def test_sp_usage_sensors_values_units_and_ids():
+    from custom_components.singapore.sensor import SP_USAGE_SENSORS, SpUsageSensor
+
+    coordinator = _sp_coordinator()
+    sensors = {
+        description[0]: SpUsageSensor(coordinator, "entry1", description)
+        for description in SP_USAGE_SENSORS
+    }
+
+    assert set(sensors) == {
+        "sp_electricity_today",
+        "sp_electricity_this_month",
+        "sp_electricity_last_month",
+        "sp_water_this_month",
+        "sp_water_last_month",
+    }
+    today = sensors["sp_electricity_today"]
+    assert today.native_value == 9.5
+    assert today.native_unit_of_measurement == "kWh"
+    assert today.device_class == "energy"
+    assert today.unique_id == "entry1_sp_8949049293_electricity_today"
+    assert not hasattr(today, "_attr_state_class")
+    # A month SP has not published yet is unknown, not zero.
+    assert sensors["sp_electricity_this_month"].native_value is None
+    water = sensors["sp_water_last_month"]
+    assert water.native_value == 33.9
+    assert water.native_unit_of_measurement == "m³"
+    assert water.device_class == "water"
+    assert today.device_info["identifiers"] == {("singapore", "entry1_sp_8949049293")}
+
+
+def test_sp_usage_sensor_none_before_first_fetch():
+    from custom_components.singapore.sensor import SP_USAGE_SENSORS, SpUsageSensor
+
+    coordinator = _sp_coordinator()
+    coordinator.data = None
+    sensor = SpUsageSensor(coordinator, "entry1", SP_USAGE_SENSORS[0])
+    assert sensor.native_value is None

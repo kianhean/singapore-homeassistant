@@ -1,6 +1,9 @@
 {
   "domain": "singapore",
   "name": "Singapore",
+  "after_dependencies": [
+    "recorder"
+  ],
   "codeowners": [
     "@kianhean"
   ],
@@ -11,8 +14,9 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/kianhean/singapore-homeassistant/issues",
   "requirements": [
-    "beautifulsoup4>=4.12.3"
+    "beautifulsoup4>=4.12.3",
+    "sp-services @ https://github.com/kianhean/sp_api/archive/refs/tags/v1.3.0.zip"
   ],
   "single_config_entry": true,
-  "version": "0.5.0"
+  "version": "0.6.0"
 }

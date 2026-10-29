@@ -5,3 +5,4 @@ beautifulsoup4==4.12.3
 voluptuous>=0.13
 aiohttp>=3.9
 ruff==0.14.11
+sp-services @ git+https://github.com/kianhean/sp_api@v1.3.0
