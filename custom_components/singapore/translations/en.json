@@ -94,6 +94,20 @@
       },
       "carbon_monoxide": {
         "name": "Carbon Monoxide"
+      },
+      "flood_alerts": {
+        "name": "Flood Alerts"
+      },
+      "dengue_clusters": {
+        "name": "Dengue Clusters"
+      },
+      "nearest_dengue_cluster": {
+        "name": "Nearest Dengue Cluster"
+      }
+    },
+    "camera": {
+      "checkpoint_camera": {
+        "name": "{location}"
       }
     }
   }

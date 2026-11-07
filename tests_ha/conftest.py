@@ -16,8 +16,11 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 
 from custom_components.singapore.coe_coordinator import COE_API_URL
 from custom_components.singapore.coordinator import TARIFF_URL
+from custom_components.singapore.dengue_coordinator import POLL_DOWNLOAD_URL
+from custom_components.singapore.flood_coordinator import FLOOD_ALERTS_URL
 from custom_components.singapore.holiday_coordinator import PUBLIC_HOLIDAYS_URL
 from custom_components.singapore.psi_coordinator import PSI_URL
+from custom_components.singapore.traffic_coordinator import TRAFFIC_IMAGES_URL
 from custom_components.singapore.train_coordinator import TRAIN_STATUS_URL
 from custom_components.singapore.weather_coordinator import (
     _READINGS_ENDPOINTS,
@@ -120,6 +123,98 @@ _PSI_PAYLOAD = {
 }
 
 
+def _flood_payload() -> dict:
+    # Issued "now" so the 3-hour safety expiry doesn't drop it.
+    issued = dt_util.now().replace(microsecond=0).isoformat()
+    return {
+        "code": 0,
+        "data": {
+            "records": [
+                {
+                    "datetime": issued,
+                    "item": {
+                        "type": "observation",
+                        "identifier": "2.49.0.0.702.2-BCM-1",
+                        "msgType": "Alert",
+                        "isStationData": False,
+                        "readings": [
+                            {
+                                "area": {
+                                    "areaDesc": "at Bt Timah Rd",
+                                    "circle": [1.33201, 103.87015, 1],
+                                },
+                                "description": "Flash flood at Bt Timah Rd",
+                                "headline": "Flash Flood Alert",
+                                "instruction": "Please avoid this area.",
+                                "severity": "Minor",
+                                "urgency": "Immediate",
+                            }
+                        ],
+                    },
+                }
+            ]
+        },
+        "errorMsg": "",
+    }
+
+
+_TRAFFIC_PAYLOAD = {
+    "items": [
+        {
+            "timestamp": "2026-04-05T08:00:00+08:00",
+            "cameras": [
+                {
+                    "camera_id": cam_id,
+                    "timestamp": "2026-04-05T07:59:00+08:00",
+                    "image": f"https://images.data.gov.sg/api/traffic-images/{cam_id}.jpg",
+                    "location": {"latitude": 1.447, "longitude": 103.771},
+                }
+                # 2702 deliberately absent: its entity must go unavailable.
+                for cam_id in ("2701", "4703", "4713", "1001")
+            ],
+        }
+    ]
+}
+
+_DENGUE_FILE_URL = (
+    "https://s3.ap-southeast-1.amazonaws.com/blobs.data.gov.sg/dengue.geojson"
+)
+
+_DENGUE_GEOJSON = {
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "properties": {"LOCALITY": "Lentor Gdns", "CASE_SIZE": 21},
+            "geometry": {
+                "type": "Polygon",
+                # Square around the pytest-homeassistant default home
+                # location (32.87336, -117.22743), so home is inside it.
+                "coordinates": [
+                    [
+                        [-117.23, 32.87],
+                        [-117.22, 32.87],
+                        [-117.22, 32.88],
+                        [-117.23, 32.88],
+                        [-117.23, 32.87],
+                    ]
+                ],
+            },
+        },
+        {
+            "type": "Feature",
+            "properties": {"LOCALITY": "Bishan St 12", "CASE_SIZE": 20},
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [[103.84, 1.34], [103.85, 1.34], [103.85, 1.35], [103.84, 1.34]]
+                ],
+            },
+        },
+    ],
+}
+
+
 def _holiday_html() -> str:
     year = dt_util.now().year
     return f"""
@@ -152,4 +247,13 @@ def mock_sources(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
     aioclient_mock.get(PUBLIC_HOLIDAYS_URL, text=_holiday_html())
     aioclient_mock.post(TRAIN_STATUS_URL, json=_TRAIN_PAYLOAD)
     aioclient_mock.get(PSI_URL, json=_PSI_PAYLOAD)
+    aioclient_mock.get(FLOOD_ALERTS_URL, json=_flood_payload())
+    aioclient_mock.get(TRAFFIC_IMAGES_URL, json=_TRAFFIC_PAYLOAD)
+    aioclient_mock.get(
+        "https://images.data.gov.sg/api/traffic-images/2701.jpg", content=b"jpeg-2701"
+    )
+    aioclient_mock.get(
+        POLL_DOWNLOAD_URL, json={"code": 0, "data": {"url": _DENGUE_FILE_URL}}
+    )
+    aioclient_mock.get(_DENGUE_FILE_URL, json=_DENGUE_GEOJSON)
     return aioclient_mock

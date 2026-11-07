@@ -84,6 +84,10 @@ class CoordinatorEntity:
         self.coordinator = coordinator
 
     @property
+    def available(self):
+        return self.coordinator.last_update_success
+
+    @property
     def unique_id(self):
         return self._attr_unique_id
 
@@ -121,6 +125,7 @@ class SensorDeviceClass:
     OZONE = "ozone"
     NITROGEN_DIOXIDE = "nitrogen_dioxide"
     SULPHUR_DIOXIDE = "sulphur_dioxide"
+    DISTANCE = "distance"
 
 
 class SensorStateClass:
@@ -132,6 +137,7 @@ class Platform:
     SENSOR = "sensor"
     WEATHER = "weather"
     CALENDAR = "calendar"
+    CAMERA = "camera"
 
 
 class HomeAssistant:
@@ -201,6 +207,10 @@ class UnitOfSpeed:
     KILOMETERS_PER_HOUR = "km/h"
 
 
+class UnitOfLength:
+    KILOMETERS = "km"
+
+
 class UnitOfPrecipitationDepth:
     MILLIMETERS = "mm"
 
@@ -216,6 +226,11 @@ CONCENTRATION_MILLIGRAMS_PER_CUBIC_METER = "mg/m³"
 class Forecast(dict):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+
+class Camera:
+    def __init__(self):
+        pass
 
 
 class CalendarEntity:
@@ -265,6 +280,7 @@ _HA_MODULES: dict[str, ModuleType] = {
         UnitOfTemperature=UnitOfTemperature,
         UnitOfSpeed=UnitOfSpeed,
         UnitOfPrecipitationDepth=UnitOfPrecipitationDepth,
+        UnitOfLength=UnitOfLength,
         PERCENTAGE=PERCENTAGE,
         DEGREE=DEGREE,
         ATTR_LATITUDE=ATTR_LATITUDE,
@@ -312,6 +328,9 @@ _HA_MODULES: dict[str, ModuleType] = {
         "homeassistant.components.calendar",
         CalendarEntity=CalendarEntity,
         CalendarEvent=CalendarEvent,
+    ),
+    "homeassistant.components.camera": _mod(
+        "homeassistant.components.camera", Camera=Camera
     ),
     "homeassistant.components.sensor": _mod(
         "homeassistant.components.sensor",

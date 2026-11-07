@@ -1,4 +1,4 @@
-"""Sensor platform for Singapore tariffs, COE, weather, PSI and train status."""
+"""Sensor platform for Singapore tariffs, COE, weather, PSI, trains, floods, dengue."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from homeassistant.const import (
     CONCENTRATION_MILLIGRAMS_PER_CUBIC_METER,
     DEGREE,
     PERCENTAGE,
+    UnitOfLength,
     UnitOfPrecipitationDepth,
     UnitOfSpeed,
     UnitOfTemperature,
@@ -34,6 +35,9 @@ from .coe_coordinator import (
 )
 from .const import DOMAIN
 from .coordinator import UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER, SPGroupCoordinator
+from .dengue_coordinator import DATASET_PAGE_URL as DENGUE_DATASET_PAGE_URL
+from .dengue_coordinator import DengueClusterCoordinator, nearest_cluster
+from .flood_coordinator import FloodAlertCoordinator
 from .psi_coordinator import (
     DEFAULT_REGION_LOCATIONS,
     PSI_REGIONS,
@@ -150,6 +154,14 @@ async def async_setup_entry(
                 unit,
             )
         )
+
+    entities.extend(
+        [
+            SingaporeFloodAlertsSensor(data.flood, entry.entry_id),
+            SingaporeDengueClustersSensor(data.dengue, entry.entry_id),
+            SingaporeNearestDengueClusterSensor(data.dengue, entry.entry_id),
+        ]
+    )
 
     async_add_entities(entities)
 
@@ -675,3 +687,152 @@ class SingaporePollutantSensor(_BasePsiSensor):
         if self.coordinator.data is not None:
             attrs["regions"] = self.coordinator.data.readings.get(self._reading_key, {})
         return attrs
+
+
+class SingaporeFloodAlertsSensor(
+    CoordinatorEntity[FloodAlertCoordinator], SensorEntity
+):
+    """Number of active PUB flash-flood alerts, with alert details as attributes."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "flood_alerts"
+    _attr_attribution = "Data provided by PUB via data.gov.sg"
+    _attr_device_class = None
+    _attr_state_class = None
+
+    def __init__(self, coordinator: FloodAlertCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._entry_id = entry_id
+        self._attr_unique_id = f"{entry_id}_flood_alerts"
+
+    @property
+    def native_value(self) -> int | None:
+        if self.coordinator.data is None:
+            return None
+        return len(self.coordinator.data.alerts)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        if self.coordinator.data is None:
+            return {}
+        data = self.coordinator.data
+        return {
+            "alerts": [a.as_dict() for a in data.alerts],
+            "locations": [a.description or a.area for a in data.alerts],
+            "last_observation": (
+                data.last_observation.isoformat() if data.last_observation else None
+            ),
+            "source": "PUB via data.gov.sg",
+        }
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{self._entry_id}_flood")},
+            name="PUB",
+            manufacturer="Singapore",
+            model="PUB Flood Alerts",
+            entry_type=DeviceEntryType.SERVICE,
+            configuration_url=(
+                "https://data.gov.sg/datasets/d_f1404e08587ce555b9ea3f565e2eb9a3/view"
+            ),
+        )
+
+
+class _BaseDengueSensor(CoordinatorEntity[DengueClusterCoordinator], SensorEntity):
+    """Shared device info for NEA dengue cluster sensors."""
+
+    _attr_has_entity_name = True
+    _attr_attribution = "Data provided by NEA via data.gov.sg"
+
+    def __init__(self, coordinator: DengueClusterCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._entry_id = entry_id
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{self._entry_id}_nea")},
+            name="NEA",
+            manufacturer="Singapore",
+            model="NEA Dengue Clusters",
+            entry_type=DeviceEntryType.SERVICE,
+            configuration_url=DENGUE_DATASET_PAGE_URL,
+        )
+
+
+class SingaporeDengueClustersSensor(_BaseDengueSensor):
+    """Number of active dengue clusters island-wide."""
+
+    _attr_translation_key = "dengue_clusters"
+    _attr_device_class = None
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator: DengueClusterCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_dengue_clusters"
+
+    @property
+    def native_value(self) -> int | None:
+        if self.coordinator.data is None:
+            return None
+        return len(self.coordinator.data.clusters)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        if self.coordinator.data is None:
+            return {}
+        data = self.coordinator.data
+        return {
+            "total_cases": data.total_cases,
+            "clusters": [c.as_dict() for c in data.clusters],
+            "source": "NEA via data.gov.sg",
+        }
+
+
+class SingaporeNearestDengueClusterSensor(_BaseDengueSensor):
+    """Distance from the Home Assistant home location to the nearest dengue cluster.
+
+    0 km means home is inside a cluster boundary. Unknown when there are no
+    active clusters.
+    """
+
+    _attr_translation_key = "nearest_dengue_cluster"
+    _attr_device_class = SensorDeviceClass.DISTANCE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfLength.KILOMETERS
+    _attr_suggested_display_precision = 2
+
+    def __init__(self, coordinator: DengueClusterCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_nearest_dengue_cluster"
+
+    def _nearest(self):
+        if self.coordinator.data is None:
+            return None
+        return nearest_cluster(
+            self.hass.config.latitude,
+            self.hass.config.longitude,
+            self.coordinator.data,
+        )
+
+    @property
+    def native_value(self) -> float | None:
+        nearest = self._nearest()
+        if nearest is None:
+            return None
+        return round(nearest[1], 3)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        nearest = self._nearest()
+        if nearest is None:
+            return {}
+        cluster, _ = nearest
+        return {
+            "locality": cluster.locality,
+            "case_size": cluster.case_size,
+            "inside_cluster": nearest[1] == 0.0,
+            "latitude": cluster.latitude,
+            "longitude": cluster.longitude,
+        }

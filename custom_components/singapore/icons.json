@@ -73,6 +73,20 @@
       },
       "carbon_monoxide": {
         "default": "mdi:molecule-co"
+      },
+      "flood_alerts": {
+        "default": "mdi:home-flood"
+      },
+      "dengue_clusters": {
+        "default": "mdi:mosquito"
+      },
+      "nearest_dengue_cluster": {
+        "default": "mdi:map-marker-distance"
+      }
+    },
+    "camera": {
+      "checkpoint_camera": {
+        "default": "mdi:cctv"
       }
     }
   }

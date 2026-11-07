@@ -15,6 +15,10 @@ custom_components/singapore/
 ├── weather_coordinator.py  # SingaporeWeatherCoordinator: 2-hour forecasts + collection 1459 readings
 ├── train_coordinator.py    # TrainStatusCoordinator: scrapes mytransport.sg MRT/LRT status
 ├── psi_coordinator.py      # PsiCoordinator: NEA PSI + pollutant readings per region
+├── flood_coordinator.py    # FloodAlertCoordinator: PUB flash-flood alerts from data.gov.sg
+├── traffic_coordinator.py  # TrafficImagesCoordinator: LTA checkpoint camera stills (Woodlands/Tuas)
+├── dengue_coordinator.py   # DengueClusterCoordinator: NEA dengue cluster GeoJSON + distance helpers
+├── camera.py               # Camera entities (Woodlands/Tuas checkpoint traffic cameras)
 ├── calendar.py             # Calendar entity (Singapore public holidays)
 ├── weather.py              # Weather entities (one per Singapore forecast area)
 ├── config_flow.py          # UI config flow (name input; single instance via manifest)
@@ -36,6 +40,9 @@ tests/
 ├── test_weather_coordinator.py  # Weather coordinator parser + HTTP mock tests
 ├── test_train_coordinator.py    # Train status parser + HTTP mock tests
 ├── test_psi_coordinator.py      # PSI parser, band mapping + HTTP mock tests
+├── test_flood_coordinator.py    # Flood alert parser, Alert/Cancel tracking, HTTP mock tests
+├── test_traffic_cameras.py      # Traffic images parser, coordinator, camera entity + image cache
+├── test_dengue_coordinator.py   # Dengue GeoJSON parser, distance math, coordinator, sensors
 ├── test_calendar.py             # Calendar event and range query tests
 ├── test_sensor.py               # Sensor value, unit, attributes, unique_id, None-safety
 ├── test_weather.py              # Weather entity condition mapping + forecast tests
@@ -60,6 +67,9 @@ class SingaporeData:
     holiday: PublicHolidayCoordinator
     train: TrainStatusCoordinator
     psi: PsiCoordinator
+    flood: FloodAlertCoordinator
+    traffic: TrafficImagesCoordinator
+    dengue: DengueClusterCoordinator
 
 type SingaporeConfigEntry = ConfigEntry[SingaporeData]
 ```
@@ -169,7 +179,7 @@ stable (`0.13.367` → HA 2026.9.4, Python 3.14) and newest (non-blocking) harne
 
 ```bash
 uv venv --python 3.14 .venv-ha
-uv pip install --python .venv-ha/bin/python pytest-homeassistant-custom-component==0.13.367 "beautifulsoup4>=4.12.3"
+uv pip install --python .venv-ha/bin/python pytest-homeassistant-custom-component==0.13.367 "beautifulsoup4>=4.12.3" PyTurboJPEG
 .venv-ha/bin/python -m pytest tests_ha -v
 ```
 
@@ -335,6 +345,52 @@ Response shape: `{ "value": { "Status": int, "AffectedSegments": [...], "Message
 - A payload with no `psi_twenty_four_hourly` raises `UpdateFailed`.
 - The first refresh runs as a background task (like COE) so a PSI outage never blocks
   integration setup.
+
+## How the Flood Alert Coordinator Works
+
+`flood_coordinator.py` GETs `https://api-open.data.gov.sg/v2/real-time/api/weather/flood-alerts`
+every **2 minutes** (no API key). Exposed as `sensor.pub_flood_alerts` (state = active
+alert count; `alerts` / `locations` attributes).
+
+Payload is CAP-style: `data.records[]` (newest first, ~25 records ≈ last 50 min), each with
+`datetime` and `item`. Routine records have empty `readings` and no `msgType`. Alert records
+carry `item.identifier`, `item.msgType` (`Alert` / `Cancel`), `item.references`
+(`"sender, identifier, sentTime"` of the alert being cancelled) and `readings[]` with
+`description`, `area.areaDesc`, `area.circle` (`[lat, lng, broadcast_radius_km]`),
+`severity`, `urgency`, `headline`, `instruction`. The full OpenAPI spec is the dataset's
+download (`d_f1404e08587ce555b9ea3f565e2eb9a3`).
+
+Because the response only covers a short window, the coordinator keeps **state across polls**
+(`self._active`, keyed by identifier): messages are applied oldest-first, an Alert adds,
+a Cancel removes any active identifier contained in its `references`. Alerts with no Cancel
+are dropped after `ALERT_MAX_AGE` (3 h). The first refresh runs as a background task so a
+data.gov.sg 429 can't block setup (same for the traffic and dengue coordinators).
+
+## How the Traffic Camera Coordinator Works
+
+`traffic_coordinator.py` GETs `https://api.data.gov.sg/v1/transport/traffic-images` every
+**2 minutes** (the v2 `api-open` route doesn't exist for this dataset). Payload:
+`items[0].cameras[]` with `camera_id`, `image` (JPEG URL on images.data.gov.sg), `timestamp`,
+`location`. Only IDs in `CHECKPOINT_CAMERAS` (2701, 2702 Woodlands; 4703, 4713 Tuas) are kept.
+The feed sometimes omits cameras (2702 was missing on 2026-11-07), so `camera.py` reports
+a camera as unavailable when its ID is absent. `async_camera_image` downloads the JPEG and
+caches it until the URL changes.
+
+## How the Dengue Cluster Coordinator Works
+
+`dengue_coordinator.py` downloads dataset `d_dbfabf16158d1b0e1c420627c0819168` (GeoJSON)
+every **6 hours**: GET `.../v1/public/api/datasets/{id}/poll-download` → `data.url`
+(signed S3 link; if absent, call `initiate-download`), then GET the file. Each feature has
+`properties.LOCALITY`, `properties.CASE_SIZE`, and Polygon/MultiPolygon geometry in lon/lat.
+`nearest_cluster()` computes the distance from `hass.config` home lat/lon to the nearest
+polygon edge (0 if inside; ray casting + local equirectangular projection), which feeds
+`sensor.nea_nearest_dengue_cluster`. Zero features is valid (no active clusters).
+
+### Camera platform test dependency
+
+HA's `camera` component imports `turbojpeg`, which a real HA install provides but the
+`pytest-homeassistant-custom-component` harness does not, so `tests_ha` installs
+`PyTurboJPEG` explicitly (CI workflow + the local command above).
 
 ### Calendar Entity
 

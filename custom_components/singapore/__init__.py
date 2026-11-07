@@ -1,4 +1,4 @@
-"""Singapore integration: tariffs, COE, weather, PSI, train status and holidays."""
+"""Singapore integration: tariffs, COE, weather, PSI, trains, holidays, floods, etc."""
 
 from __future__ import annotations
 
@@ -14,8 +14,11 @@ from homeassistant.helpers.event import async_track_time_change
 from .coe_coordinator import CoeCoordinator
 from .const import DOMAIN
 from .coordinator import SPGroupCoordinator
+from .dengue_coordinator import DengueClusterCoordinator
+from .flood_coordinator import FloodAlertCoordinator
 from .holiday_coordinator import PublicHolidayCoordinator
 from .psi_coordinator import PsiCoordinator
+from .traffic_coordinator import TrafficImagesCoordinator
 from .train_coordinator import TrainStatusCoordinator
 from .weather_coordinator import SingaporeWeatherCoordinator
 
@@ -23,7 +26,7 @@ _LOGGER = logging.getLogger(__name__)
 
 __all__ = ["DOMAIN", "SingaporeConfigEntry", "SingaporeData"]
 
-PLATFORMS = [Platform.SENSOR, Platform.WEATHER, Platform.CALENDAR]
+PLATFORMS = [Platform.SENSOR, Platform.WEATHER, Platform.CALENDAR, Platform.CAMERA]
 
 # COE results are published after each bidding exercise; refresh daily at 19:30.
 _COE_REFRESH_HOUR = 19
@@ -40,6 +43,9 @@ class SingaporeData:
     holiday: PublicHolidayCoordinator
     train: TrainStatusCoordinator
     psi: PsiCoordinator
+    flood: FloodAlertCoordinator
+    traffic: TrafficImagesCoordinator
+    dengue: DengueClusterCoordinator
 
 
 type SingaporeConfigEntry = ConfigEntry[SingaporeData]
@@ -53,6 +59,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
     train_coordinator = TrainStatusCoordinator(hass, entry)
     coe_coordinator = CoeCoordinator(hass, entry)
     psi_coordinator = PsiCoordinator(hass, entry)
+    flood_coordinator = FloodAlertCoordinator(hass, entry)
+    traffic_coordinator = TrafficImagesCoordinator(hass, entry)
+    dengue_coordinator = DengueClusterCoordinator(hass, entry)
 
     # Fetch independent data sources concurrently to speed up setup.
     # return_exceptions=True lets every coordinator finish its first refresh
@@ -93,6 +102,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
         hass, _initial_refresh_psi(), "singapore_psi_initial_refresh"
     )
 
+    async def _initial_refresh(coordinator, label: str) -> None:
+        await coordinator.async_refresh()
+        if not coordinator.last_update_success:
+            _LOGGER.warning(
+                "Initial %s refresh failed; continuing setup and retrying later", label
+            )
+
+    # Flood alerts, traffic cameras and dengue clusters are supplementary; don't
+    # block setup on data.gov.sg availability/rate limits.
+    for coordinator, label in (
+        (flood_coordinator, "flood alert"),
+        (traffic_coordinator, "traffic camera"),
+        (dengue_coordinator, "dengue cluster"),
+    ):
+        entry.async_create_background_task(
+            hass,
+            _initial_refresh(coordinator, label),
+            f"singapore_{label.replace(' ', '_')}_initial_refresh",
+        )
+
     async def _refresh_coe(_now) -> None:
         await coe_coordinator.async_refresh()
 
@@ -112,6 +141,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
         holiday=holiday_coordinator,
         train=train_coordinator,
         psi=psi_coordinator,
+        flood=flood_coordinator,
+        traffic=traffic_coordinator,
+        dengue=dengue_coordinator,
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
