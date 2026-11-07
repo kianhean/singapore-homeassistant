@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from homeassistant import config_entries
+from homeassistant.components.camera import async_get_image
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONCENTRATION_MICROGRAMS_PER_CUBIC_METER
 from homeassistant.core import HomeAssistant
@@ -84,6 +85,33 @@ async def test_setup_creates_entities_and_unloads(
     assert float(co.state) == 0.6
     assert co.attributes["unit_of_measurement"] == "mg/m³"
 
+    flood = hass.states.get("sensor.pub_flood_alerts")
+    assert flood is not None
+    assert flood.state == "1"
+    assert flood.attributes["locations"] == ["Flash flood at Bt Timah Rd"]
+    assert flood.attributes["attribution"] == "Data provided by PUB via data.gov.sg"
+
+    causeway = hass.states.get("camera.traffic_cameras_woodlands_causeway")
+    assert causeway is not None
+    assert causeway.state == "idle"
+    assert causeway.attributes["checkpoint"] == "Woodlands"
+    missing = hass.states.get("camera.traffic_cameras_woodlands_checkpoint")
+    assert missing is not None and missing.state == "unavailable"
+    assert hass.states.get("camera.traffic_cameras_tuas_checkpoint").state == "idle"
+    image = await async_get_image(hass, "camera.traffic_cameras_woodlands_causeway")
+    assert image.content == b"jpeg-2701"
+
+    dengue = hass.states.get("sensor.nea_dengue_clusters")
+    assert dengue is not None
+    assert dengue.state == "2"
+    assert dengue.attributes["total_cases"] == 41
+
+    nearest = hass.states.get("sensor.nea_nearest_dengue_cluster")
+    assert nearest is not None
+    assert float(nearest.state) == 0.0
+    assert nearest.attributes["locality"] == "Lentor Gdns"
+    assert nearest.attributes["unit_of_measurement"] == "km"
+
     # Every entity must use a stable, entry-scoped unique ID.
     registry = er.async_get(hass)
     entities = er.async_entries_for_config_entry(registry, entry.entry_id)
@@ -142,3 +170,5 @@ async def test_diagnostics(hass: HomeAssistant, hass_client, mock_sources) -> No
     assert diag["coordinators"]["train"]["data"]["status"] == "disruption"
     psi = diag["coordinators"]["psi"]["data"]
     assert psi["national"]["psi_twenty_four_hourly"] == 52
+    assert diag["coordinators"]["flood"]["data"]["alerts"][0]["severity"] == "Minor"
+    assert diag["coordinators"]["dengue"]["last_update_success"] is True

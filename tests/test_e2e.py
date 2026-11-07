@@ -10,6 +10,7 @@ for upstream payload/markup changes across every external source.
 from __future__ import annotations
 
 import asyncio
+import json
 
 import aiohttp
 import pytest
@@ -278,6 +279,64 @@ def test_e2e_train_status_page_fetch_and_parse():
     )
     assert data.line_statuses, "No per-line statuses parsed"
     assert set(data.line_statuses) == set(TRAIN_LINES), "Per-line status keys mismatch"
+
+
+def test_e2e_flood_alerts_fetch_and_parse():
+    """Fetch live PUB flood alerts and assert the envelope still parses."""
+    from custom_components.singapore.flood_coordinator import (
+        FLOOD_ALERTS_URL,
+        _parse_flood_messages,
+    )
+
+    try:
+        payload = asyncio.run(_async_get_json(FLOOD_ALERTS_URL))
+    except Exception as err:
+        pytest.skip(f"Skipping e2e due to network error: {err}")
+
+    messages, latest = _parse_flood_messages(payload)
+    assert latest is not None, "No observation timestamps in flood-alerts payload"
+    for msg in messages:
+        assert msg.msg_type in {"Alert", "Cancel"}, msg.msg_type
+
+
+def test_e2e_traffic_images_checkpoint_cameras():
+    """Fetch live LTA traffic images and assert checkpoint cameras still appear."""
+    from custom_components.singapore.traffic_coordinator import (
+        TRAFFIC_IMAGES_URL,
+        _parse_traffic_images,
+    )
+
+    try:
+        payload = asyncio.run(_async_get_json(TRAFFIC_IMAGES_URL))
+    except Exception as err:
+        pytest.skip(f"Skipping e2e due to network error: {err}")
+
+    data = _parse_traffic_images(payload)
+    assert data.cameras, "No Woodlands/Tuas checkpoint cameras in traffic-images feed"
+    for cam in data.cameras.values():
+        assert cam.image_url.startswith("https://"), cam.image_url
+
+
+def test_e2e_dengue_clusters_download_and_parse():
+    """Download the live NEA dengue clusters GeoJSON and assert it parses."""
+    from custom_components.singapore.dengue_coordinator import (
+        POLL_DOWNLOAD_URL,
+        _parse_dengue_geojson,
+    )
+
+    try:
+        poll = asyncio.run(_async_get_json(POLL_DOWNLOAD_URL))
+        file_url = poll["data"]["url"]
+        # S3 serves the file as binary/octet-stream, so decode the text manually.
+        payload = json.loads(asyncio.run(_async_get_text(file_url)))
+    except Exception as err:
+        pytest.skip(f"Skipping e2e due to network error: {err}")
+
+    data = _parse_dengue_geojson(payload)
+    for cluster in data.clusters:
+        assert cluster.locality, "Cluster missing LOCALITY"
+        assert cluster.polygons, f"Cluster {cluster.locality} has no geometry"
+        assert 1.1 < cluster.latitude < 1.5, cluster.latitude
 
 
 def test_e2e_raw_html_debug(capsys):

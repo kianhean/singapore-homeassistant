@@ -9,6 +9,7 @@ from custom_components.singapore.coordinator import (
     UNIT_WATER,
     TariffData,
 )
+from custom_components.singapore.flood_coordinator import FloodAlert, FloodAlertData
 from custom_components.singapore.sensor import (
     UNIT_HUMIDITY,
     UNIT_RAINFALL,
@@ -17,6 +18,7 @@ from custom_components.singapore.sensor import (
     UNIT_WIND_SPEED,
     SingaporeCoeResultSensor,
     SingaporeElectricityTariffSensor,
+    SingaporeFloodAlertsSensor,
     SingaporeGasTariffSensor,
     SingaporeHumiditySensor,
     SingaporeRainfallSensor,
@@ -495,3 +497,50 @@ def test_pollutant_sensors():
 
     # Readings absent from the payload report None rather than raising.
     assert sensors["ozone"].native_value is None
+
+
+def _flood_coordinator(data):
+    coordinator = MagicMock()
+    coordinator.data = data
+    return coordinator
+
+
+def test_flood_alerts_sensor_counts_active_alerts():
+    from datetime import datetime, timedelta, timezone
+
+    issued = datetime(2026, 11, 7, 17, 5, tzinfo=timezone(timedelta(hours=8)))
+    alert = FloodAlert(
+        identifier="A1",
+        issued=issued,
+        headline="Flash Flood Alert",
+        description="Flash flood at Bt Timah Rd",
+        area="at Bt Timah Rd",
+        instruction="Please avoid this area.",
+        severity="Minor",
+        urgency="Immediate",
+        latitude=1.33,
+        longitude=103.87,
+    )
+    sensor = SingaporeFloodAlertsSensor(
+        _flood_coordinator(FloodAlertData(alerts=[alert], last_observation=issued)),
+        "entry1",
+    )
+    assert sensor.native_value == 1
+    assert sensor.unique_id == "entry1_flood_alerts"
+    assert sensor.device_info["identifiers"] == {("singapore", "entry1_flood")}
+    attrs = sensor.extra_state_attributes
+    assert attrs["locations"] == ["Flash flood at Bt Timah Rd"]
+    assert attrs["alerts"][0]["latitude"] == 1.33
+    assert attrs["last_observation"] == issued.isoformat()
+
+
+def test_flood_alerts_sensor_zero_and_none():
+    assert (
+        SingaporeFloodAlertsSensor(
+            _flood_coordinator(FloodAlertData()), "e"
+        ).native_value
+        == 0
+    )
+    sensor = SingaporeFloodAlertsSensor(_flood_coordinator(None), "e")
+    assert sensor.native_value is None
+    assert sensor.extra_state_attributes == {}

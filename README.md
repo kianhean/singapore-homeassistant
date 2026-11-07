@@ -154,6 +154,43 @@ entities:
     label_mode: state
 ```
 
+### PUB flood alerts
+
+Updated every **2 minutes** from [PUB via data.gov.sg](https://data.gov.sg/datasets/d_f1404e08587ce555b9ea3f565e2eb9a3/view).
+
+| Entity ID | Name | Description |
+|-----------|------|-------------|
+| `sensor.pub_flood_alerts` | PUB Flood Alerts | Number of active flash-flood alerts (`0` when none) |
+
+Attributes: `locations` (list of alert descriptions) and `alerts` (full details per alert:
+description, area, severity, instruction, issued time, latitude/longitude). An alert stays
+active until PUB issues its matching Cancel, or for 3 hours at most.
+
+Example automation trigger: `{{ states('sensor.pub_flood_alerts') | int(0) > 0 }}`.
+
+### Checkpoint traffic cameras
+
+Updated every **2 minutes** from [LTA via data.gov.sg](https://data.gov.sg/datasets/d_6cdb6b405b25aaaacbaf7689bcc6fae0/view).
+Only the Woodlands and Tuas checkpoint cameras are exposed, as `camera` entities showing the latest still.
+
+| Entity ID | LTA camera | View |
+|-----------|-----------|------|
+| `camera.traffic_cameras_woodlands_causeway` | 2701 | Woodlands Causeway (towards Johor) |
+| `camera.traffic_cameras_woodlands_checkpoint` | 2702 | Woodlands Checkpoint (towards BKE) |
+| `camera.traffic_cameras_tuas_second_link` | 4703 | Tuas Second Link |
+| `camera.traffic_cameras_tuas_checkpoint` | 4713 | Tuas Checkpoint |
+
+A camera shows as unavailable while LTA leaves it out of the feed.
+
+### Dengue clusters
+
+Updated every **6 hours** from [NEA via data.gov.sg](https://data.gov.sg/datasets/d_dbfabf16158d1b0e1c420627c0819168/view).
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.nea_dengue_clusters` | NEA Dengue Clusters | — | Number of active clusters; attributes `total_cases` and `clusters` (locality, cases, centroid) |
+| `sensor.nea_nearest_dengue_cluster` | NEA Nearest Dengue Cluster | km | Distance from your HA home location to the nearest cluster boundary (`0` = inside a cluster) |
+
 ### Public holidays
 
 Updated every 24 hours from [MOM](https://www.mom.gov.sg/employment-practices/public-holidays).
@@ -246,6 +283,9 @@ sensor.air_quality_psi_east:
 | [data.gov.sg / NEA (collection 1456)](https://data.gov.sg/collections/1456/view) | 2-hour area weather forecasts | Every 10 min |
 | [data.gov.sg / NEA (collection 1459)](https://data.gov.sg/collections/1459/view) | Realtime weather readings | Every 10 min |
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_fe37906a0182569d891506e815e819b7/view) | PSI and pollutant readings | Every 15 min |
+| [data.gov.sg / PUB](https://data.gov.sg/datasets/d_f1404e08587ce555b9ea3f565e2eb9a3/view) | Flash-flood alerts | Every 2 min |
+| [data.gov.sg / LTA](https://data.gov.sg/datasets/d_6cdb6b405b25aaaacbaf7689bcc6fae0/view) | Woodlands & Tuas checkpoint camera images | Every 2 min |
+| [data.gov.sg / NEA](https://data.gov.sg/datasets/d_dbfabf16158d1b0e1c420627c0819168/view) | Dengue clusters | Every 6 h |
 | [MOM](https://www.mom.gov.sg/employment-practices/public-holidays) | Public holidays | Every 24 h |
 | [mytransport.sg](https://www.mytransport.sg/trainstatus) | MRT/LRT train status | Every 5 min |
 

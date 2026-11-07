@@ -6,11 +6,14 @@ from unittest.mock import MagicMock
 from homeassistant.config_entries import ConfigEntry
 
 from custom_components.singapore import SingaporeData
+from custom_components.singapore.dengue_coordinator import DengueData
 from custom_components.singapore.diagnostics import (
     async_get_config_entry_diagnostics,
 )
+from custom_components.singapore.flood_coordinator import FloodAlertData
 from custom_components.singapore.holiday_coordinator import PublicHoliday
 from custom_components.singapore.psi_coordinator import PsiData
+from custom_components.singapore.traffic_coordinator import TrafficImagesData
 from custom_components.singapore.train_coordinator import TrainStatusData
 
 
@@ -33,12 +36,25 @@ async def test_diagnostics_serializes_all_coordinators():
             TrainStatusData(status="normal", details="", line_statuses={})
         ),
         psi=_coordinator(PsiData(national={"psi_twenty_four_hourly": 39.0})),
+        flood=_coordinator(FloodAlertData()),
+        traffic=_coordinator(TrafficImagesData()),
+        dengue=_coordinator(DengueData()),
     )
 
     result = await async_get_config_entry_diagnostics(MagicMock(), entry)
 
     coordinators = result["coordinators"]
-    assert set(coordinators) == {"tariff", "coe", "weather", "holiday", "train", "psi"}
+    assert set(coordinators) == {
+        "tariff",
+        "coe",
+        "weather",
+        "holiday",
+        "train",
+        "psi",
+        "flood",
+        "traffic",
+        "dengue",
+    }
     assert coordinators["tariff"]["last_update_success"] is False
     assert "boom" in coordinators["tariff"]["last_exception"]
     assert coordinators["holiday"]["data"] == [
@@ -47,3 +63,5 @@ async def test_diagnostics_serializes_all_coordinators():
     assert coordinators["train"]["data"]["status"] == "normal"
     assert coordinators["coe"]["data"] is None
     assert coordinators["psi"]["data"]["national"]["psi_twenty_four_hourly"] == 39.0
+    assert coordinators["flood"]["data"]["alerts"] == []
+    assert coordinators["dengue"]["data"]["clusters"] == []

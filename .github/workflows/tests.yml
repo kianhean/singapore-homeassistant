@@ -81,7 +81,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install Home Assistant test harness
-        run: pip install "${{ matrix.phcc }}" "beautifulsoup4>=4.12.3"
+        # PyTurboJPEG: required by HA's camera component (auto-installed in real HA).
+        run: pip install "${{ matrix.phcc }}" "beautifulsoup4>=4.12.3" PyTurboJPEG
 
       - name: Show Home Assistant version
         run: python -c "from homeassistant.const import __version__; print(__version__)"
