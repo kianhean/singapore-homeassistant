@@ -18,6 +18,7 @@ custom_components/singapore/
 ├── flood_coordinator.py    # FloodAlertCoordinator: PUB flash-flood alerts from data.gov.sg
 ├── traffic_coordinator.py  # TrafficImagesCoordinator: LTA checkpoint camera stills (Woodlands/Tuas)
 ├── dengue_coordinator.py   # DengueClusterCoordinator: NEA dengue cluster GeoJSON + distance helpers
+├── lightning_coordinator.py # LightningCoordinator: NEA lightning strikes, 30-min rolling window
 ├── camera.py               # Camera entities (Woodlands/Tuas checkpoint traffic cameras)
 ├── calendar.py             # Calendar entity (Singapore public holidays)
 ├── weather.py              # Weather entities (one per Singapore forecast area)
@@ -43,6 +44,7 @@ tests/
 ├── test_flood_coordinator.py    # Flood alert parser, Alert/Cancel tracking, HTTP mock tests
 ├── test_traffic_cameras.py      # Traffic images parser, coordinator, camera entity + image cache
 ├── test_dengue_coordinator.py   # Dengue GeoJSON parser, distance math, coordinator, sensors
+├── test_lightning_coordinator.py # Lightning parser, rolling window, coordinator, sensors
 ├── test_calendar.py             # Calendar event and range query tests
 ├── test_sensor.py               # Sensor value, unit, attributes, unique_id, None-safety
 ├── test_weather.py              # Weather entity condition mapping + forecast tests
@@ -70,6 +72,7 @@ class SingaporeData:
     flood: FloodAlertCoordinator
     traffic: TrafficImagesCoordinator
     dengue: DengueClusterCoordinator
+    lightning: LightningCoordinator
 
 type SingaporeConfigEntry = ConfigEntry[SingaporeData]
 ```
@@ -369,7 +372,7 @@ Because the response only covers a short window, the coordinator keeps **state a
 (`self._active`, keyed by identifier): messages are applied oldest-first, an Alert adds,
 a Cancel removes any active identifier contained in its `references`. Alerts with no Cancel
 are dropped after `ALERT_MAX_AGE` (3 h). The first refresh runs as a background task so a
-data.gov.sg 429 can't block setup (same for the traffic and dengue coordinators).
+data.gov.sg 429 can't block setup (same for the traffic, dengue and lightning coordinators).
 
 ## How the Traffic Camera Coordinator Works
 
@@ -393,6 +396,23 @@ polygon edge (0 if inside; ray casting + local equirectangular projection), whic
 `_get_json` retries HTTP 429 up to 3 times (numeric `Retry-After`, capped at 60 s, else
 2/4/8 s backoff). While no data has loaded, a failed refresh sets `update_interval` to
 `RETRY_INTERVAL` (10 min) instead of waiting the full 6 h; the next success restores it.
+
+## How the Lightning Coordinator Works
+
+`lightning_coordinator.py` GETs `https://api-open.data.gov.sg/v2/real-time/api/weather?api=lightning`
+every **2 minutes** (dataset `d_08238953fe0f6dd13f10714ebfbcb9f9`, MSS Lightning Detection
+System). Payload: `data.records[]` with `datetime` and `item.readings[]`, each with
+`location.latitude` / `location.longitude` (strings), `type` (`G` = cloud-to-ground,
+`C` = cloud-to-cloud, mapped via `STRIKE_TYPES`), `text`, and `datetime` (variable fractional
+seconds, e.g. `.96+08:00`). No lightning means empty `readings`; a missing `records` list
+raises `UpdateFailed`. Coverage extends beyond Singapore (strikes near Batam are common).
+
+Each response only holds the latest observation, so the coordinator keeps a set of
+`LightningStrike`s (frozen dataclass, so duplicates across polls collapse) and drops any older
+than `STRIKE_WINDOW` (30 min), also on failed polls. `sensor.nea_lightning_strikes` = count in
+window; `sensor.nea_nearest_lightning` = haversine km from `hass.config` home to the nearest
+strike (`None` when there are none) plus `strikes_within_10_km`. Both sit on the shared *NEA*
+device with the dengue sensors (`_nea_device_info` in `sensor.py`).
 
 ### Camera platform test dependency
 

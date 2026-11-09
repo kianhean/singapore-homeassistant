@@ -339,6 +339,25 @@ def test_e2e_dengue_clusters_download_and_parse():
         assert 1.1 < cluster.latitude < 1.5, cluster.latitude
 
 
+def test_e2e_lightning_fetch_and_parse():
+    """Fetch live NEA lightning observations and assert the envelope still parses."""
+    from custom_components.singapore.lightning_coordinator import (
+        LIGHTNING_URL,
+        _parse_lightning,
+    )
+
+    try:
+        payload = asyncio.run(_async_get_json(LIGHTNING_URL))
+    except Exception as err:
+        pytest.skip(f"Skipping e2e due to network error: {err}")
+
+    strikes, latest = _parse_lightning(payload)
+    assert latest is not None, "No observation timestamp in lightning payload"
+    for strike in strikes:
+        assert strike.type in {"cloud_to_ground", "cloud_to_cloud"}, strike.type
+        assert 0 < strike.latitude < 3 and 102 < strike.longitude < 106, strike
+
+
 def test_e2e_raw_html_debug(capsys):
     """Fetch and print diagnostic info to aid parser debugging.
 

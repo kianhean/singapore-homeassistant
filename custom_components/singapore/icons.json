@@ -82,6 +82,12 @@
       },
       "nearest_dengue_cluster": {
         "default": "mdi:map-marker-distance"
+      },
+      "lightning_strikes": {
+        "default": "mdi:lightning-bolt"
+      },
+      "nearest_lightning": {
+        "default": "mdi:map-marker-distance"
       }
     },
     "camera": {

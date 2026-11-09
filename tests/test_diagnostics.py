@@ -12,6 +12,7 @@ from custom_components.singapore.diagnostics import (
 )
 from custom_components.singapore.flood_coordinator import FloodAlertData
 from custom_components.singapore.holiday_coordinator import PublicHoliday
+from custom_components.singapore.lightning_coordinator import LightningData
 from custom_components.singapore.psi_coordinator import PsiData
 from custom_components.singapore.traffic_coordinator import TrafficImagesData
 from custom_components.singapore.train_coordinator import TrainStatusData
@@ -39,6 +40,7 @@ async def test_diagnostics_serializes_all_coordinators():
         flood=_coordinator(FloodAlertData()),
         traffic=_coordinator(TrafficImagesData()),
         dengue=_coordinator(DengueData()),
+        lightning=_coordinator(LightningData()),
     )
 
     result = await async_get_config_entry_diagnostics(MagicMock(), entry)
@@ -54,6 +56,7 @@ async def test_diagnostics_serializes_all_coordinators():
         "flood",
         "traffic",
         "dengue",
+        "lightning",
     }
     assert coordinators["tariff"]["last_update_success"] is False
     assert "boom" in coordinators["tariff"]["last_exception"]
@@ -65,3 +68,4 @@ async def test_diagnostics_serializes_all_coordinators():
     assert coordinators["psi"]["data"]["national"]["psi_twenty_four_hourly"] == 39.0
     assert coordinators["flood"]["data"]["alerts"] == []
     assert coordinators["dengue"]["data"]["clusters"] == []
+    assert coordinators["lightning"]["data"]["strikes"] == []

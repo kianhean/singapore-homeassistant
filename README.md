@@ -9,7 +9,7 @@ A [HACS](https://hacs.xyz) custom integration for Singapore-specific data:
 - **Utilities:** SP Group electricity, gas, water and solar export tariffs
 - **Transport:** COE bidding results, MRT/LRT train status, Woodlands and Tuas checkpoint traffic cameras
 - **Weather:** NEA weather by forecast area with a 4-day daily forecast, plus live temperature, humidity, wind and rainfall
-- **Environment:** air quality (PSI and pollutants, with per-region map markers), PUB flash-flood alerts, NEA dengue clusters with distance from your home
+- **Environment:** air quality (PSI and pollutants, with per-region map markers), PUB flash-flood alerts, NEA dengue clusters and live lightning strikes, each with distance from your home
 - **Calendar:** Singapore public holidays
 
 Requires **Home Assistant 2025.4** or newer.
@@ -232,6 +232,35 @@ Updated every **6 hours** from [NEA via data.gov.sg](https://data.gov.sg/dataset
 
 The nearest-cluster distance uses the home location in **Settings → System → General**.
 
+### Lightning
+
+Updated every **2 minutes** from [NEA's Lightning Detection System via data.gov.sg](https://data.gov.sg/datasets/d_08238953fe0f6dd13f10714ebfbcb9f9/view).
+Strikes are kept for a rolling **30-minute** window. The feed also covers the region
+around Singapore (for example Johor and the Riau Islands).
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.nea_lightning_strikes` | NEA Lightning Strikes | — | Strikes detected in the last 30 min; attributes `cloud_to_ground`, `cloud_to_cloud` and `strikes` (newest 50: time, latitude, longitude, type) |
+| `sensor.nea_nearest_lightning` | NEA Nearest Lightning | km | Distance from your HA home location to the nearest strike in the last 30 min (unknown when there's none); attributes `strikes_within_10_km`, plus the nearest strike's `type`, `time`, `latitude` and `longitude` |
+
+Cloud-to-ground strikes are the dangerous kind; cloud-to-cloud lightning often comes
+before them. NEA notes that most strikes fall within 5–6 km of a thunderstorm, and a storm
+more than 10 km away can still reach you.
+
+Example automation that warns you when lightning comes within 5 km:
+
+```yaml
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.nea_nearest_lightning
+    below: 5
+actions:
+  - action: notify.notify
+    data:
+      title: Lightning nearby
+      message: "Lightning {{ states('sensor.nea_nearest_lightning') }} km away"
+```
+
 ### Public holidays
 
 Updated every 24 hours from [MOM](https://www.mom.gov.sg/employment-practices/public-holidays).
@@ -306,7 +335,7 @@ sensor.air_quality_psi_east:
 - **Diagnostics:** on the Singapore integration page, open the three-dot menu and choose
   **Download diagnostics**. The file shows each data source's last update result, error
   and parsed data. Attach it when opening an issue.
-- **Unavailable sensors:** flood alerts, traffic cameras, dengue clusters, PSI and COE
+- **Unavailable sensors:** flood alerts, traffic cameras, dengue clusters, lightning, PSI and COE
   load in the background, so the rest of the integration still starts if one of those
   sources is down. Their sensors show as unavailable until a fetch succeeds.
 - **HTTP 429 in the log:** data.gov.sg rate-limits bursts of requests, which can happen
@@ -325,6 +354,7 @@ sensor.air_quality_psi_east:
 | [data.gov.sg / PUB](https://data.gov.sg/datasets/d_f1404e08587ce555b9ea3f565e2eb9a3/view) | Flash-flood alerts | Every 2 min |
 | [data.gov.sg / LTA](https://data.gov.sg/datasets/d_6cdb6b405b25aaaacbaf7689bcc6fae0/view) | Woodlands & Tuas checkpoint camera images | Every 2 min |
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_dbfabf16158d1b0e1c420627c0819168/view) | Dengue clusters | Every 6 h |
+| [data.gov.sg / NEA](https://data.gov.sg/datasets/d_08238953fe0f6dd13f10714ebfbcb9f9/view) | Lightning observations | Every 2 min |
 | [MOM](https://www.mom.gov.sg/employment-practices/public-holidays) | Public holidays | Every 24 h |
 | [mytransport.sg](https://www.mytransport.sg/trainstatus) | MRT/LRT train status | Every 5 min |
 

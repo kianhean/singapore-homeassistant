@@ -19,6 +19,7 @@ from custom_components.singapore.coordinator import TARIFF_URL
 from custom_components.singapore.dengue_coordinator import POLL_DOWNLOAD_URL
 from custom_components.singapore.flood_coordinator import FLOOD_ALERTS_URL
 from custom_components.singapore.holiday_coordinator import PUBLIC_HOLIDAYS_URL
+from custom_components.singapore.lightning_coordinator import LIGHTNING_URL
 from custom_components.singapore.psi_coordinator import PSI_URL
 from custom_components.singapore.traffic_coordinator import TRAFFIC_IMAGES_URL
 from custom_components.singapore.train_coordinator import TRAIN_STATUS_URL
@@ -215,6 +216,44 @@ _DENGUE_GEOJSON = {
 }
 
 
+def _lightning_payload() -> dict:
+    now = dt_util.utcnow().isoformat()
+    return {
+        "code": 0,
+        "data": {
+            "records": [
+                {
+                    "datetime": now,
+                    "item": {
+                        "type": "observation",
+                        "readings": [
+                            # ~1.1 km north of the harness home location.
+                            {
+                                "location": {
+                                    "latitude": "32.88336",
+                                    "longitude": "-117.22743",
+                                },
+                                "type": "G",
+                                "text": "Cloud to Ground",
+                                "datetime": now,
+                            },
+                            {
+                                "location": {
+                                    "latitude": "1.2008",
+                                    "longitude": "104.1714",
+                                },
+                                "type": "C",
+                                "text": "Cloud to Cloud",
+                                "datetime": now,
+                            },
+                        ],
+                    },
+                }
+            ]
+        },
+    }
+
+
 def _holiday_html() -> str:
     year = dt_util.now().year
     return f"""
@@ -259,4 +298,5 @@ def mock_sources(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
         json={"code": 0, "data": {"url": _DENGUE_FILE_URL}},
     )
     aioclient_mock.get(_DENGUE_FILE_URL, json=_DENGUE_GEOJSON)
+    aioclient_mock.get(LIGHTNING_URL, json=_lightning_payload())
     return aioclient_mock
