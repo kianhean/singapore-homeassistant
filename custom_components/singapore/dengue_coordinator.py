@@ -255,7 +255,8 @@ class DengueClusterCoordinator(DataUpdateCoordinator[DengueData]):
             async with session.get(
                 url, timeout=aiohttp.ClientTimeout(total=30)
             ) as response:
-                if response.status == 200:
+                # poll-download / initiate-download answer 201 Created on success.
+                if 200 <= response.status < 300:
                     return await response.json(content_type=None)
                 if response.status != 429 or attempt == _MAX_RETRIES:
                     raise UpdateFailed(f"{url} returned HTTP {response.status}")

@@ -252,8 +252,11 @@ def mock_sources(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
     aioclient_mock.get(
         "https://images.data.gov.sg/api/traffic-images/2701.jpg", content=b"jpeg-2701"
     )
+    # The live poll-download endpoint answers 201 Created.
     aioclient_mock.get(
-        POLL_DOWNLOAD_URL, json={"code": 0, "data": {"url": _DENGUE_FILE_URL}}
+        POLL_DOWNLOAD_URL,
+        status=201,
+        json={"code": 0, "data": {"url": _DENGUE_FILE_URL}},
     )
     aioclient_mock.get(_DENGUE_FILE_URL, json=_DENGUE_GEOJSON)
     return aioclient_mock
