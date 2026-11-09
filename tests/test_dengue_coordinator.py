@@ -5,10 +5,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from custom_components.singapore.dengue_coordinator import (
+    RETRY_INTERVAL,
+    UPDATE_INTERVAL,
     DengueClusterCoordinator,
     DengueData,
     UpdateFailed,
     _parse_dengue_geojson,
+    _retry_after_seconds,
     distance_to_cluster_km,
     nearest_cluster,
 )
@@ -95,9 +98,10 @@ def test_nearest_cluster_picks_closest():
     assert nearest_cluster(1.3, 103.8, DengueData()) is None
 
 
-def _response(status=200, payload=None):
+def _response(status=200, payload=None, headers=None):
     response = AsyncMock()
     response.status = status
+    response.headers = headers or {}
     response.json = AsyncMock(return_value=payload)
     response.__aenter__ = AsyncMock(return_value=response)
     response.__aexit__ = AsyncMock(return_value=False)
@@ -145,16 +149,57 @@ async def test_coordinator_initiates_download_when_poll_has_no_url():
 
 
 @pytest.mark.asyncio
+async def test_coordinator_retries_429_then_succeeds():
+    session = MagicMock()
+    session.get = MagicMock(
+        side_effect=[
+            _response(status=429, headers={"Retry-After": "5"}),
+            _response(status=429),
+            _response(payload={"code": 0, "data": {"url": "https://s3/file"}}),
+            _response(payload=_geojson(_feature("A", 4))),
+        ]
+    )
+    sleep = AsyncMock()
+    coordinator = DengueClusterCoordinator(MagicMock())
+    with (
+        patch(
+            "custom_components.singapore.dengue_coordinator.async_get_clientsession",
+            return_value=session,
+        ),
+        patch("custom_components.singapore.dengue_coordinator.asyncio.sleep", sleep),
+    ):
+        await coordinator.async_refresh()
+    assert coordinator.last_update_success is True
+    assert coordinator.data.total_cases == 4
+    assert [c.args[0] for c in sleep.await_args_list] == [5.0, 4.0]
+    assert coordinator.update_interval == UPDATE_INTERVAL
+
+
+def test_retry_after_seconds():
+    assert _retry_after_seconds("3", 0) == 3.0
+    assert _retry_after_seconds("9999", 0) == 60.0
+    assert _retry_after_seconds("Wed, 21 Oct 2026 07:28:00 GMT", 0) == 2.0
+    assert _retry_after_seconds(None, 2) == 8.0
+
+
+@pytest.mark.asyncio
 async def test_coordinator_http_error_fallback_and_failure():
     session = MagicMock()
     session.get = MagicMock(return_value=_response(status=429))
+    sleep = AsyncMock()
     coordinator = DengueClusterCoordinator(MagicMock())
-    with patch(
-        "custom_components.singapore.dengue_coordinator.async_get_clientsession",
-        return_value=session,
+    with (
+        patch(
+            "custom_components.singapore.dengue_coordinator.async_get_clientsession",
+            return_value=session,
+        ),
+        patch("custom_components.singapore.dengue_coordinator.asyncio.sleep", sleep),
     ):
         await coordinator.async_refresh()
         assert coordinator.last_update_success is False
+        # 1 attempt + 3 retries, then give up and retry soon (no data yet).
+        assert session.get.call_count == 4
+        assert coordinator.update_interval == RETRY_INTERVAL
 
         coordinator.data = DengueData()
         await coordinator.async_refresh()
