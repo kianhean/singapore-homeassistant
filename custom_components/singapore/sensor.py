@@ -1,4 +1,4 @@
-"""Sensor platform for Singapore tariffs, COE, weather, PSI, trains, floods, dengue."""
+"""Sensor platform: tariffs, COE, weather, PSI, trains, floods, dengue, lightning."""
 
 from __future__ import annotations
 
@@ -35,9 +35,13 @@ from .coe_coordinator import (
 )
 from .const import DOMAIN
 from .coordinator import UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER, SPGroupCoordinator
-from .dengue_coordinator import DATASET_PAGE_URL as DENGUE_DATASET_PAGE_URL
 from .dengue_coordinator import DengueClusterCoordinator, nearest_cluster
 from .flood_coordinator import FloodAlertCoordinator
+from .lightning_coordinator import (
+    LightningCoordinator,
+    nearest_strike,
+    strike_distance_km,
+)
 from .psi_coordinator import (
     DEFAULT_REGION_LOCATIONS,
     PSI_REGIONS,
@@ -160,6 +164,8 @@ async def async_setup_entry(
             SingaporeFloodAlertsSensor(data.flood, entry.entry_id),
             SingaporeDengueClustersSensor(data.dengue, entry.entry_id),
             SingaporeNearestDengueClusterSensor(data.dengue, entry.entry_id),
+            SingaporeLightningStrikesSensor(data.lightning, entry.entry_id),
+            SingaporeNearestLightningSensor(data.lightning, entry.entry_id),
         ]
     )
 
@@ -739,6 +745,18 @@ class SingaporeFloodAlertsSensor(
         )
 
 
+def _nea_device_info(entry_id: str) -> DeviceInfo:
+    """Device shared by the NEA dengue and lightning sensors."""
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{entry_id}_nea")},
+        name="NEA",
+        manufacturer="Singapore",
+        model="NEA via data.gov.sg",
+        entry_type=DeviceEntryType.SERVICE,
+        configuration_url="https://www.nea.gov.sg",
+    )
+
+
 class _BaseDengueSensor(CoordinatorEntity[DengueClusterCoordinator], SensorEntity):
     """Shared device info for NEA dengue cluster sensors."""
 
@@ -751,14 +769,7 @@ class _BaseDengueSensor(CoordinatorEntity[DengueClusterCoordinator], SensorEntit
 
     @property
     def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._entry_id}_nea")},
-            name="NEA",
-            manufacturer="Singapore",
-            model="NEA Dengue Clusters",
-            entry_type=DeviceEntryType.SERVICE,
-            configuration_url=DENGUE_DATASET_PAGE_URL,
-        )
+        return _nea_device_info(self._entry_id)
 
 
 class SingaporeDengueClustersSensor(_BaseDengueSensor):
@@ -836,3 +847,110 @@ class SingaporeNearestDengueClusterSensor(_BaseDengueSensor):
             "latitude": cluster.latitude,
             "longitude": cluster.longitude,
         }
+
+
+# Strikes this close to home count as "nearby" (NEA: most strokes fall within
+# 5-6 km of a thunderstorm cloud; a storm 10 km away can still strike).
+LIGHTNING_NEARBY_KM = 10.0
+
+
+class _BaseLightningSensor(CoordinatorEntity[LightningCoordinator], SensorEntity):
+    """Shared device info for NEA lightning sensors."""
+
+    _attr_has_entity_name = True
+    _attr_attribution = "Data provided by NEA (MSS) via data.gov.sg"
+
+    def __init__(self, coordinator: LightningCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._entry_id = entry_id
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return _nea_device_info(self._entry_id)
+
+
+class SingaporeLightningStrikesSensor(_BaseLightningSensor):
+    """Number of lightning strikes detected in the last 30 minutes."""
+
+    _attr_translation_key = "lightning_strikes"
+    _attr_device_class = None
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator: LightningCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_lightning_strikes"
+
+    @property
+    def native_value(self) -> int | None:
+        if self.coordinator.data is None:
+            return None
+        return len(self.coordinator.data.strikes)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        if self.coordinator.data is None:
+            return {}
+        data = self.coordinator.data
+        return {
+            "cloud_to_ground": data.cloud_to_ground,
+            "cloud_to_cloud": len(data.strikes) - data.cloud_to_ground,
+            # Newest first; capped so a big storm doesn't bloat the state.
+            "strikes": [s.as_dict() for s in data.strikes[:50]],
+            "last_observation": (
+                data.last_observation.isoformat() if data.last_observation else None
+            ),
+            "window_minutes": 30,
+            "source": "NEA via data.gov.sg",
+        }
+
+
+class SingaporeNearestLightningSensor(_BaseLightningSensor):
+    """Distance from the HA home location to the nearest strike in the last 30 min.
+
+    Unknown when no lightning has been detected in that window.
+    """
+
+    _attr_translation_key = "nearest_lightning"
+    _attr_device_class = SensorDeviceClass.DISTANCE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfLength.KILOMETERS
+    _attr_suggested_display_precision = 1
+
+    def __init__(self, coordinator: LightningCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_nearest_lightning"
+
+    def _home(self) -> tuple[float, float]:
+        return self.hass.config.latitude, self.hass.config.longitude
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        nearest = nearest_strike(*self._home(), self.coordinator.data)
+        return None if nearest is None else round(nearest[1], 2)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        if self.coordinator.data is None:
+            return {}
+        data = self.coordinator.data
+        lat, lon = self._home()
+        nearest = nearest_strike(lat, lon, data)
+        within = sum(
+            1
+            for s in data.strikes
+            if strike_distance_km(lat, lon, s) <= LIGHTNING_NEARBY_KM
+        )
+        attrs: dict = {f"strikes_within_{int(LIGHTNING_NEARBY_KM)}_km": within}
+        if nearest is not None:
+            strike, _ = nearest
+            attrs.update(
+                {
+                    "type": strike.type,
+                    "time": strike.time.isoformat(),
+                    "latitude": strike.latitude,
+                    "longitude": strike.longitude,
+                }
+            )
+        return attrs

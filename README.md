@@ -4,10 +4,17 @@
 
 # Singapore Home Assistant custom integration
 
-A [HACS](https://hacs.xyz) custom integration for Singapore-specific data: utility
-tariffs, COE bidding results, live weather, air quality (PSI), train status, and public holidays.
+A [HACS](https://hacs.xyz) custom integration for Singapore-specific data:
 
-### HACS installation (manual, pre-merge)
+- **Utilities:** SP Group electricity, gas, water and solar export tariffs
+- **Transport:** COE bidding results, MRT/LRT train status, Woodlands and Tuas checkpoint traffic cameras
+- **Weather:** NEA weather by forecast area with a 4-day daily forecast, plus live temperature, humidity, wind and rainfall
+- **Environment:** air quality (PSI and pollutants, with per-region map markers), PUB flash-flood alerts, NEA dengue clusters and live lightning strikes, each with distance from your home
+- **Calendar:** Singapore public holidays
+
+Requires **Home Assistant 2025.4** or newer.
+
+## Installation
 
 This integration is **not merged into the default HACS store yet**, so install it as a
 custom repository first:
@@ -21,6 +28,21 @@ custom repository first:
 7. Search for **Singapore** in HACS and install it.
 8. Restart Home Assistant.
 
+## Setup
+
+1. Go to **Settings → Devices & Services → Add Integration**.
+2. Search for **Singapore**.
+3. Enter a name and click **Submit**.
+
+Only one Singapore entry can be added. Entities are grouped into devices (Energy, COE,
+Weather, MRT/LRT, Air Quality, PUB, NEA, Traffic Cameras, Public Holidays).
+
+> **Entity IDs on older installs:** since v0.3.0, entity names come from their device
+> (for example *Energy Electricity Tariff*). New installs get IDs like
+> `sensor.energy_electricity_tariff`. Installs that started before v0.3.0 keep their
+> original IDs (for example `sensor.singapore_electricity_tariff`), so existing dashboards
+> and automations keep working. The tables below show the IDs a new install gets.
+
 ## What you get
 
 ### SP Group utility tariffs
@@ -30,10 +52,10 @@ every 24 hours.
 
 | Entity ID | Name | Unit | Description |
 |-----------|------|------|-------------|
-| `sensor.singapore_electricity_tariff` | Singapore Electricity Tariff | ¢/kWh | Total residential electricity tariff |
-| `sensor.singapore_solar_export_price` | Singapore Solar Export Price | ¢/kWh | Electricity tariff minus network costs |
-| `sensor.singapore_gas_tariff` | Singapore Gas Tariff | ¢/kWh | Piped natural gas tariff |
-| `sensor.singapore_water_tariff` | Singapore Water Tariff | SGD/m³ | Water tariff, lower residential tier (≤40 m³, with GST) |
+| `sensor.energy_electricity_tariff` | Energy Electricity Tariff | ¢/kWh | Total residential electricity tariff (with GST) |
+| `sensor.energy_solar_export_price` | Energy Solar Export Price | ¢/kWh | Electricity tariff minus network costs |
+| `sensor.energy_gas_tariff` | Energy Gas Tariff | ¢/kWh | Piped natural gas tariff (with GST) |
+| `sensor.energy_water_tariff` | Energy Water Tariff | SGD/m³ | Water tariff, lower residential tier (≤40 m³, with GST) |
 
 Tariff sensors include `quarter` (e.g. `Q1`), `year`, and `source` as state attributes.
 The solar export price sensor also includes `network_cost` and `total_tariff`.
@@ -49,11 +71,11 @@ daily at **19:30**, after each bidding exercise.
 
 | Entity ID | Name | Unit | Category |
 |-----------|------|------|----------|
-| `sensor.singapore_coe_category_a` | Singapore COE Category A | SGD | Cars ≤1600cc / ≤97kW (electric) |
-| `sensor.singapore_coe_category_b` | Singapore COE Category B | SGD | Cars >1600cc / >97kW (electric) |
-| `sensor.singapore_coe_category_c` | Singapore COE Category C | SGD | Goods vehicles and buses |
-| `sensor.singapore_coe_category_d` | Singapore COE Category D | SGD | Motorcycles |
-| `sensor.singapore_coe_category_e` | Singapore COE Category E (Open) | SGD | Open — all except motorcycles |
+| `sensor.coe_category_a` | COE Category A | SGD | Cars ≤1600cc / ≤97kW (electric) |
+| `sensor.coe_category_b` | COE Category B | SGD | Cars >1600cc / >97kW (electric) |
+| `sensor.coe_category_c` | COE Category C | SGD | Goods vehicles and buses |
+| `sensor.coe_category_d` | COE Category D | SGD | Motorcycles |
+| `sensor.coe_category_e` | COE Category E | SGD | Open — all except motorcycles |
 
 Each sensor includes `category`, `description`, `month`, `bidding_no`, and `source` as
 state attributes.
@@ -69,27 +91,32 @@ Station readings are averaged across all available stations at fetch time.
 
 | Entity ID | Name | Unit | Description |
 |-----------|------|------|-------------|
-| `sensor.singapore_temperature` | Singapore Temperature | °C | Aggregated air temperature |
-| `sensor.singapore_humidity` | Singapore Humidity | % | Aggregated relative humidity |
-| `sensor.singapore_wind_speed` | Singapore Wind Speed | km/h | Aggregated wind speed |
-| `sensor.singapore_wind_bearing` | Singapore Wind Bearing | ° | Aggregated wind direction |
-| `sensor.singapore_rainfall` | Singapore Rainfall | mm | Aggregated rainfall |
+| `sensor.weather_temperature` | Weather Temperature | °C | Aggregated air temperature |
+| `sensor.weather_humidity` | Weather Humidity | % | Aggregated relative humidity |
+| `sensor.weather_wind_speed` | Weather Wind Speed | km/h | Aggregated wind speed |
+| `sensor.weather_wind_bearing` | Weather Wind Bearing | ° | Aggregated wind direction |
+| `sensor.weather_rainfall` | Weather Rainfall | mm | Aggregated rainfall |
 
 <p align="center">
   <img src="images/weather-overview.jpeg" alt="Singapore Weather entity list showing area forecasts alongside humidity, rainfall, temperature, wind bearing, and wind speed sensors" width="320">
 </p>
 
-### Weather entities (2-hour forecast, by area)
+### Weather entities (by forecast area)
 
-One weather entity per forecast area from [data.gov.sg collection 1456](https://data.gov.sg/collections/1456/view),
-updated every **10 minutes**. Each 2-hour NEA forecast block becomes two hourly forecast
-points in Home Assistant.
+One weather entity per NEA forecast area from [data.gov.sg collection 1456](https://data.gov.sg/collections/1456/view),
+updated every **10 minutes**.
 
-Example entities: `weather.singapore_weather_bedok`, `weather.singapore_weather_ang_mo_kio`,
-`weather.singapore_weather_woodlands`.
+Example entities: `weather.weather_bedok`, `weather.weather_ang_mo_kio`,
+`weather.weather_woodlands`.
 
-Each entity has a mapped HA condition (`sunny`, `partlycloudy`, `rainy`, etc.), an hourly
-forecast list, and attributes like `raw_condition`, `valid_start`, and `valid_end`.
+- **Current condition** comes from the area's 2-hour NEA forecast, mapped to an HA
+  condition (`sunny`, `partlycloudy`, `rainy`, `lightning-rainy`, etc.).
+- **Current temperature, humidity and wind** come from the live readings above.
+- **Daily forecast** is NEA's Singapore-wide 4-day outlook, with high/low temperature,
+  humidity and wind for each day. It is the same for every area.
+
+Attributes: `forecast_area`, `raw_condition` (NEA's original text), `valid_start` /
+`valid_end` (the 2-hour forecast window), plus the live readings.
 
 <p align="center">
   <img src="images/weather-forecast-bedok.jpeg" alt="Singapore Weather Bedok forecast card showing current condition and multi-day forecast" width="320">
@@ -102,8 +129,8 @@ Tracks both an overall network status and a per-line status for each MRT/LRT lin
 
 | Entity ID | Name | Description |
 |-----------|------|-------------|
-| `sensor.singapore_train_status` | Singapore Train Status | Overall network status: `normal`, `planned`, or `disruption` |
-| `sensor.singapore_<line>_status` | e.g. Singapore Circle Line Status | Per-line status |
+| `sensor.mrt_lrt_status` | MRT/LRT Status | Overall network status: `normal`, `planned`, or `disruption`; `details` attribute holds LTA's messages |
+| `sensor.mrt_lrt_<line>_status` | e.g. MRT/LRT Circle Line Status | Per-line status, e.g. `sensor.mrt_lrt_circle_line_status` |
 
 Lines: North-South, East-West, North East, Circle, Downtown, Thomson-East Coast,
 Bukit Panjang LRT, Sengkang LRT, Punggol LRT.
@@ -166,7 +193,19 @@ Attributes: `locations` (list of alert descriptions) and `alerts` (full details 
 description, area, severity, instruction, issued time, latitude/longitude). An alert stays
 active until PUB issues its matching Cancel, or for 3 hours at most.
 
-Example automation trigger: `{{ states('sensor.pub_flood_alerts') | int(0) > 0 }}`.
+Example automation that sends a notification when a new alert appears:
+
+```yaml
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.pub_flood_alerts
+    above: 0
+actions:
+  - action: notify.notify
+    data:
+      title: PUB flood alert
+      message: "{{ state_attr('sensor.pub_flood_alerts', 'locations') | join(', ') }}"
+```
 
 ### Checkpoint traffic cameras
 
@@ -191,6 +230,37 @@ Updated every **6 hours** from [NEA via data.gov.sg](https://data.gov.sg/dataset
 | `sensor.nea_dengue_clusters` | NEA Dengue Clusters | — | Number of active clusters; attributes `total_cases` and `clusters` (locality, cases, centroid) |
 | `sensor.nea_nearest_dengue_cluster` | NEA Nearest Dengue Cluster | km | Distance from your HA home location to the nearest cluster boundary (`0` = inside a cluster) |
 
+The nearest-cluster distance uses the home location in **Settings → System → General**.
+
+### Lightning
+
+Updated every **2 minutes** from [NEA's Lightning Detection System via data.gov.sg](https://data.gov.sg/datasets/d_08238953fe0f6dd13f10714ebfbcb9f9/view).
+Strikes are kept for a rolling **30-minute** window. The feed also covers the region
+around Singapore (for example Johor and the Riau Islands).
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.nea_lightning_strikes` | NEA Lightning Strikes | — | Strikes detected in the last 30 min; attributes `cloud_to_ground`, `cloud_to_cloud` and `strikes` (newest 50: time, latitude, longitude, type) |
+| `sensor.nea_nearest_lightning` | NEA Nearest Lightning | km | Distance from your HA home location to the nearest strike in the last 30 min (unknown when there's none); attributes `strikes_within_10_km`, plus the nearest strike's `type`, `time`, `latitude` and `longitude` |
+
+Cloud-to-ground strikes are the dangerous kind; cloud-to-cloud lightning often comes
+before them. NEA notes that most strikes fall within 5–6 km of a thunderstorm, and a storm
+more than 10 km away can still reach you.
+
+Example automation that warns you when lightning comes within 5 km:
+
+```yaml
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.nea_nearest_lightning
+    below: 5
+actions:
+  - action: notify.notify
+    data:
+      title: Lightning nearby
+      message: "Lightning {{ states('sensor.nea_nearest_lightning') }} km away"
+```
+
 ### Public holidays
 
 Updated every 24 hours from [MOM](https://www.mom.gov.sg/employment-practices/public-holidays).
@@ -198,7 +268,7 @@ Shows up as a Home Assistant calendar with all-day events from the current year 
 
 | Entity ID | Name |
 |-----------|------|
-| `calendar.singapore_public_holidays` | Singapore Public Holidays |
+| `calendar.public_holidays` | Public Holidays |
 
 <p align="center">
   <img src="images/public-holidays-calendar.jpeg" alt="Singapore public holidays calendar showing Good Friday and Saturday as all-day events" width="320">
@@ -207,7 +277,7 @@ Shows up as a Home Assistant calendar with all-day events from the current year 
 ## Example sensor states
 
 ```yaml
-sensor.singapore_electricity_tariff:
+sensor.energy_electricity_tariff:
   state: 29.72
   unit_of_measurement: ¢/kWh
   attributes:
@@ -215,7 +285,7 @@ sensor.singapore_electricity_tariff:
     year: 2026
     source: SP Group
 
-sensor.singapore_solar_export_price:
+sensor.energy_solar_export_price:
   state: 23.47
   unit_of_measurement: ¢/kWh
   attributes:
@@ -225,7 +295,7 @@ sensor.singapore_solar_export_price:
     network_cost: 6.25
     total_tariff: 29.72
 
-sensor.singapore_coe_category_a:
+sensor.coe_category_a:
   state: 95501
   unit_of_measurement: SGD
   attributes:
@@ -235,7 +305,7 @@ sensor.singapore_coe_category_a:
     bidding_no: 1
     source: data.gov.sg / LTA
 
-sensor.singapore_temperature:
+sensor.weather_temperature:
   state: 31.2
   unit_of_measurement: °C
   attributes:
@@ -260,19 +330,17 @@ sensor.air_quality_psi_east:
     source: data.gov.sg / NEA
 ```
 
-## Installation via HACS (manual custom repository)
+## Troubleshooting
 
-1. Open HACS in your Home Assistant instance.
-2. Go to **Integrations → Custom repositories** (three-dot menu).
-3. Add `https://github.com/kianhean/singapore-homeassistant` with category **Integration**.
-4. Search for **Singapore** and install it.
-5. Restart Home Assistant.
-
-## Setup
-
-1. Go to **Settings → Devices & Services → Add Integration**.
-2. Search for **Singapore**.
-3. Enter a name and click **Submit**.
+- **Diagnostics:** on the Singapore integration page, open the three-dot menu and choose
+  **Download diagnostics**. The file shows each data source's last update result, error
+  and parsed data. Attach it when opening an issue.
+- **Unavailable sensors:** flood alerts, traffic cameras, dengue clusters, lightning, PSI and COE
+  load in the background, so the rest of the integration still starts if one of those
+  sources is down. Their sensors show as unavailable until a fetch succeeds.
+- **HTTP 429 in the log:** data.gov.sg rate-limits bursts of requests, which can happen
+  when Home Assistant starts. Weather and dengue requests retry right away; other
+  sources try again on their next scheduled update.
 
 ## Data sources
 
@@ -280,12 +348,13 @@ sensor.air_quality_psi_east:
 |--------|------|---------|
 | [SP Group](https://www.spgroup.com.sg/our-services/utilities/tariff-information) | Electricity, gas, water tariffs | Every 24 h |
 | [data.gov.sg / LTA](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view) | COE bidding results | Daily at 19:30 |
-| [data.gov.sg / NEA (collection 1456)](https://data.gov.sg/collections/1456/view) | 2-hour area weather forecasts | Every 10 min |
+| [data.gov.sg / NEA (collection 1456)](https://data.gov.sg/collections/1456/view) | 2-hour area forecasts and 4-day outlook | Every 10 min |
 | [data.gov.sg / NEA (collection 1459)](https://data.gov.sg/collections/1459/view) | Realtime weather readings | Every 10 min |
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_fe37906a0182569d891506e815e819b7/view) | PSI and pollutant readings | Every 15 min |
 | [data.gov.sg / PUB](https://data.gov.sg/datasets/d_f1404e08587ce555b9ea3f565e2eb9a3/view) | Flash-flood alerts | Every 2 min |
 | [data.gov.sg / LTA](https://data.gov.sg/datasets/d_6cdb6b405b25aaaacbaf7689bcc6fae0/view) | Woodlands & Tuas checkpoint camera images | Every 2 min |
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_dbfabf16158d1b0e1c420627c0819168/view) | Dengue clusters | Every 6 h |
+| [data.gov.sg / NEA](https://data.gov.sg/datasets/d_08238953fe0f6dd13f10714ebfbcb9f9/view) | Lightning observations | Every 2 min |
 | [MOM](https://www.mom.gov.sg/employment-practices/public-holidays) | Public holidays | Every 24 h |
 | [mytransport.sg](https://www.mytransport.sg/trainstatus) | MRT/LRT train status | Every 5 min |
 
@@ -295,8 +364,11 @@ See [CLAUDE.md](CLAUDE.md) for project structure, test instructions, and convent
 
 ```bash
 pip install -r requirements_test.txt
-pytest tests/ -v
+pytest tests/ -v -m "not e2e"
 ```
+
+`tests_ha/` runs the integration inside a real Home Assistant; `pytest tests/test_e2e.py -m e2e`
+hits the live data sources. See CLAUDE.md for both.
 
 ## License
 

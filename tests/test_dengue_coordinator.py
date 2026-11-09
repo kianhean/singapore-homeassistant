@@ -129,6 +129,26 @@ async def test_coordinator_polls_then_downloads_file():
 
 
 @pytest.mark.asyncio
+async def test_coordinator_accepts_201_from_download_api():
+    # data.gov.sg's poll-download returns 201 Created with the signed URL.
+    session = MagicMock()
+    session.get = MagicMock(
+        side_effect=[
+            _response(status=201, payload={"code": 0, "data": {"url": "https://s3/f"}}),
+            _response(payload=_geojson(_feature("A", 4))),
+        ]
+    )
+    coordinator = DengueClusterCoordinator(MagicMock())
+    with patch(
+        "custom_components.singapore.dengue_coordinator.async_get_clientsession",
+        return_value=session,
+    ):
+        await coordinator.async_refresh()
+    assert coordinator.last_update_success is True
+    assert coordinator.data.total_cases == 4
+
+
+@pytest.mark.asyncio
 async def test_coordinator_initiates_download_when_poll_has_no_url():
     session = MagicMock()
     session.get = MagicMock(

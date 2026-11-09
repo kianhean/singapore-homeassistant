@@ -18,6 +18,7 @@ custom_components/singapore/
 ├── flood_coordinator.py    # FloodAlertCoordinator: PUB flash-flood alerts from data.gov.sg
 ├── traffic_coordinator.py  # TrafficImagesCoordinator: LTA checkpoint camera stills (Woodlands/Tuas)
 ├── dengue_coordinator.py   # DengueClusterCoordinator: NEA dengue cluster GeoJSON + distance helpers
+├── lightning_coordinator.py # LightningCoordinator: NEA lightning strikes, 30-min rolling window
 ├── camera.py               # Camera entities (Woodlands/Tuas checkpoint traffic cameras)
 ├── calendar.py             # Calendar entity (Singapore public holidays)
 ├── weather.py              # Weather entities (one per Singapore forecast area)
@@ -43,6 +44,7 @@ tests/
 ├── test_flood_coordinator.py    # Flood alert parser, Alert/Cancel tracking, HTTP mock tests
 ├── test_traffic_cameras.py      # Traffic images parser, coordinator, camera entity + image cache
 ├── test_dengue_coordinator.py   # Dengue GeoJSON parser, distance math, coordinator, sensors
+├── test_lightning_coordinator.py # Lightning parser, rolling window, coordinator, sensors
 ├── test_calendar.py             # Calendar event and range query tests
 ├── test_sensor.py               # Sensor value, unit, attributes, unique_id, None-safety
 ├── test_weather.py              # Weather entity condition mapping + forecast tests
@@ -70,6 +72,7 @@ class SingaporeData:
     flood: FloodAlertCoordinator
     traffic: TrafficImagesCoordinator
     dengue: DengueClusterCoordinator
+    lightning: LightningCoordinator
 
 type SingaporeConfigEntry = ConfigEntry[SingaporeData]
 ```
@@ -84,34 +87,40 @@ Platforms read it via `entry.runtime_data.<coordinator>` (see `sensor.py`, `weat
 
 ## Sensors
 
+Entity IDs below are what a **new install** gets: with `_attr_has_entity_name = True`, HA
+builds the ID from device name + entity name (e.g. device *Energy* + *Electricity Tariff*
+→ `sensor.energy_electricity_tariff`). Installs created before v0.3.0 (the naming
+migration) keep their legacy `sensor.singapore_*` IDs because the unique IDs didn't change.
+`tests_ha/test_integration.py` asserts the new-install IDs.
+
 ### SP Group Utility Tariffs
 
 | Entity ID | Name | Unit | Description |
 |-----------|------|------|-------------|
-| `sensor.singapore_electricity_tariff` | Singapore Electricity Tariff | ¢/kWh | Total residential electricity tariff (with GST) |
-| `sensor.singapore_solar_export_price` | Singapore Solar Export Price | ¢/kWh | Tariff minus network costs |
-| `sensor.singapore_gas_tariff` | Singapore Gas Tariff | ¢/kWh | Piped natural gas tariff (with GST) |
-| `sensor.singapore_water_tariff` | Singapore Water Tariff | SGD/m³ | Water tariff, lower residential tier (≤40 m³, with GST) |
+| `sensor.energy_electricity_tariff` | Energy Electricity Tariff | ¢/kWh | Total residential electricity tariff (with GST) |
+| `sensor.energy_solar_export_price` | Energy Solar Export Price | ¢/kWh | Tariff minus network costs |
+| `sensor.energy_gas_tariff` | Energy Gas Tariff | ¢/kWh | Piped natural gas tariff (with GST) |
+| `sensor.energy_water_tariff` | Energy Water Tariff | SGD/m³ | Water tariff, lower residential tier (≤40 m³, with GST) |
 
 ### COE Bidding Results
 
 | Entity ID | Name | Unit | Description |
 |-----------|------|------|-------------|
-| `sensor.singapore_coe_category_a` | Singapore COE Category A | SGD | Cars ≤1600cc / ≤97kW electric |
-| `sensor.singapore_coe_category_b` | Singapore COE Category B | SGD | Cars >1600cc / >97kW electric |
-| `sensor.singapore_coe_category_c` | Singapore COE Category C | SGD | Goods vehicles and buses |
-| `sensor.singapore_coe_category_d` | Singapore COE Category D | SGD | Motorcycles |
-| `sensor.singapore_coe_category_e` | Singapore COE Category E (Open) | SGD | All except motorcycles |
+| `sensor.coe_category_a` | COE Category A | SGD | Cars ≤1600cc / ≤97kW electric |
+| `sensor.coe_category_b` | COE Category B | SGD | Cars >1600cc / >97kW electric |
+| `sensor.coe_category_c` | COE Category C | SGD | Goods vehicles and buses |
+| `sensor.coe_category_d` | COE Category D | SGD | Motorcycles |
+| `sensor.coe_category_e` | COE Category E | SGD | All except motorcycles |
 
 ### NEA Realtime Weather Readings (Collection 1459)
 
 | Entity ID | Name | Unit | Description |
 |-----------|------|------|-------------|
-| `sensor.singapore_temperature` | Singapore Temperature | °C | Aggregated air temperature |
-| `sensor.singapore_humidity` | Singapore Humidity | % | Aggregated relative humidity |
-| `sensor.singapore_wind_speed` | Singapore Wind Speed | km/h | Aggregated wind speed |
-| `sensor.singapore_wind_bearing` | Singapore Wind Bearing | ° | Aggregated wind direction |
-| `sensor.singapore_rainfall` | Singapore Rainfall | mm | Aggregated rainfall |
+| `sensor.weather_temperature` | Weather Temperature | °C | Aggregated air temperature |
+| `sensor.weather_humidity` | Weather Humidity | % | Aggregated relative humidity |
+| `sensor.weather_wind_speed` | Weather Wind Speed | km/h | Aggregated wind speed |
+| `sensor.weather_wind_bearing` | Weather Wind Bearing | ° | Aggregated wind direction |
+| `sensor.weather_rainfall` | Weather Rainfall | mm | Aggregated rainfall |
 
 ### NEA Air Quality / PSI
 
@@ -128,16 +137,17 @@ Platforms read it via `entry.runtime_data.<coordinator>` (see `sensor.py`, `weat
 
 ### Weather Entities (collection 1456)
 
-One `weather` entity is created per forecast area (e.g. Bedok, Woodlands, Ang Mo Kio).
-The entity exposes Home Assistant weather conditions and hourly forecasts approximated
-from NEA's 2-hour periods.
+One `weather` entity is created per forecast area (e.g. `weather.weather_bedok`; the name is
+the raw area via `_attr_name`, under the *Weather* device). Current condition comes from the
+area's 2-hour forecast; current temperature/humidity/wind from the collection 1459 readings.
+Forecasts are `FORECAST_DAILY` only, from the Singapore-wide 4-day outlook (same for every area).
 
 ### Train Status Sensors
 
 | Entity ID | Name | Description |
 |-----------|------|-------------|
-| `sensor.singapore_train_status` | Singapore Train Status | Overall MRT/LRT network status (`normal` / `planned` / `disruption`) |
-| `sensor.singapore_<line>_status` | Singapore \<Line\> Status | Per-line status for NSL, EWL, NEL, CCL, DTL, TEL, BPLRT, SKLRT, PGLRT |
+| `sensor.mrt_lrt_status` | MRT/LRT Status | Overall MRT/LRT network status (`normal` / `planned` / `disruption`) |
+| `sensor.mrt_lrt_<line>_status` | MRT/LRT \<Line\> Status | Per-line status for NSL, EWL, NEL, CCL, DTL, TEL, BPLRT, SKLRT, PGLRT |
 
 Train status sensors are `SensorDeviceClass.ENUM` with `options = TRAIN_STATUS_OPTIONS`;
 state display names live under `entity.sensor.<key>.state` in `strings.json`, state
@@ -259,8 +269,8 @@ Forecast parsing supports both common payload styles:
 - `items[0].forecasts` (legacy shape)
 - `data.records[0].periods[0].regions` (newer shape)
 
-Each weather entity converts a single 2-hour interval into two hourly forecast points
-for Home Assistant (`t` and `t+1h`) with mapped HA conditions.
+The 2-hour forecast sets each area entity's current condition. The four-day outlook
+(see below) feeds `_async_forecast_daily()`; there is no hourly forecast.
 
 ### Forecast Subscription Pattern
 
@@ -270,17 +280,15 @@ after every coordinator refresh so forecast subscribers (the frontend weather ca
 new data. Implement forecasts as the synchronous `@callback _async_forecast_daily()`;
 do not override `_handle_coordinator_update` to push listeners manually.
 
-### Collection 1456 — Not Yet Integrated
+### Collection 1456 — Other Forecast APIs
 
-Two additional NEA forecast APIs in collection 1456 are unused:
+`four-day-outlook` is integrated (daily forecasts); `twenty-four-hr-forecast` is not:
 
 | Endpoint | Coverage | Periods | Has temp/humidity? |
 |----------|----------|---------|-------------------|
 | `twenty-four-hr-forecast` | 5 regions (N/S/E/W/central) | ~4 × 6-hour periods | No |
 | `four-day-outlook` | Singapore-wide | 4 daily forecasts | Yes (high/low ranges) |
 
-The 4-day outlook is the most valuable to add: it would enable `FORECAST_DAILY` support
-on weather entities with proper temperature, humidity, and wind ranges.
 The 24-hour forecast adds regional granularity for hourly forecasts beyond the current
 2-hour window, but provides no temperature/humidity data.
 
@@ -322,7 +330,7 @@ Response shape: `{ "value": { "Status": int, "AffectedSegments": [...], "Message
 
 `TrainStatusData` contains:
 - `status` — `"normal"`, `"planned"`, or `"disruption"` (overall network)
-- `details` — all message content joined with ` | ` (empty string when normal); exposed as `details` attribute on `sensor.singapore_train_status`
+- `details` — all message content joined with ` | ` (empty string when normal); exposed as `details` attribute on `sensor.mrt_lrt_status`
 - `line_statuses` — dict mapping each line name to `"normal"`, `"planned"`, or `"disruption"`
 
 ## How the PSI Coordinator Works
@@ -364,7 +372,7 @@ Because the response only covers a short window, the coordinator keeps **state a
 (`self._active`, keyed by identifier): messages are applied oldest-first, an Alert adds,
 a Cancel removes any active identifier contained in its `references`. Alerts with no Cancel
 are dropped after `ALERT_MAX_AGE` (3 h). The first refresh runs as a background task so a
-data.gov.sg 429 can't block setup (same for the traffic and dengue coordinators).
+data.gov.sg 429 can't block setup (same for the traffic, dengue and lightning coordinators).
 
 ## How the Traffic Camera Coordinator Works
 
@@ -385,6 +393,26 @@ every **6 hours**: GET `.../v1/public/api/datasets/{id}/poll-download` → `data
 `nearest_cluster()` computes the distance from `hass.config` home lat/lon to the nearest
 polygon edge (0 if inside; ray casting + local equirectangular projection), which feeds
 `sensor.nea_nearest_dengue_cluster`. Zero features is valid (no active clusters).
+`_get_json` retries HTTP 429 up to 3 times (numeric `Retry-After`, capped at 60 s, else
+2/4/8 s backoff). While no data has loaded, a failed refresh sets `update_interval` to
+`RETRY_INTERVAL` (10 min) instead of waiting the full 6 h; the next success restores it.
+
+## How the Lightning Coordinator Works
+
+`lightning_coordinator.py` GETs `https://api-open.data.gov.sg/v2/real-time/api/weather?api=lightning`
+every **2 minutes** (dataset `d_08238953fe0f6dd13f10714ebfbcb9f9`, MSS Lightning Detection
+System). Payload: `data.records[]` with `datetime` and `item.readings[]`, each with
+`location.latitude` / `location.longitude` (strings), `type` (`G` = cloud-to-ground,
+`C` = cloud-to-cloud, mapped via `STRIKE_TYPES`), `text`, and `datetime` (variable fractional
+seconds, e.g. `.96+08:00`). No lightning means empty `readings`; a missing `records` list
+raises `UpdateFailed`. Coverage extends beyond Singapore (strikes near Batam are common).
+
+Each response only holds the latest observation, so the coordinator keeps a set of
+`LightningStrike`s (frozen dataclass, so duplicates across polls collapse) and drops any older
+than `STRIKE_WINDOW` (30 min), also on failed polls. `sensor.nea_lightning_strikes` = count in
+window; `sensor.nea_nearest_lightning` = haversine km from `hass.config` home to the nearest
+strike (`None` when there are none) plus `strikes_within_10_km`. Both sit on the shared *NEA*
+device with the dengue sensors (`_nea_device_info` in `sensor.py`).
 
 ### Camera platform test dependency
 
@@ -396,7 +424,7 @@ HA's `camera` component imports `turbojpeg`, which a real HA install provides bu
 
 | Entity ID | Name | Description |
 |-----------|------|-------------|
-| `calendar.singapore_public_holidays` | Singapore Public Holidays | Singapore public holiday all-day events (year >= current year) |
+| `calendar.public_holidays` | Public Holidays | Singapore public holiday all-day events (year >= current year) |
 
 Holiday data source: `https://www.mom.gov.sg/employment-practices/public-holidays`
 
@@ -453,8 +481,9 @@ Both commands must exit cleanly — CI will fail otherwise.
 - Entities use `_attr_has_entity_name = True` with `_attr_translation_key`
   (+ `_attr_translation_placeholders` where dynamic) and `DeviceInfo` (not a raw dict) with
   `entry_type=DeviceEntryType.SERVICE`. Entity strings live under `entity.sensor.<key>` in
-  `strings.json`/`translations/en.json`. Unique IDs are unaffected by naming, so entity IDs
-  stay stable across the naming migration — only the displayed friendly name changes.
+  `strings.json`/`translations/en.json`. Unique IDs are unaffected by naming, so existing
+  installs keep their entity IDs across the naming migration; new installs get
+  device-prefixed IDs (see "Sensors" above).
 - Coordinator `_async_update_data()` exception handling: only catch `(aiohttp.ClientError,
   TimeoutError)` and an explicit `UpdateFailed` raised for a bad HTTP status — those fall back
   to last-known data with a warning (transient network resilience). Do **not** catch bare

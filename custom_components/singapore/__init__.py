@@ -17,6 +17,7 @@ from .coordinator import SPGroupCoordinator
 from .dengue_coordinator import DengueClusterCoordinator
 from .flood_coordinator import FloodAlertCoordinator
 from .holiday_coordinator import PublicHolidayCoordinator
+from .lightning_coordinator import LightningCoordinator
 from .psi_coordinator import PsiCoordinator
 from .traffic_coordinator import TrafficImagesCoordinator
 from .train_coordinator import TrainStatusCoordinator
@@ -46,6 +47,7 @@ class SingaporeData:
     flood: FloodAlertCoordinator
     traffic: TrafficImagesCoordinator
     dengue: DengueClusterCoordinator
+    lightning: LightningCoordinator
 
 
 type SingaporeConfigEntry = ConfigEntry[SingaporeData]
@@ -62,6 +64,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
     flood_coordinator = FloodAlertCoordinator(hass, entry)
     traffic_coordinator = TrafficImagesCoordinator(hass, entry)
     dengue_coordinator = DengueClusterCoordinator(hass, entry)
+    lightning_coordinator = LightningCoordinator(hass, entry)
 
     # Fetch independent data sources concurrently to speed up setup.
     # return_exceptions=True lets every coordinator finish its first refresh
@@ -109,12 +112,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
                 "Initial %s refresh failed; continuing setup and retrying later", label
             )
 
-    # Flood alerts, traffic cameras and dengue clusters are supplementary; don't
-    # block setup on data.gov.sg availability/rate limits.
+    # Flood alerts, traffic cameras, dengue clusters and lightning are supplementary;
+    # don't block setup on data.gov.sg availability/rate limits.
     for coordinator, label in (
         (flood_coordinator, "flood alert"),
         (traffic_coordinator, "traffic camera"),
         (dengue_coordinator, "dengue cluster"),
+        (lightning_coordinator, "lightning"),
     ):
         entry.async_create_background_task(
             hass,
@@ -144,6 +148,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
         flood=flood_coordinator,
         traffic=traffic_coordinator,
         dengue=dengue_coordinator,
+        lightning=lightning_coordinator,
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

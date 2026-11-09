@@ -103,6 +103,12 @@
       },
       "nearest_dengue_cluster": {
         "name": "Nearest Dengue Cluster"
+      },
+      "lightning_strikes": {
+        "name": "Lightning Strikes"
+      },
+      "nearest_lightning": {
+        "name": "Nearest Lightning"
       }
     },
     "camera": {

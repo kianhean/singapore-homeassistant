@@ -112,6 +112,17 @@ async def test_setup_creates_entities_and_unloads(
     assert nearest.attributes["locality"] == "Lentor Gdns"
     assert nearest.attributes["unit_of_measurement"] == "km"
 
+    strikes = hass.states.get("sensor.nea_lightning_strikes")
+    assert strikes is not None
+    assert strikes.state == "2"
+    assert strikes.attributes["cloud_to_ground"] == 1
+
+    lightning = hass.states.get("sensor.nea_nearest_lightning")
+    assert lightning is not None
+    assert 1.0 < float(lightning.state) < 1.2
+    assert lightning.attributes["type"] == "cloud_to_ground"
+    assert lightning.attributes["strikes_within_10_km"] == 1
+
     # Every entity must use a stable, entry-scoped unique ID.
     registry = er.async_get(hass)
     entities = er.async_entries_for_config_entry(registry, entry.entry_id)
