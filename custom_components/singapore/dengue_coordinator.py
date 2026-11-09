@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
 from dataclasses import dataclass, field
@@ -25,6 +26,15 @@ DATASET_PAGE_URL = f"https://data.gov.sg/datasets/{DENGUE_DATASET_ID}/view"
 
 # NEA updates the cluster file about once a day.
 UPDATE_INTERVAL = timedelta(hours=6)
+# After a failed refresh with no data yet, retry sooner than the 6 h interval so
+# a transient data.gov.sg 429 at startup doesn't leave sensors unavailable for hours.
+RETRY_INTERVAL = timedelta(minutes=10)
+
+# data.gov.sg rate-limits bursts (HA startup fires several integrations' requests
+# at once), so retry HTTP 429 with Retry-After / exponential backoff.
+_MAX_RETRIES = 3
+_RETRY_BACKOFF_BASE = 2  # seconds; doubles per attempt
+_MAX_RETRY_WAIT = 60.0  # seconds; cap on a server-supplied Retry-After
 
 _EARTH_RADIUS_KM = 6371.0088
 
@@ -212,6 +222,17 @@ def _parse_dengue_geojson(payload: dict) -> DengueData:
     return DengueData(clusters=clusters)
 
 
+def _retry_after_seconds(header: str | None, attempt: int) -> float:
+    """Seconds to wait before retrying: Retry-After if numeric, else backoff."""
+    try:
+        wait = float(header) if header is not None else None
+    except (TypeError, ValueError):
+        wait = None
+    if wait is None or wait < 0:
+        wait = float(_RETRY_BACKOFF_BASE ** (attempt + 1))
+    return min(wait, _MAX_RETRY_WAIT)
+
+
 class DengueClusterCoordinator(DataUpdateCoordinator[DengueData]):
     """Downloads the NEA dengue clusters GeoJSON from data.gov.sg."""
 
@@ -229,12 +250,27 @@ class DengueClusterCoordinator(DataUpdateCoordinator[DengueData]):
         )
 
     async def _get_json(self, session: aiohttp.ClientSession, url: str) -> dict:
-        async with session.get(
-            url, timeout=aiohttp.ClientTimeout(total=30)
-        ) as response:
-            if response.status != 200:
-                raise UpdateFailed(f"{url} returned HTTP {response.status}")
-            return await response.json(content_type=None)
+        """GET url as JSON, retrying HTTP 429 up to _MAX_RETRIES times."""
+        for attempt in range(_MAX_RETRIES + 1):
+            async with session.get(
+                url, timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
+                if response.status == 200:
+                    return await response.json(content_type=None)
+                if response.status != 429 or attempt == _MAX_RETRIES:
+                    raise UpdateFailed(f"{url} returned HTTP {response.status}")
+                wait = _retry_after_seconds(
+                    response.headers.get("Retry-After"), attempt
+                )
+            _LOGGER.debug(
+                "HTTP 429 from %s; retrying in %.1fs (%d/%d)",
+                url,
+                wait,
+                attempt + 1,
+                _MAX_RETRIES,
+            )
+            await asyncio.sleep(wait)
+        raise UpdateFailed(f"{url} returned HTTP 429")  # pragma: no cover
 
     async def _download_url(self, session: aiohttp.ClientSession) -> str:
         """Get a signed S3 URL for the dataset file (initiating a download if needed)."""
@@ -249,6 +285,17 @@ class DengueClusterCoordinator(DataUpdateCoordinator[DengueData]):
         raise UpdateFailed("data.gov.sg did not return a dengue clusters download URL")
 
     async def _async_update_data(self) -> DengueData:
+        try:
+            data = await self._fetch()
+        except UpdateFailed:
+            if self.data is None:
+                # Nothing to show yet: retry soon instead of waiting 6 hours.
+                self.update_interval = RETRY_INTERVAL
+            raise
+        self.update_interval = UPDATE_INTERVAL
+        return data
+
+    async def _fetch(self) -> DengueData:
         session = async_get_clientsession(self.hass)
         try:
             file_url = await self._download_url(session)
