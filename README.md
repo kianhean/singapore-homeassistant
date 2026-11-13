@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS Custom"></a>
+  <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-Default-41BDF5.svg" alt="HACS Default"></a>
   <a href="https://github.com/kianhean/singapore-homeassistant/releases"><img src="https://img.shields.io/github/v/release/kianhean/singapore-homeassistant" alt="Latest release"></a>
   <a href="https://github.com/kianhean/singapore-homeassistant/actions/workflows/tests.yml"><img src="https://github.com/kianhean/singapore-homeassistant/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <img src="https://img.shields.io/badge/Home%20Assistant-2025.4%2B-41BDF5?logo=home-assistant&logoColor=white" alt="Home Assistant 2025.4 or newer">
@@ -35,14 +35,12 @@
 
 ## Installation
 
-The quickest way is the **Open in HACS** button above. To do it by hand:
+The integration is in the default HACS store. Use the **Open in HACS** button above, or:
 
 1. Open **HACS** in Home Assistant.
-2. Open the three-dot menu (top-right) → **Custom repositories**.
-3. Repository: `https://github.com/kianhean/singapore-homeassistant`, category: **Integration** → **Add**.
-4. Search for **Singapore** in HACS, install it, and restart Home Assistant.
+2. Search for **Singapore** and install it.
+3. Restart Home Assistant.
 
-The integration isn't in the default HACS store yet, so it has to be added as a custom repository first.
 Requires **Home Assistant 2025.4** or newer.
 
 ## Setup
