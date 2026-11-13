@@ -1,0 +1,20 @@
+<!doctype html>
+<!-- Real LTA stills from the data.gov.sg traffic-images feed (cameras/*.jpg), shown in
+     picture-entity cards. Refresh them with fetch_cameras.py. -->
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="ha.css">
+<style>
+  body { padding: 20px; }
+  .g { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .cam { position: relative; aspect-ratio: 16/9; }
+  .cam img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cam .bar { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 14px; background: rgba(0,0,0,.55); font-size: 14px; font-weight: 500; }
+</style></head>
+<body>
+<div class="heading" style="margin-bottom:8px"><i m="mdiCctv"></i>Checkpoints</div>
+<div class="g">
+  <div class="card cam"><img src="cameras/2701.jpg" alt=""><div class="bar">Woodlands Causeway</div></div>
+  <div class="card cam"><img src="cameras/2702.jpg" alt=""><div class="bar">Woodlands Checkpoint</div></div>
+  <div class="card cam"><img src="cameras/4703.jpg" alt=""><div class="bar">Tuas Second Link</div></div>
+  <div class="card cam"><img src="cameras/4713.jpg" alt=""><div class="bar">Tuas Checkpoint</div></div>
+</div>
+</body></html>

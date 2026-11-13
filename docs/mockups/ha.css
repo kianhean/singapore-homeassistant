@@ -1,0 +1,79 @@
+/* Home Assistant dark-theme look-alike used by the README mock-ups. */
+:root {
+  --bg: #111111;
+  --card: #1c1c1c;
+  --border: rgba(225, 225, 225, 0.12);
+  --text: #e1e1e1;
+  --muted: #9b9b9b;
+  --primary: #03a9f4;
+  --green: #4caf50;
+  --amber: #ffb300;
+  --orange: #ff9800;
+  --red: #f44336;
+  --blue: #2196f3;
+  --purple: #9c27b0;
+  --teal: #009688;
+  --yellow: #ffc107;
+  --sg-red: #d71f35;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: var(--bg); }
+body {
+  font-family: "Inter", "Roboto", system-ui, sans-serif;
+  color: var(--text);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+svg.mdi { width: 24px; height: 24px; fill: currentColor; flex: none; }
+
+/* App chrome */
+.app { display: flex; min-height: 100vh; }
+.sidebar {
+  width: 56px; background: #1c1c1c; border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; align-items: center; gap: 22px; padding-top: 18px;
+  color: var(--muted);
+}
+.sidebar .active { color: var(--primary); }
+.main { flex: 1; min-width: 0; }
+.topbar {
+  height: 56px; display: flex; align-items: center; gap: 28px; padding: 0 24px;
+  border-bottom: 1px solid var(--border); background: #1c1c1c;
+}
+.topbar .title { font-size: 20px; font-weight: 500; }
+.tabs { display: flex; gap: 26px; height: 100%; }
+.tabs span { display: flex; align-items: center; color: var(--muted); font-weight: 500; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; }
+.tabs .on { color: var(--primary); box-shadow: inset 0 -2px 0 var(--primary); }
+.topbar .spacer { flex: 1; }
+
+/* Sections view */
+.view { display: grid; gap: 24px; padding: 24px; align-items: start; }
+.section { display: flex; flex-direction: column; gap: 8px; }
+.heading { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 500; padding: 6px 4px 2px; }
+.heading svg.mdi { width: 20px; height: 20px; color: var(--muted); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.card-pad { padding: 16px; }
+.card-title { font-size: 16px; font-weight: 500; padding: 14px 16px 4px; }
+
+/* Tile card */
+.tile { display: flex; align-items: center; gap: 10px; padding: 10px; min-height: 56px; }
+.bubble {
+  --c: var(--primary);
+  width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  color: var(--c); background: color-mix(in srgb, var(--c) 20%, transparent);
+}
+.bubble svg.mdi { width: 20px; height: 20px; }
+.tile .name { font-size: 14px; font-weight: 500; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .state { font-size: 12px; color: var(--muted); line-height: 16px; white-space: nowrap; }
+.tile > div:last-child { min-width: 0; }
+
+/* Entities card rows */
+.row { display: flex; align-items: center; gap: 16px; padding: 0 16px; height: 40px; }
+.row .ic { color: #44739e; }
+.row .label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .val { color: var(--text); white-space: nowrap; }
+.card .rows { padding: 4px 0 8px; }
+
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }

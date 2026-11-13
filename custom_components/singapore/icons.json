@@ -78,7 +78,7 @@
         "default": "mdi:home-flood"
       },
       "dengue_clusters": {
-        "default": "mdi:mosquito"
+        "default": "mdi:bug"
       },
       "nearest_dengue_cluster": {
         "default": "mdi:map-marker-distance"

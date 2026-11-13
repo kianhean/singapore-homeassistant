@@ -1,54 +1,206 @@
+<h1 align="center">Singapore for Home Assistant</h1>
+
 <p align="center">
-  <img src="custom_components/singapore/images/icon.png" alt="Singapore Home Assistant custom integration" width="300">
+  Weather, PSI, MRT status, COE prices, utility tariffs, flash floods, dengue and lightning,<br>
+  straight from official Singapore government sources. No API keys, no accounts.
 </p>
 
-# Singapore Home Assistant custom integration
+<p align="center">
+  <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS Custom"></a>
+  <a href="https://github.com/kianhean/singapore-homeassistant/releases"><img src="https://img.shields.io/github/v/release/kianhean/singapore-homeassistant" alt="Latest release"></a>
+  <a href="https://github.com/kianhean/singapore-homeassistant/actions/workflows/tests.yml"><img src="https://github.com/kianhean/singapore-homeassistant/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
+  <img src="https://img.shields.io/badge/Home%20Assistant-2025.4%2B-41BDF5?logo=home-assistant&logoColor=white" alt="Home Assistant 2025.4 or newer">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/kianhean/singapore-homeassistant" alt="MIT License"></a>
+</p>
 
-A [HACS](https://hacs.xyz) custom integration for Singapore-specific data:
+<p align="center">
+  <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=kianhean&repository=singapore-homeassistant&category=integration"><img src="https://my.home-assistant.io/badges/hacs_repository.svg" alt="Open your Home Assistant instance and open this repository in HACS"></a>
+  <a href="https://my.home-assistant.io/redirect/config_flow_start/?domain=singapore"><img src="https://my.home-assistant.io/badges/config_flow_start.svg" alt="Open your Home Assistant instance and start setting up the Singapore integration"></a>
+</p>
 
-- **Utilities:** SP Group electricity, gas, water and solar export tariffs
-- **Transport:** COE bidding results, MRT/LRT train status, Woodlands and Tuas checkpoint traffic cameras
-- **Weather:** NEA weather by forecast area with a 4-day daily forecast, plus live temperature, humidity, wind and rainfall
-- **Environment:** air quality (PSI and pollutants, with per-region map markers), PUB flash-flood alerts, NEA dengue clusters and live lightning strikes, each with distance from your home
-- **Calendar:** Singapore public holidays
+<p align="center">
+  <img src="images/hero.jpg" alt="Example Singapore dashboard: Bedok weather with a 4-day forecast, PSI gauge and PSI by region, MRT/LRT line status, live Woodlands Causeway and Tuas Checkpoint camera stills, nearest lightning and dengue cluster distances, flood alerts, utility tariffs and COE prices" width="100%">
+  <br>
+  <sub>An example dashboard built only from Home Assistant's built-in cards. The integration provides the entities; <a href="examples/dashboard.yaml">this YAML</a> builds the dashboard. Camera stills are real LTA images.</sub>
+</p>
 
-Requires **Home Assistant 2025.4** or newer.
+## What's inside
+
+| | | |
+|---|---|---|
+| 🌦️ **Weather**<br>A weather entity for every NEA forecast area, 4-day forecast, live temperature, humidity, wind and rain | 😷 **Air quality**<br>PSI and six pollutants, overall and per region, ready for a Map card | 🚇 **MRT/LRT**<br>Network and per-line status (normal, planned works, disruption) with LTA's message |
+| ⚡ **Lightning**<br>Live strikes and the distance to the nearest one from your home | 🦟 **Dengue**<br>Active NEA clusters and how far the nearest is from your home | 🌊 **Flash floods**<br>PUB flood alerts as they're issued and cancelled |
+| 🚗 **COE**<br>Category A–E premiums, refreshed after each bidding exercise | 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🛂 **Checkpoints**<br>Woodlands and Tuas traffic camera stills as camera entities |
+| 🎉 **Public holidays**<br>MOM's holiday list as a calendar | 🔑 **No setup pain**<br>All public data, no API keys, one config entry | 🛠️ **Easy to debug**<br>Built-in diagnostics download and background loading |
 
 ## Installation
 
-This integration is **not merged into the default HACS store yet**, so install it as a
-custom repository first:
+The quickest way is the **Open in HACS** button above. To do it by hand:
 
 1. Open **HACS** in Home Assistant.
-2. Go to **Integrations**.
-3. Open the three-dot menu (top-right) → **Custom repositories**.
-4. Repository: `https://github.com/kianhean/singapore-homeassistant`
-5. Category: **Integration**
-6. Click **Add**.
-7. Search for **Singapore** in HACS and install it.
-8. Restart Home Assistant.
+2. Open the three-dot menu (top-right) → **Custom repositories**.
+3. Repository: `https://github.com/kianhean/singapore-homeassistant`, category: **Integration** → **Add**.
+4. Search for **Singapore** in HACS, install it, and restart Home Assistant.
+
+The integration isn't in the default HACS store yet, so it has to be added as a custom repository first.
+Requires **Home Assistant 2025.4** or newer.
 
 ## Setup
 
-1. Go to **Settings → Devices & Services → Add Integration**.
+1. Go to **Settings → Devices & Services → Add Integration** (or use the **Add integration** button above).
 2. Search for **Singapore**.
 3. Enter a name and click **Submit**.
 
 Only one Singapore entry can be added. Entities are grouped into devices (Energy, COE,
 Weather, MRT/LRT, Air Quality, PUB, NEA, Traffic Cameras, Public Holidays).
 
+The lightning and dengue distances are measured from the home location in
+**Settings → System → General**, so make sure it's set.
+
 > **Entity IDs on older installs:** since v0.3.0, entity names come from their device
 > (for example *Energy Electricity Tariff*). New installs get IDs like
 > `sensor.energy_electricity_tariff`. Installs that started before v0.3.0 keep their
 > original IDs (for example `sensor.singapore_electricity_tariff`), so existing dashboards
-> and automations keep working. The tables below show the IDs a new install gets.
+> and automations keep working. This README uses the IDs a new install gets.
 
-## What you get
+## Recipes
+
+<p align="center">
+  <img src="images/alerts.png" alt="Phone lock screen with Home Assistant notifications for nearby lightning, a PUB flood alert, a Circle Line disruption and new COE results, next to the NEA, PUB and MRT/LRT sensors that triggered them" width="100%">
+  <br>
+  <sub>Notifications like these come from the automations below. Change <code>notify.notify</code> to your phone's notify action (for example <code>notify.mobile_app_your_phone</code>).</sub>
+</p>
+
+<details open>
+<summary><b>⚡ Warn me when lightning is close</b></summary>
+
+```yaml
+alias: Lightning nearby
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.nea_nearest_lightning
+    below: 5
+actions:
+  - action: notify.notify
+    data:
+      title: Lightning nearby
+      message: >-
+        Lightning {{ states('sensor.nea_nearest_lightning') | float | round(1) }} km away
+        ({{ state_attr('sensor.nea_nearest_lightning', 'type') | replace('_', ' ') }})
+```
+
+Cloud-to-ground strikes are the dangerous kind. NEA notes that most strikes fall within
+5–6 km of a thunderstorm, so 5 km is a sensible threshold for getting out of the pool.
+</details>
+
+<details>
+<summary><b>🚇 Tell me if my MRT line is disrupted before work</b></summary>
+
+```yaml
+alias: Circle Line disruption
+triggers:
+  - trigger: state
+    entity_id: sensor.mrt_lrt_circle_line_status
+    to: disruption
+conditions:
+  - condition: time
+    after: "06:30:00"
+    before: "09:30:00"
+    weekday: [mon, tue, wed, thu, fri]
+actions:
+  - action: notify.notify
+    data:
+      title: "Circle Line: Disruption"
+      message: "{{ state_attr('sensor.mrt_lrt_status', 'details') }}"
+```
+</details>
+
+<details>
+<summary><b>🌊 Flash-flood alert</b></summary>
+
+```yaml
+alias: PUB flood alert
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.pub_flood_alerts
+    above: 0
+actions:
+  - action: notify.notify
+    data:
+      title: PUB flood alert
+      message: "{{ state_attr('sensor.pub_flood_alerts', 'locations') | join(', ') }}"
+```
+</details>
+
+<details>
+<summary><b>😷 Turn on the air purifier when the haze is bad</b></summary>
+
+```yaml
+alias: Haze mode
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.air_quality_psi
+    above: 100
+actions:
+  - action: fan.turn_on
+    target:
+      entity_id: fan.living_room_purifier
+  - action: notify.notify
+    data:
+      message: >-
+        PSI is {{ states('sensor.air_quality_psi') }}
+        ({{ state_attr('sensor.air_quality_psi', 'band') | replace('_', ' ') }}). Purifier on.
+```
+</details>
+
+<details>
+<summary><b>🚗 Send me the COE results</b></summary>
+
+```yaml
+alias: COE results
+triggers:
+  - trigger: state
+    entity_id: sensor.coe_category_a
+    not_from: [unavailable, unknown]
+    not_to: [unavailable, unknown]
+actions:
+  - action: notify.notify
+    data:
+      title: COE results
+      message: >-
+        Cat A {{ '{:,}'.format(states('sensor.coe_category_a') | int) }} SGD ·
+        Cat B {{ '{:,}'.format(states('sensor.coe_category_b') | int) }} SGD ·
+        Cat E {{ '{:,}'.format(states('sensor.coe_category_e') | int) }} SGD
+```
+</details>
+
+## Dashboard ideas
+
+**Copy the whole dashboard:** [`examples/dashboard.yaml`](examples/dashboard.yaml) builds the dashboard
+at the top of this page. Paste it into a new dashboard's raw configuration editor.
+
+**PSI by region:** the hero dashboard lists the 24-hour PSI for each region. Each regional sensor
+also carries `latitude`/`longitude`, so you can put them on a Map card instead ([YAML below](#psi-on-the-map)).
+
+**Checkpoint cameras:** a picture-entity card per camera gives you a quick look at the Causeway and Second Link queues.
+
+<p align="center">
+  <img src="images/checkpoint-cameras.jpg" alt="Four picture-entity cards showing live LTA stills of Woodlands Causeway, Woodlands Checkpoint, Tuas Second Link and Tuas Checkpoint, with heavy traffic towards Johor" width="640">
+  <br>
+  <sub>Real LTA stills from data.gov.sg, Friday 13 November 2026, 16:50.</sub>
+</p>
+
+## Entity reference
+
+Everything the integration creates, by data source. Expand a section for its entities and attributes.
 
 ### SP Group utility tariffs
 
 Scraped from the [SP Group tariff page](https://www.spgroup.com.sg/our-services/utilities/tariff-information)
 every 24 hours.
+
+<details>
+<summary>Entities and attributes</summary>
 
 | Entity ID | Name | Unit | Description |
 |-----------|------|------|-------------|
@@ -64,10 +216,15 @@ The solar export price sensor also includes `network_cost` and `total_tariff`.
   <img src="images/energy-sensors.jpeg" alt="Singapore Energy device page showing electricity, gas, solar export, and water tariff sensors" width="320">
 </p>
 
+</details>
+
 ### COE bidding results
 
 Pulled from the [LTA dataset on data.gov.sg](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view)
 daily at **19:30**, after each bidding exercise.
+
+<details>
+<summary>Entities and attributes</summary>
 
 | Entity ID | Name | Unit | Category |
 |-----------|------|------|----------|
@@ -84,10 +241,15 @@ state attributes.
   <img src="images/coe-sensors.jpeg" alt="Singapore COE device page showing Category A to E certificate of entitlement sensors" width="320">
 </p>
 
+</details>
+
 ### NEA realtime weather readings
 
 Updated every **10 minutes** from [data.gov.sg collection 1459](https://data.gov.sg/collections/1459/view).
 Station readings are averaged across all available stations at fetch time.
+
+<details>
+<summary>Entities and attributes</summary>
 
 | Entity ID | Name | Unit | Description |
 |-----------|------|------|-------------|
@@ -101,10 +263,15 @@ Station readings are averaged across all available stations at fetch time.
   <img src="images/weather-overview.jpeg" alt="Singapore Weather entity list showing area forecasts alongside humidity, rainfall, temperature, wind bearing, and wind speed sensors" width="320">
 </p>
 
+</details>
+
 ### Weather entities (by forecast area)
 
 One weather entity per NEA forecast area from [data.gov.sg collection 1456](https://data.gov.sg/collections/1456/view),
 updated every **10 minutes**.
+
+<details>
+<summary>Entities and attributes</summary>
 
 Example entities: `weather.weather_bedok`, `weather.weather_ang_mo_kio`,
 `weather.weather_woodlands`.
@@ -122,10 +289,15 @@ Attributes: `forecast_area`, `raw_condition` (NEA's original text), `valid_start
   <img src="images/weather-forecast-bedok.jpeg" alt="Singapore Weather Bedok forecast card showing current condition and multi-day forecast" width="320">
 </p>
 
+</details>
+
 ### MRT/LRT train status
 
 Updated every **5 minutes** from [mytransport.sg](https://www.mytransport.sg/trainstatus).
 Tracks both an overall network status and a per-line status for each MRT/LRT line.
+
+<details>
+<summary>Entities and attributes</summary>
 
 | Entity ID | Name | Description |
 |-----------|------|-------------|
@@ -139,10 +311,15 @@ Bukit Panjang LRT, Sengkang LRT, Punggol LRT.
   <img src="images/train-status.jpeg" alt="Singapore MRT/LRT device page showing overall and per-line train status sensors" width="320">
 </p>
 
+</details>
+
 ### Air quality (PSI)
 
 Updated every **15 minutes** from [data.gov.sg / NEA](https://data.gov.sg/datasets/d_fe37906a0182569d891506e815e819b7/view).
 Grouped under an **Air Quality** device.
+
+<details>
+<summary>Entities and attributes</summary>
 
 | Entity ID | Name | Unit | Description |
 |-----------|------|------|-------------|
@@ -156,6 +333,8 @@ Grouped under an **Air Quality** device.
 | `sensor.air_quality_carbon_monoxide` | Air Quality Carbon Monoxide | mg/m³ | 8-hour max CO (highest region) |
 
 The Singapore-wide pollutant sensors also expose a `regions` attribute with each region's value.
+
+</details>
 
 #### PSI on the map
 
@@ -185,6 +364,9 @@ entities:
 
 Updated every **2 minutes** from [PUB via data.gov.sg](https://data.gov.sg/datasets/d_f1404e08587ce555b9ea3f565e2eb9a3/view).
 
+<details>
+<summary>Entities and attributes</summary>
+
 | Entity ID | Name | Description |
 |-----------|------|-------------|
 | `sensor.pub_flood_alerts` | PUB Flood Alerts | Number of active flash-flood alerts (`0` when none) |
@@ -193,24 +375,17 @@ Attributes: `locations` (list of alert descriptions) and `alerts` (full details 
 description, area, severity, instruction, issued time, latitude/longitude). An alert stays
 active until PUB issues its matching Cancel, or for 3 hours at most.
 
-Example automation that sends a notification when a new alert appears:
+See [Recipes](#recipes) for a notification automation.
 
-```yaml
-triggers:
-  - trigger: numeric_state
-    entity_id: sensor.pub_flood_alerts
-    above: 0
-actions:
-  - action: notify.notify
-    data:
-      title: PUB flood alert
-      message: "{{ state_attr('sensor.pub_flood_alerts', 'locations') | join(', ') }}"
-```
+</details>
 
 ### Checkpoint traffic cameras
 
 Updated every **2 minutes** from [LTA via data.gov.sg](https://data.gov.sg/datasets/d_6cdb6b405b25aaaacbaf7689bcc6fae0/view).
 Only the Woodlands and Tuas checkpoint cameras are exposed, as `camera` entities showing the latest still.
+
+<details>
+<summary>Entities and attributes</summary>
 
 | Entity ID | LTA camera | View |
 |-----------|-----------|------|
@@ -221,9 +396,14 @@ Only the Woodlands and Tuas checkpoint cameras are exposed, as `camera` entities
 
 A camera shows as unavailable while LTA leaves it out of the feed.
 
+</details>
+
 ### Dengue clusters
 
 Updated every **6 hours** from [NEA via data.gov.sg](https://data.gov.sg/datasets/d_dbfabf16158d1b0e1c420627c0819168/view).
+
+<details>
+<summary>Entities and attributes</summary>
 
 | Entity ID | Name | Unit | Description |
 |-----------|------|------|-------------|
@@ -232,11 +412,16 @@ Updated every **6 hours** from [NEA via data.gov.sg](https://data.gov.sg/dataset
 
 The nearest-cluster distance uses the home location in **Settings → System → General**.
 
+</details>
+
 ### Lightning
 
 Updated every **2 minutes** from [NEA's Lightning Detection System via data.gov.sg](https://data.gov.sg/datasets/d_08238953fe0f6dd13f10714ebfbcb9f9/view).
 Strikes are kept for a rolling **30-minute** window. The feed also covers the region
 around Singapore (for example Johor and the Riau Islands).
+
+<details>
+<summary>Entities and attributes</summary>
 
 | Entity ID | Name | Unit | Description |
 |-----------|------|------|-------------|
@@ -247,24 +432,17 @@ Cloud-to-ground strikes are the dangerous kind; cloud-to-cloud lightning often c
 before them. NEA notes that most strikes fall within 5–6 km of a thunderstorm, and a storm
 more than 10 km away can still reach you.
 
-Example automation that warns you when lightning comes within 5 km:
+See [Recipes](#recipes) for a lightning warning automation.
 
-```yaml
-triggers:
-  - trigger: numeric_state
-    entity_id: sensor.nea_nearest_lightning
-    below: 5
-actions:
-  - action: notify.notify
-    data:
-      title: Lightning nearby
-      message: "Lightning {{ states('sensor.nea_nearest_lightning') }} km away"
-```
+</details>
 
 ### Public holidays
 
 Updated every 24 hours from [MOM](https://www.mom.gov.sg/employment-practices/public-holidays).
 Shows up as a Home Assistant calendar with all-day events from the current year onward.
+
+<details>
+<summary>Entities and attributes</summary>
 
 | Entity ID | Name |
 |-----------|------|
@@ -274,7 +452,12 @@ Shows up as a Home Assistant calendar with all-day events from the current year 
   <img src="images/public-holidays-calendar.jpeg" alt="Singapore public holidays calendar showing Good Friday and Saturday as all-day events" width="320">
 </p>
 
+</details>
+
 ## Example sensor states
+
+<details>
+<summary>Show example states</summary>
 
 ```yaml
 sensor.energy_electricity_tariff:
@@ -330,6 +513,8 @@ sensor.air_quality_psi_east:
     source: data.gov.sg / NEA
 ```
 
+</details>
+
 ## Troubleshooting
 
 - **Diagnostics:** on the Singapore integration page, open the three-dot menu and choose
@@ -370,6 +555,22 @@ pytest tests/ -v -m "not e2e"
 `tests_ha/` runs the integration inside a real Home Assistant; `pytest tests/test_e2e.py -m e2e`
 hits the live data sources. See CLAUDE.md for both.
 
+The README images are rendered from HTML in [`docs/mockups/`](docs/mockups): run
+`uv run docs/mockups/fetch_cameras.py` for fresh camera stills, then
+`cd docs/mockups && npm install && node build.mjs`. Keep `hero.html` in sync with
+[`examples/dashboard.yaml`](examples/dashboard.yaml).
+
+## Contributing
+
+Bug reports, data source ideas and pull requests are welcome. When something looks wrong, attach
+the **Download diagnostics** file to your [issue](https://github.com/kianhean/singapore-homeassistant/issues).
+If the integration is useful to you, a ⭐ on GitHub helps other Singapore Home Assistant users find it.
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
+
+Data and the checkpoint camera stills in the README come from data.gov.sg, LTA, NEA, PUB, MOM and
+SP Group, and remain theirs (data.gov.sg data is under the
+[Singapore Open Data Licence](https://data.gov.sg/open-data-licence)). This project isn't affiliated
+with any of them.

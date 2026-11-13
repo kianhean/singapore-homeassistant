@@ -1,0 +1,52 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="ha.css">
+<style>
+  body { padding: 28px; }
+  .wrap { display: grid; grid-template-columns: 420px 1fr; gap: 28px; align-items: start; }
+  .phone { border-radius: 36px; padding: 22px 16px 26px; background: linear-gradient(160deg, #22344d, #3b2440 60%, #4a2a2a); border: 1px solid var(--border); }
+  .clock { text-align: center; font-size: 64px; font-weight: 300; color: #f2f2f2; margin-top: 6px; }
+  .date { text-align: center; color: #d4d4d4; margin-bottom: 22px; font-size: 15px; }
+  .note { background: rgba(32, 32, 36, .82); border-radius: 18px; padding: 12px 14px; margin-top: 10px; display: flex; gap: 12px; }
+  .note .app { display: block; width: 32px; height: 32px; border-radius: 8px; background: #18bcf2; display: grid; place-items: center; color: #fff; flex: none; min-height: 0; }
+  .note .app svg.mdi { width: 20px; height: 20px; }
+  .note .top { display: flex; justify-content: space-between; font-size: 12px; color: #a9a9a9; }
+  .note b { display: block; font-size: 15px; font-weight: 600; margin: 2px 0; }
+  .note p { font-size: 14px; color: #d8d8d8; line-height: 1.35; }
+  .side { display: flex; flex-direction: column; gap: 8px; }
+  .heading .sub { color: var(--muted); font-size: 13px; font-weight: 400; margin-left: auto; }
+  .row .val.amber { color: var(--amber); }
+</style></head>
+<body><div class="wrap">
+  <div class="phone">
+    <div class="clock">18:42</div>
+    <div class="date">Friday, 13 November</div>
+    <div class="note"><span class="app"><i m="mdiHomeAssistant"></i></span><div style="flex:1">
+      <div class="top"><span>HOME ASSISTANT</span><span>now</span></div>
+      <b>Lightning nearby</b><p>Lightning 3.2 km away (cloud to ground)</p></div></div>
+    <div class="note"><span class="app"><i m="mdiHomeAssistant"></i></span><div style="flex:1">
+      <div class="top"><span>HOME ASSISTANT</span><span>12 min ago</span></div>
+      <b>PUB flood alert</b><p>Flash flood at Jalan Seaview. Please avoid the area for the next 1 hour.</p></div></div>
+    <div class="note"><span class="app"><i m="mdiHomeAssistant"></i></span><div style="flex:1">
+      <div class="top"><span>HOME ASSISTANT</span><span>07:31</span></div>
+      <b>Circle Line: Disruption</b><p>07:28-CCL-Due to a track fault, no train service between Paya Lebar and Dhoby Ghaut. Free bridging bus services are available.</p></div></div>
+    <div class="note"><span class="app"><i m="mdiHomeAssistant"></i></span><div style="flex:1">
+      <div class="top"><span>HOME ASSISTANT</span><span>Wed</span></div>
+      <b>COE results</b><p>Cat A 95,501 SGD · Cat B 113,890 SGD · Cat E 114,002 SGD</p></div></div>
+  </div>
+
+  <div class="side">
+    <div class="card"><div class="card-title">NEA</div><div class="rows">
+      <div class="row"><span class="ic" style="color:var(--amber)"><i m="mdiMapMarkerDistance"></i></span><span class="label">NEA Nearest Lightning</span><span class="val">3.2 km</span></div>
+      <div class="row"><span class="ic"><i m="mdiLightningBolt"></i></span><span class="label">NEA Lightning Strikes</span><span class="val">23</span></div>
+      <div class="row"><span class="ic"><i m="mdiMapMarkerDistance"></i></span><span class="label">NEA Nearest Dengue Cluster</span><span class="val">1.2 km</span></div>
+    </div></div>
+    <div class="card"><div class="card-title">PUB</div><div class="rows">
+      <div class="row"><span class="ic" style="color:var(--amber)"><i m="mdiHomeFlood"></i></span><span class="label">PUB Flood Alerts</span><span class="val">1</span></div>
+    </div></div>
+    <div class="card"><div class="card-title">MRT/LRT</div><div class="rows">
+      <div class="row"><span class="ic" style="color:var(--red)"><i m="mdiAlert"></i></span><span class="label">MRT/LRT Status</span><span class="val">Disruption</span></div>
+      <div class="row"><span class="ic" style="color:var(--red)"><i m="mdiAlert"></i></span><span class="label">MRT/LRT Circle Line Status</span><span class="val">Disruption</span></div>
+      <div class="row"><span class="ic"><i m="mdiTrain"></i></span><span class="label">MRT/LRT North-South Line Status</span><span class="val">Normal</span></div>
+    </div></div>
+  </div>
+</div></body></html>

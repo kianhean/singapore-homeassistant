@@ -1,0 +1,124 @@
+<!doctype html>
+<!-- Mirrors examples/dashboard.yaml: only built-in Home Assistant cards, with the states
+     they display. Keep the two in sync. -->
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="ha.css">
+<style>
+  .view { grid-template-columns: repeat(3, 1fr); }
+  .wx-top { display: flex; align-items: center; gap: 14px; padding: 16px 16px 8px; }
+  .wx-top .big svg.mdi { width: 56px; height: 56px; color: #ffc107; }
+  .wx-top .cond { font-size: 20px; font-weight: 500; white-space: nowrap; }
+  .wx-top .area { color: var(--muted); font-size: 14px; }
+  .wx-top .temp { margin-left: auto; text-align: right; white-space: nowrap; }
+  .wx-top .temp b { font-size: 34px; font-weight: 400; }
+  .wx-top .temp b sup { font-size: 16px; color: var(--muted); }
+  .wx-top .temp div { color: var(--muted); font-size: 13px; }
+  .fc { display: grid; grid-template-columns: repeat(4, 1fr); text-align: center; padding: 8px 8px 16px; }
+  .fc .d { color: var(--muted); font-size: 13px; }
+  .fc svg.mdi { width: 30px; height: 30px; margin: 6px 0; }
+  .fc .hi { font-weight: 500; }
+  .fc .lo { color: var(--muted); }
+  .sun { color: #ffc107; } .cloud { color: #b0bec5; } .rain { color: #64b5f6; }
+  .gauge { display: flex; flex-direction: column; align-items: center; padding: 14px 16px 10px; }
+  .gauge .v { margin-top: -54px; font-size: 30px; font-weight: 500; }
+  .gauge .n { color: var(--muted); margin-top: 2px; }
+  .cam { position: relative; aspect-ratio: 16/9; }
+  .cam img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cam .bar { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px; background: rgba(0,0,0,.55); font-size: 15px; font-weight: 500; }
+  .row .ic { color: #44739e; }
+  .row .ic.amber { color: var(--amber); }
+</style></head>
+<body><div class="app">
+  <nav class="sidebar">
+    <i m="mdiMenu"></i><span class="active"><i m="mdiViewDashboard"></i></span><i m="mdiChartBox"></i><i m="mdiFormatListBulletedType"></i><i m="mdiCalendar"></i><i m="mdiCog"></i>
+  </nav>
+  <div class="main">
+    <header class="topbar">
+      <span class="title">Singapore</span>
+      <span class="spacer"></span><i m="mdiMagnify"></i><i m="mdiPencil"></i>
+    </header>
+    <div class="view">
+
+      <div class="section">
+        <div class="heading"><i m="mdiWeatherPartlyCloudy"></i>Weather</div>
+        <div class="card">
+          <div class="wx-top">
+            <span class="big"><i m="mdiWeatherLightningRainy"></i></span>
+            <div><div class="cond">Lightning, rainy</div><div class="area">Bedok</div></div>
+            <div class="temp"><b>31.2<sup> °C</sup></b><div>Humidity 74 %</div></div>
+          </div>
+          <div class="fc">
+            <div><div class="d">Fri</div><span class="sun"><i m="mdiWeatherLightningRainy"></i></span><div class="hi">33°</div><div class="lo">25°</div></div>
+            <div><div class="d">Sat</div><span class="rain"><i m="mdiWeatherPouring"></i></span><div class="hi">32°</div><div class="lo">24°</div></div>
+            <div><div class="d">Sun</div><span class="sun"><i m="mdiWeatherPartlyCloudy"></i></span><div class="hi">33°</div><div class="lo">25°</div></div>
+            <div><div class="d">Mon</div><span class="cloud"><i m="mdiWeatherCloudy"></i></span><div class="hi">32°</div><div class="lo">25°</div></div>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="card tile"><span class="bubble" style="--c:var(--blue)"><i m="mdiWeatherRainy"></i></span><div><div class="name">Rainfall</div><div class="state">0.4 mm</div></div></div>
+          <div class="card tile"><span class="bubble" style="--c:var(--teal)"><i m="mdiWeatherWindy"></i></span><div><div class="name">Wind speed</div><div class="state">9.2 km/h</div></div></div>
+        </div>
+
+        <div class="heading"><i m="mdiAirFilter"></i>Air quality</div>
+        <div class="card gauge">
+          <svg viewBox="0 0 200 110" width="220">
+            <path d="M15 100 A85 85 0 0 1 185 100" fill="none" stroke="#2f2f2f" stroke-width="18"/>
+            <path d="M15 100 A85 85 0 0 1 23.1 63.8" fill="none" stroke="#4caf50" stroke-width="18"/>
+          </svg>
+          <div class="v">42</div><div class="n">PSI</div>
+        </div>
+        <div class="grid2">
+          <div class="card tile"><span class="bubble" style="--c:var(--green)"><i m="mdiBlur"></i></span><div><div class="name">PM2.5</div><div class="state">14 µg/m³</div></div></div>
+          <div class="card tile"><span class="bubble" style="--c:var(--green)"><i m="mdiBlur"></i></span><div><div class="name">PM10</div><div class="state">27 µg/m³</div></div></div>
+        </div>
+        <div class="card"><div class="card-title">PSI by region</div><div class="rows">
+          <div class="row"><span class="ic"><i m="mdiAirFilter"></i></span><span class="label">North</span><span class="val">35</span></div>
+          <div class="row"><span class="ic"><i m="mdiAirFilter"></i></span><span class="label">South</span><span class="val">40</span></div>
+          <div class="row"><span class="ic"><i m="mdiAirFilter"></i></span><span class="label">East</span><span class="val">42</span></div>
+          <div class="row"><span class="ic"><i m="mdiAirFilter"></i></span><span class="label">West</span><span class="val">38</span></div>
+          <div class="row"><span class="ic"><i m="mdiAirFilter"></i></span><span class="label">Central</span><span class="val">39</span></div>
+        </div></div>
+      </div>
+
+      <div class="section">
+        <div class="heading"><i m="mdiTrain"></i>Getting around</div>
+        <div class="card tile"><span class="bubble" style="--c:var(--amber)"><i m="mdiWrenchClock"></i></span><div><div class="name">MRT/LRT Status</div><div class="state">Planned works</div></div></div>
+        <div class="card"><div class="rows">
+          <div class="row"><span class="ic"><i m="mdiTrain"></i></span><span class="label">North-South Line</span><span class="val">Normal</span></div>
+          <div class="row"><span class="ic"><i m="mdiTrain"></i></span><span class="label">East-West Line</span><span class="val">Normal</span></div>
+          <div class="row"><span class="ic"><i m="mdiTrain"></i></span><span class="label">North East Line</span><span class="val">Normal</span></div>
+          <div class="row"><span class="ic amber"><i m="mdiWrenchClock"></i></span><span class="label">Circle Line</span><span class="val">Planned works</span></div>
+          <div class="row"><span class="ic"><i m="mdiTrain"></i></span><span class="label">Downtown Line</span><span class="val">Normal</span></div>
+          <div class="row"><span class="ic"><i m="mdiTrain"></i></span><span class="label">Thomson-East Coast Line</span><span class="val">Normal</span></div>
+        </div></div>
+        <div class="card cam"><img src="cameras/2701.jpg" alt=""><div class="bar">Woodlands Causeway</div></div>
+        <div class="card cam"><img src="cameras/4713.jpg" alt=""><div class="bar">Tuas Checkpoint</div></div>
+      </div>
+
+      <div class="section">
+        <div class="heading"><i m="mdiHomeOutline"></i>Near home</div>
+        <div class="card tile"><span class="bubble" style="--c:var(--amber)"><i m="mdiMapMarkerDistance"></i></span><div><div class="name">Nearest lightning</div><div class="state">7.4 km</div></div></div>
+        <div class="card tile"><span class="bubble" style="--c:var(--orange)"><i m="mdiMapMarkerDistance"></i></span><div><div class="name">Nearest dengue cluster</div><div class="state">1.2 km</div></div></div>
+        <div class="card tile"><span class="bubble" style="--c:var(--blue)"><i m="mdiHomeFlood"></i></span><div><div class="name">PUB flood alerts</div><div class="state">0</div></div></div>
+
+        <div class="heading"><i m="mdiLightningBolt"></i>Utilities</div>
+        <div class="grid2">
+          <div class="card tile"><span class="bubble" style="--c:var(--yellow)"><i m="mdiLightningBolt"></i></span><div><div class="name">Electricity</div><div class="state">29.72 ¢/kWh</div></div></div>
+          <div class="card tile"><span class="bubble" style="--c:var(--orange)"><i m="mdiSolarPower"></i></span><div><div class="name">Solar export</div><div class="state">23.47 ¢/kWh</div></div></div>
+          <div class="card tile"><span class="bubble" style="--c:var(--red)"><i m="mdiGasBurner"></i></span><div><div class="name">Gas</div><div class="state">23.41 ¢/kWh</div></div></div>
+          <div class="card tile"><span class="bubble" style="--c:var(--blue)"><i m="mdiWater"></i></span><div><div class="name">Water</div><div class="state">1.56 SGD/m³</div></div></div>
+        </div>
+
+        <div class="heading"><i m="mdiCar"></i>COE</div>
+        <div class="card"><div class="rows">
+          <div class="row"><span class="ic"><i m="mdiCar"></i></span><span class="label">Category A</span><span class="val">95,501 SGD</span></div>
+          <div class="row"><span class="ic"><i m="mdiCar"></i></span><span class="label">Category B</span><span class="val">113,890 SGD</span></div>
+          <div class="row"><span class="ic"><i m="mdiCar"></i></span><span class="label">Category C</span><span class="val">66,000 SGD</span></div>
+          <div class="row"><span class="ic"><i m="mdiCar"></i></span><span class="label">Category D</span><span class="val">8,889 SGD</span></div>
+          <div class="row"><span class="ic"><i m="mdiCar"></i></span><span class="label">Category E</span><span class="val">114,002 SGD</span></div>
+        </div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</body></html>

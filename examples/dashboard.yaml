@@ -1,0 +1,154 @@
+# The dashboard in images/hero.jpg, built only from Home Assistant's built-in cards.
+#
+# To use it: Settings → Dashboards → Add dashboard → New dashboard from scratch,
+# open it, ⋮ → Edit dashboard → ⋮ → Raw configuration editor, and paste this in.
+#
+# Entity IDs are the ones a new install gets. Installs from before v0.3.0 use
+# sensor.singapore_* IDs instead (see the README). Swap weather.weather_bedok for
+# your own forecast area.
+title: Singapore
+views:
+  - title: Singapore
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Weather
+            icon: mdi:weather-partly-cloudy
+          - type: weather-forecast
+            entity: weather.weather_bedok
+            name: Bedok
+            forecast_type: daily
+            secondary_info_attribute: humidity
+          - type: tile
+            entity: sensor.weather_rainfall
+            name: Rainfall
+            color: blue
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.weather_wind_speed
+            name: Wind speed
+            color: teal
+            grid_options: { columns: 6 }
+          - type: heading
+            heading: Air quality
+            icon: mdi:air-filter
+          - type: gauge
+            entity: sensor.air_quality_psi
+            name: PSI
+            min: 0
+            max: 300
+            severity: { green: 0, yellow: 51, red: 201 }
+          - type: tile
+            entity: sensor.air_quality_pm2_5
+            name: PM2.5
+            color: green
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.air_quality_pm10
+            name: PM10
+            color: green
+            grid_options: { columns: 6 }
+          - type: entities
+            title: PSI by region
+            entities:
+              - entity: sensor.air_quality_psi_north
+                name: North
+              - entity: sensor.air_quality_psi_south
+                name: South
+              - entity: sensor.air_quality_psi_east
+                name: East
+              - entity: sensor.air_quality_psi_west
+                name: West
+              - entity: sensor.air_quality_psi_central
+                name: Central
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Getting around
+            icon: mdi:train
+          - type: tile
+            entity: sensor.mrt_lrt_status
+            name: MRT/LRT Status
+            color: amber
+          - type: entities
+            entities:
+              - entity: sensor.mrt_lrt_north_south_line_status
+                name: North-South Line
+              - entity: sensor.mrt_lrt_east_west_line_status
+                name: East-West Line
+              - entity: sensor.mrt_lrt_north_east_line_status
+                name: North East Line
+              - entity: sensor.mrt_lrt_circle_line_status
+                name: Circle Line
+              - entity: sensor.mrt_lrt_downtown_line_status
+                name: Downtown Line
+              - entity: sensor.mrt_lrt_thomson_east_coast_line_status
+                name: Thomson-East Coast Line
+          - type: picture-entity
+            entity: camera.traffic_cameras_woodlands_causeway
+            name: Woodlands Causeway
+            show_state: false
+          - type: picture-entity
+            entity: camera.traffic_cameras_tuas_checkpoint
+            name: Tuas Checkpoint
+            show_state: false
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Near home
+            icon: mdi:home-outline
+          - type: tile
+            entity: sensor.nea_nearest_lightning
+            name: Nearest lightning
+            color: amber
+          - type: tile
+            entity: sensor.nea_nearest_dengue_cluster
+            name: Nearest dengue cluster
+            color: orange
+          - type: tile
+            entity: sensor.pub_flood_alerts
+            name: PUB flood alerts
+            color: blue
+          - type: heading
+            heading: Utilities
+            icon: mdi:lightning-bolt
+          - type: tile
+            entity: sensor.energy_electricity_tariff
+            name: Electricity
+            color: yellow
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.energy_solar_export_price
+            name: Solar export
+            color: orange
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.energy_gas_tariff
+            name: Gas
+            color: red
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.energy_water_tariff
+            name: Water
+            color: blue
+            grid_options: { columns: 6 }
+          - type: heading
+            heading: COE
+            icon: mdi:car
+          - type: entities
+            entities:
+              - entity: sensor.coe_category_a
+                name: Category A
+              - entity: sensor.coe_category_b
+                name: Category B
+              - entity: sensor.coe_category_c
+                name: Category C
+              - entity: sensor.coe_category_d
+                name: Category D
+              - entity: sensor.coe_category_e
+                name: Category E

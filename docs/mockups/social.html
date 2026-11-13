@@ -1,0 +1,41 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="ha.css">
+<style>
+  body { width: 1280px; height: 640px; overflow: hidden; background: radial-gradient(circle at 85% 20%, #3a1018 0, #111 55%); position: relative; }
+  .left { position: absolute; left: 72px; top: 64px; width: 600px; }
+  .kicker { display: inline-flex; align-items: center; gap: 8px; color: #18bcf2; font-weight: 600; font-size: 18px; letter-spacing: .04em; }
+  .kicker svg.mdi { width: 26px; height: 26px; }
+  h1 { font-size: 62px; line-height: 1.02; font-weight: 700; margin: 18px 0 18px; letter-spacing: -.02em; }
+  h1 span { color: var(--sg-red); }
+  .lead { font-size: 22px; color: #bdbdbd; line-height: 1.4; }
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+  .chips .chip { font-size: 16px; padding: 8px 14px; background: #1f1f1f; border: 1px solid var(--border); color: var(--text); }
+  .chips svg.mdi { width: 18px; height: 18px; color: var(--c); }
+  .right { position: absolute; right: -40px; top: 70px; width: 520px; display: flex; flex-direction: column; gap: 10px; transform: rotate(-4deg); }
+  .right .card { box-shadow: 0 20px 40px rgba(0,0,0,.5); }
+  .url { position: absolute; left: 72px; bottom: 40px; color: #8a8a8a; font-size: 18px; }
+</style></head>
+<body>
+  <div class="left">
+    <div class="kicker"><i m="mdiHomeAssistant"></i>HACS INTEGRATION</div>
+    <h1><span>Singapore</span><br>for Home Assistant</h1>
+    <div class="lead">Weather, PSI, MRT status, COE, tariffs, floods, dengue and lightning, from official sources. No API keys.</div>
+    <div class="chips">
+      <span class="chip" style="--c:#ffc107"><i m="mdiWeatherLightningRainy"></i>NEA weather</span>
+      <span class="chip" style="--c:#4caf50"><i m="mdiAirFilter"></i>PSI</span>
+      <span class="chip" style="--c:#fa9e0d"><i m="mdiTrain"></i>MRT/LRT</span>
+      <span class="chip" style="--c:#64b5f6"><i m="mdiCarHatchback"></i>COE</span>
+      <span class="chip" style="--c:#ffb300"><i m="mdiFlash"></i>Lightning</span>
+      <span class="chip" style="--c:#03a9f4"><i m="mdiHomeFlood"></i>Floods</span>
+    </div>
+  </div>
+  <div class="right">
+    <div class="card tile"><span class="bubble" style="--c:var(--amber)"><i m="mdiMapMarkerDistance"></i></span><div><div class="name">Nearest lightning</div><div class="state">7.4 km</div></div></div>
+    <div class="card tile"><span class="bubble" style="--c:var(--green)"><i m="mdiAirFilter"></i></span><div><div class="name">PSI</div><div class="state">42</div></div></div>
+    <div class="card tile"><span class="bubble" style="--c:var(--red)"><i m="mdiAlert"></i></span><div><div class="name">Circle Line</div><div class="state">Disruption</div></div></div>
+    <div class="card tile"><span class="bubble" style="--c:var(--blue)"><i m="mdiCar"></i></span><div><div class="name">COE Category A</div><div class="state">95,501 SGD</div></div></div>
+    <div class="card tile"><span class="bubble" style="--c:var(--yellow)"><i m="mdiSolarPower"></i></span><div><div class="name">Solar export</div><div class="state">23.47 ¢/kWh</div></div></div>
+    <div class="card tile"><span class="bubble" style="--c:var(--orange)"><i m="mdiMapMarkerDistance"></i></span><div><div class="name">Nearest dengue cluster</div><div class="state">1.2 km</div></div></div>
+  </div>
+  <div class="url">github.com/kianhean/singapore-homeassistant</div>
+</body></html>
