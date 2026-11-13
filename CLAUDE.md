@@ -74,13 +74,14 @@ tests_ha/test_blueprints.py      # Runs every blueprint in real HA (one test per
 examples/dashboard.yaml          # Built-in-cards dashboard shown in images/hero.jpg
 examples/sp_account_dashboard.yaml # SP account dashboard (built-in cards); tests_ha checks every
                                  # entity/statistic in it exists (test_sp_account_statistics.py)
+                                 # docs/mockups/sp_account.html mirrors it → images/sp-account-dashboard.png
 docs/mockups/                    # HTML sources for the README images (node build.mjs → images/*.png)
 └── fetch_cameras.py             # uv run: pulls real checkpoint stills into docs/mockups/cameras/
 ```
 
 README images must only show what Home Assistant really renders from this integration's
 entities with built-in cards (no custom cards, invented attributes or reworded states), and
-`hero.html` must stay in sync with `examples/dashboard.yaml`. Camera stills are real LTA images,
+`hero.html` must stay in sync with `examples/dashboard.yaml` (and `sp_account.html` with `examples/sp_account_dashboard.yaml`). Camera stills are real LTA images,
 not illustrations.
 
 Entry data is stored on `entry.runtime_data` as a `SingaporeData` dataclass (not
@@ -508,7 +509,8 @@ headers) when touching this code.
   reloads only when the set of SP subentries changed, otherwise it calls
   `coordinator.async_subentry_updated()` (new tokens → new client + refresh).
 - Energy statistics are imported with `async_add_external_statistics` as
-  `singapore:<premise_id>_<key>` (`electricity`, `electricity_cost`, `gas`, `last_bill`).
+  `singapore:<premise_id>_<key>` (`electricity`, `electricity_cost`, `gas`, `water`,
+  `last_bill`). `water` (billed months, m³ only) is ours, not upstream's.
   `unit_class` is only included when the running HA's `StatisticMetaData` has it (2025.4
   rejects it, newer HA warns without it). The poll passes its readings into the import task
   because HA starts tasks eagerly, before `coordinator.data` is set.

@@ -52,6 +52,7 @@ from .sp_account.const import (
     SENSOR_KEY_ELECTRICITY,
     SENSOR_KEY_GAS,
     SENSOR_KEY_LAST_BILL,
+    SENSOR_KEY_WATER,
     SLOW_POLL_MS,
     STATISTIC_KEY_ELECTRICITY_COST,
     STATISTIC_NAME_BILL,
@@ -59,6 +60,7 @@ from .sp_account.const import (
     STATISTIC_NAME_ELECTRICITY_COST,
     STATISTIC_NAME_GAS,
     UNIT_KWH,
+    UNIT_M3,
     UNIT_SGD,
     UPDATE_INTERVAL,
     translated_error,
@@ -79,6 +81,10 @@ _LOGGER = logging.getLogger(__name__)
 
 SUBENTRY_TYPE_SP_ACCOUNT = "sp_account"
 ISSUE_AUTH_FAILED = "sp_account_auth_failed"
+
+# Statistic names are written to the database once and never translated, so
+# they stay fixed English, like the vendored STATISTIC_NAME_* constants.
+STATISTIC_NAME_WATER = "SP Group water"
 
 _PointT = TypeVar("_PointT", bound=HasStart)
 
@@ -457,6 +463,19 @@ class SpAccountCoordinator(DataUpdateCoordinator[UsageReadings]):
                         usage.gas.unit,
                         "energy" if usage.gas.unit == UNIT_KWH else "volume",
                     ),
+                    points,
+                    _cumulative,
+                )
+        # Not imported upstream: water is billed monthly, but a monthly series
+        # still gives the Energy dashboard's water tracking ~13 months of
+        # history (month/year views). Only m³, which the recorder can convert.
+        if usage.water is not None and usage.water.unit == UNIT_M3:
+            points = cumulative_points(usage.water.periods)
+            if points:
+                self._add_external_statistics(
+                    usage.premise_id,
+                    external_statistic_id(usage.premise_id, SENSOR_KEY_WATER),
+                    metadata(SENSOR_KEY_WATER, STATISTIC_NAME_WATER, UNIT_M3, "volume"),
                     points,
                     _cumulative,
                 )

@@ -41,7 +41,7 @@ async def test_energy_statistics_are_imported(
     ids = await recorder_mock.async_add_executor_job(list_statistic_ids, hass)
     statistic_ids = {item["statistic_id"] for item in ids}
     usage = entry.runtime_data.sp_accounts[next(iter(entry.subentries))].data
-    for key in ("electricity", "electricity_cost"):
+    for key in ("electricity", "electricity_cost", "water", "last_bill"):
         assert external_statistic_id(usage.premise_id, key) in statistic_ids
 
 

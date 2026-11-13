@@ -33,7 +33,7 @@
 | 🚇 **MRT/LRT**<br>Network and per-line status (normal, planned works, disruption) with LTA's message | 🛂 **Checkpoints**<br>Woodlands and Tuas traffic camera stills as camera entities | 🚗 **COE**<br>Category A–E premiums, refreshed after each bidding exercise |
 | ⚡ **Lightning**<br>Live strikes and the distance to the nearest one from your home | 🦟 **Dengue**<br>Active NEA clusters and how far the nearest is from your home | 🌊 **Flash floods**<br>PUB flood alerts as they're issued and cancelled |
 | 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🎉 **Public holidays**<br>MOM's holiday list as a calendar | 🧩 **Blueprints**<br>[One-click automations](#one-click-blueprints) for lightning, MRT disruptions, floods, haze and COE |
-| 🏠 **Your SP account** *(optional)*<br>Sign in once to get your own electricity, water and gas usage, down to the half hour on a smart meter | 📊 **Energy dashboard**<br>Hourly electricity history and its cost at the current SP tariff, ready for Home Assistant's Energy dashboard | 🧾 **Bills**<br>Last bill, amount due, meter readings and SP Green Goals, for [reminders and dashboards](#your-sp-account) |
+| 🏠 **Your SP account** *(optional)*<br>Sign in once to get your own electricity, water and gas usage, down to the half hour on a smart meter | 📊 **Energy dashboard**<br>Hourly electricity with cost at the current SP tariff, plus monthly water, ready for [Home Assistant's Energy dashboard](#energy-dashboard-electricity-and-water) | 🧾 **Bills**<br>Last bill, amount due, meter readings and SP Green Goals, for [reminders and dashboards](#your-sp-account) |
 
 The public data needs no API keys and no account: one config entry, and a diagnostics download when
 something looks off. Linking your SP Group e-account is optional ([how](#optional-link-your-sp-group-e-account));
@@ -350,6 +350,12 @@ also carries `latitude`/`longitude`, so you can put them on a Map card instead (
 
 ### Your SP account
 
+<p align="center">
+  <img src="images/sp-account-dashboard.png" alt="SP account dashboard: this month's electricity use (153.1 kWh) and estimated cost (45.50 SGD), last month's 371.4 kWh, the 29.72 cents/kWh tariff, today's usage, daily and hourly electricity bar charts, amount due and last bill of 116.38 SGD, a bar chart of monthly bills, and Green Goals usage against a 350 kWh target" width="100%">
+  <br>
+  <sub>The dashboard from <a href="examples/sp_account_dashboard.yaml">examples/sp_account_dashboard.yaml</a>, built only from Home Assistant's built-in cards. Example account data.</sub>
+</p>
+
 With an SP account linked, **[`examples/sp_account_dashboard.yaml`](examples/sp_account_dashboard.yaml)**
 adds an *SP account* dashboard built only from built-in cards. Find-and-replace its two
 placeholders (your device slug and premise ID, explained at the top of the file), then paste it in.
@@ -365,10 +371,8 @@ It shows:
 A test runs the example against a real Home Assistant, so every entity and statistic in it exists
 on a new install.
 
-**The Energy dashboard** is the other half: under **Settings → Dashboards → Energy**, add
-**SP Group electricity** as grid consumption and **SP Group electricity cost** as its cost (details
-in the [entity reference](#sp-group-e-account-optional)). You then get Home Assistant's own
-usage, cost and comparison views for your flat or house.
+**The Energy dashboard** is the other half: see the
+[step-by-step setup below](#energy-dashboard-electricity-and-water).
 
 **Today's estimated cost.** Combine the account's usage with the tariff the integration
 scrapes, using a template sensor in `configuration.yaml`:
@@ -391,6 +395,42 @@ template:
 **Weather and usage together.** A History graph card with **Electricity last 30 min** and
 `sensor.weather_temperature` shows how much a hot afternoon costs you in air-con. Put both
 on one card.
+
+### Energy dashboard: electricity and water
+
+With an SP account linked, Home Assistant's built-in **Energy dashboard** can track your flat or
+house's electricity (with cost) and water. Wait for the account's first poll (a minute or so after
+adding it), then go to **Settings → Dashboards → Energy**:
+
+1. **Electricity grid → Add consumption.** Pick **SP Group electricity**, a statistic, not a
+   sensor. Under cost, choose **Use an entity tracking the total costs** and pick
+   **SP Group electricity cost**.
+2. **Water consumption → Add water source.** Pick **SP Group water**.
+3. **Gas consumption** (only if you have piped gas on the account): pick **SP Group gas**.
+4. Save, and open the **Energy** dashboard from the sidebar.
+
+If you have more than one SP account, each has its own set (the ID contains the premise ID,
+e.g. `singapore:2001590888_electricity`). **Developer tools → Statistics**, search "SP Group",
+lists them.
+
+**What to expect**
+
+- **History right away.** About 13 months of past usage is imported on the first poll, so the
+  month and year views fill in immediately. You don't have to wait for Home Assistant to collect it.
+- **Electricity is hourly on a smart meter,** but SP publishes it a few hours late. Today's bars
+  fill in through the day, so the *today* view looks low until the evening. Check yesterday for
+  a complete day. Without a smart meter, SP only has billed months, so you'll see one block per
+  month.
+- **Water is monthly.** SP bills water monthly, so each month's usage lands as one bar at the
+  start of the billing period. Use the month or year view; the day view will look empty.
+- **Cost is an estimate.** It uses the SP Group regulated tariff (incl. GST) this integration
+  reads, and the whole series is re-priced when the tariff changes each quarter. If you buy
+  electricity from an Open Electricity Market retailer, your real rate differs. The **Last bill**
+  sensor has the exact amount. Water cost isn't calculated (your bill includes charges beyond
+  the per-m³ tariff).
+- **Don't pick the sensors** (*Electricity cumulative*, *Electricity today*, *Electricity meter*,
+  *Water meter* and so on) as Energy sources. They measure other things, and Home Assistant would
+  compute its own sum from them that disagrees with the imported history.
 
 ## Entity reference
 
@@ -449,7 +489,8 @@ appear only when SP returns data for them). New ones are added without a reload.
 | Unread notifications, Bill delivery, FCU (Tengah cooling), SP tariff | When SP returns them |
 | Account | Account status; carries the address, account number and retailer as attributes |
 
-**Energy dashboard.** After the first poll, long-term statistics are imported:
+**Energy dashboard.** After the first poll, long-term statistics are imported (setup steps:
+[Energy dashboard: electricity and water](#energy-dashboard-electricity-and-water)):
 
 - Grid consumption: pick the statistic **SP Group electricity**
   (`singapore:<premise_id>_electricity`), not a sensor. It is built from the AMI half-hours
@@ -459,11 +500,11 @@ appear only when SP returns data for them). New ones are added without a reload.
   scrapes, and the whole series is re-priced when the tariff changes each quarter, so past
   quarters show at the current rate. If you buy from an Open Electricity Market retailer, your
   real rate differs; use your bills (**Last bill**) for exact amounts.
+- Water: **SP Group water** (`singapore:<premise_id>_water`), billed months in m³.
 - Gas: **SP Group gas** (`singapore:<premise_id>_gas`) when SP returns gas data.
 - **SP Group bill** (`singapore:<premise_id>_last_bill`) has one point per billed month.
 - Don't use *Electricity cumulative*, *Electricity last billed*, *Electricity meter* or
   *Electricity this month* as a grid source. They measure different things.
-- Leave water out of Energy: SP bills water monthly, so there's no hourly series.
 
 </details>
 
