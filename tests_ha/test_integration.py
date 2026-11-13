@@ -134,6 +134,32 @@ async def test_setup_creates_entities_and_unloads(
     assert entry.state is ConfigEntryState.NOT_LOADED
 
 
+async def test_hourly_forecast_uses_area_region(
+    hass: HomeAssistant, mock_sources
+) -> None:
+    await _setup(hass)
+
+    bedok_state = hass.states.get("weather.weather_bedok")
+    assert bedok_state.attributes["forecast_region"] == "east"
+
+    response = await hass.services.async_call(
+        "weather",
+        "get_forecasts",
+        {
+            "entity_id": ["weather.weather_bedok", "weather.weather_woodlands"],
+            "type": "hourly",
+        },
+        blocking=True,
+        return_response=True,
+    )
+
+    bedok = response["weather.weather_bedok"]["forecast"]
+    assert [f["condition"] for f in bedok] == ["lightning-rainy", "sunny"]
+    assert bedok[0]["datetime"] == "2099-01-01T18:00:00+08:00"
+    woodlands = response["weather.weather_woodlands"]["forecast"]
+    assert [f["condition"] for f in woodlands] == ["cloudy", "cloudy"]
+
+
 async def test_setup_retries_when_source_unavailable(
     hass: HomeAssistant, mock_sources
 ) -> None:

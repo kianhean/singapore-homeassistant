@@ -1,9 +1,10 @@
-"""Data coordinator for Singapore NEA 2-hour area forecasts."""
+"""Data coordinator for Singapore NEA area forecasts and realtime readings."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import math
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 
@@ -13,10 +14,15 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .psi_coordinator import DEFAULT_REGION_LOCATIONS
+
 _LOGGER = logging.getLogger(__name__)
 
 WEATHER_URL = "https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast"
 FOUR_DAY_URL = "https://api-open.data.gov.sg/v2/real-time/api/four-day-outlook"
+TWENTY_FOUR_HR_URL = (
+    "https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast"
+)
 UPDATE_INTERVAL = timedelta(minutes=10)
 
 _SGT = timezone(timedelta(hours=8))
@@ -89,6 +95,15 @@ class FourDayForecastEntry:
 
 
 @dataclass
+class RegionalForecastPeriod:
+    """One period of the 24-hour forecast, with a condition per region."""
+
+    start: datetime
+    end: datetime
+    regions: dict[str, str]  # lowercase region name -> NEA condition text
+
+
+@dataclass
 class WeatherAreaData:
     """Per-area weather forecast data."""
 
@@ -96,6 +111,9 @@ class WeatherAreaData:
     condition_text: str
     valid_start: datetime
     valid_end: datetime
+    # 24-hour forecast region (north/south/east/west/central) nearest the area's
+    # NEA label location; None when the payload has no area metadata.
+    region: str | None = None
 
 
 @dataclass
@@ -106,6 +124,7 @@ class WeatherData:
     updated_at: datetime | None
     readings: WeatherReadings
     four_day_forecast: list[FourDayForecastEntry] | None = field(default=None)
+    regional_forecast: list[RegionalForecastPeriod] | None = field(default=None)
 
 
 class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
@@ -130,10 +149,12 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
         timeout = aiohttp.ClientTimeout(total=30)
         two_hr_resp: aiohttp.ClientResponse | None = None
         four_day_resp: aiohttp.ClientResponse | None = None
+        day_resp: aiohttp.ClientResponse | None = None
         try:
-            two_hr_resp, four_day_resp = await asyncio.gather(
+            two_hr_resp, four_day_resp, day_resp = await asyncio.gather(
                 session.get(WEATHER_URL, timeout=timeout),
                 session.get(FOUR_DAY_URL, timeout=timeout),
+                session.get(TWENTY_FOUR_HR_URL, timeout=timeout),
             )
             if two_hr_resp.status != 200:
                 raise UpdateFailed(
@@ -148,6 +169,15 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
                 _LOGGER.warning(
                     "four-day-outlook returned HTTP %s; skipping daily forecast",
                     four_day_resp.status,
+                )
+            if day_resp.status == 200:
+                parsed.regional_forecast = _parse_twenty_four_hour(
+                    await day_resp.json()
+                )
+            else:
+                _LOGGER.warning(
+                    "twenty-four-hr-forecast returned HTTP %s; skipping hourly forecast",
+                    day_resp.status,
                 )
             parsed.readings = await _fetch_aggregated_readings(
                 session, self._readings_sem
@@ -172,6 +202,8 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
                 two_hr_resp.release()
             if four_day_resp is not None:
                 four_day_resp.release()
+            if day_resp is not None:
+                day_resp.release()
 
 
 async def _fetch_with_retry(
@@ -394,6 +426,69 @@ def _parse_four_day(payload: dict) -> list[FourDayForecastEntry]:
     return entries
 
 
+def _nearest_region(latitude: float, longitude: float) -> str:
+    """Return the 24-hour forecast region whose centre is nearest a point."""
+    scale = math.cos(math.radians(latitude))
+    return min(
+        DEFAULT_REGION_LOCATIONS,
+        key=lambda r: (
+            (DEFAULT_REGION_LOCATIONS[r][0] - latitude) ** 2
+            + ((DEFAULT_REGION_LOCATIONS[r][1] - longitude) * scale) ** 2
+        ),
+    )
+
+
+def _area_regions(payload: dict) -> dict[str, str]:
+    """Map each 2-hour forecast area to its 24-hour forecast region."""
+    metadata = (
+        payload.get("area_metadata")
+        or payload.get("data", {}).get("area_metadata")
+        or []
+    )
+    regions: dict[str, str] = {}
+    for row in metadata:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("name") or "").strip()
+        loc = row.get("label_location") or row.get("labelLocation") or {}
+        lat, lon = _to_float(loc.get("latitude")), _to_float(loc.get("longitude"))
+        if name and lat is not None and lon is not None:
+            regions[name] = _nearest_region(lat, lon)
+    return regions
+
+
+def _parse_twenty_four_hour(payload: dict) -> list[RegionalForecastPeriod]:
+    """Parse the twenty-four-hr-forecast payload into regional periods.
+
+    Supports:
+    - v2: data.records[0].periods[{timePeriod{start,end}, regions{r: {text}}}]
+    - v1: items[0].periods[{time{start,end}, regions{r: "text"}}]
+    """
+    records = payload.get("data", {}).get("records") or payload.get("items") or []
+    if not records or not isinstance(records[0], dict):
+        return []
+    periods: list[RegionalForecastPeriod] = []
+    for row in records[0].get("periods") or []:
+        if not isinstance(row, dict):
+            continue
+        time = row.get("timePeriod") or row.get("time_period") or row.get("time") or {}
+        start = _parse_iso_datetime(time.get("start"))
+        end = _parse_iso_datetime(time.get("end"))
+        if start is None or end is None:
+            continue
+        regions: dict[str, str] = {}
+        for region, value in (row.get("regions") or {}).items():
+            text = value.get("text") if isinstance(value, dict) else value
+            text = str(text or "").strip()
+            if text:
+                regions[str(region).strip().lower()] = text
+        if regions:
+            periods.append(
+                RegionalForecastPeriod(start=start, end=end, regions=regions)
+            )
+    return periods
+
+
 def _parse_weather(payload: dict) -> WeatherData:
     """Parse weather API payload.
 
@@ -404,6 +499,7 @@ def _parse_weather(payload: dict) -> WeatherData:
     updated_at = _parse_iso_datetime(payload.get("api_info", {}).get("status"))
 
     areas: dict[str, WeatherAreaData] = {}
+    area_regions = _area_regions(payload)
 
     # Shape A: items[] list with forecasts[] objects containing area/forecast.
     items = payload.get("items") or payload.get("data", {}).get("items") or []
@@ -429,6 +525,7 @@ def _parse_weather(payload: dict) -> WeatherData:
                     condition_text=cond,
                     valid_start=start,
                     valid_end=end,
+                    region=area_regions.get(area),
                 )
 
         if areas:

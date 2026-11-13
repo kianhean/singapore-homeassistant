@@ -11,6 +11,7 @@ from homeassistant.const import UnitOfSpeed, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from . import SingaporeConfigEntry
 from .const import DOMAIN
@@ -70,7 +71,9 @@ class SingaporeAreaWeatherEntity(
 
     _attr_has_entity_name = True
     _attr_attribution = "Data provided by NEA via data.gov.sg"
-    _attr_supported_features = WeatherEntityFeature.FORECAST_DAILY
+    _attr_supported_features = (
+        WeatherEntityFeature.FORECAST_DAILY | WeatherEntityFeature.FORECAST_HOURLY
+    )
     _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_native_wind_speed_unit = UnitOfSpeed.KILOMETERS_PER_HOUR
 
@@ -121,6 +124,7 @@ class SingaporeAreaWeatherEntity(
         readings = self.coordinator.data.readings
         return {
             "forecast_area": self._area,
+            "forecast_region": area.region,
             "source": "data.gov.sg / NEA",
             "raw_condition": area.condition_text,
             "valid_start": area.valid_start.isoformat(),
@@ -168,6 +172,35 @@ class SingaporeAreaWeatherEntity(
                 payload["humidity"] = entry.humidity_high
             result.append(Forecast(**payload))
         return result
+
+    @callback
+    def _async_forecast_hourly(self) -> list[Forecast] | None:
+        """Return the 24-hour forecast for this area's region.
+
+        NEA forecasts the next 24 hours in a few periods (e.g. 6 pm-6 am,
+        6 am-midday, midday-6 pm) per region, with no temperature, so each
+        period becomes one entry at its start time carrying only a condition.
+        Periods that have already ended are skipped.
+        """
+        data = self.coordinator.data
+        if data is None or not data.regional_forecast:
+            return None
+        area = data.areas.get(self._area)
+        if area is None or area.region is None:
+            return None
+        now = dt_util.utcnow()
+        result: list[Forecast] = []
+        for period in data.regional_forecast:
+            text = period.regions.get(area.region)
+            if text is None or period.end <= now:
+                continue
+            result.append(
+                Forecast(
+                    datetime=period.start.isoformat(),
+                    condition=_map_condition(text),
+                )
+            )
+        return result or None
 
     @property
     def device_info(self) -> DeviceInfo:
