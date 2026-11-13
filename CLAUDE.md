@@ -72,6 +72,8 @@ tests_ha/                        # Runs against a REAL Home Assistant (no module
 blueprints/automation/singapore/  # Importable automation blueprints (README "Import" buttons)
 tests_ha/test_blueprints.py      # Runs every blueprint in real HA (one test per blueprint, required)
 examples/dashboard.yaml          # Built-in-cards dashboard shown in images/hero.jpg
+examples/sp_account_dashboard.yaml # SP account dashboard (built-in cards); tests_ha checks every
+                                 # entity/statistic in it exists (test_sp_account_statistics.py)
 docs/mockups/                    # HTML sources for the README images (node build.mjs → images/*.png)
 └── fetch_cameras.py             # uv run: pulls real checkpoint stills into docs/mockups/cameras/
 ```

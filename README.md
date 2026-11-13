@@ -33,14 +33,12 @@
 | 🚇 **MRT/LRT**<br>Network and per-line status (normal, planned works, disruption) with LTA's message | 🛂 **Checkpoints**<br>Woodlands and Tuas traffic camera stills as camera entities | 🚗 **COE**<br>Category A–E premiums, refreshed after each bidding exercise |
 | ⚡ **Lightning**<br>Live strikes and the distance to the nearest one from your home | 🦟 **Dengue**<br>Active NEA clusters and how far the nearest is from your home | 🌊 **Flash floods**<br>PUB flood alerts as they're issued and cancelled |
 | 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🎉 **Public holidays**<br>MOM's holiday list as a calendar | 🧩 **Blueprints**<br>[One-click automations](#one-click-blueprints) for lightning, MRT disruptions, floods, haze and COE |
+| 🏠 **Your SP account** *(optional)*<br>Sign in once to get your own electricity, water and gas usage, down to the half hour on a smart meter | 📊 **Energy dashboard**<br>Hourly electricity history and its cost at the current SP tariff, ready for Home Assistant's Energy dashboard | 🧾 **Bills**<br>Last bill, amount due, meter readings and SP Green Goals, for [reminders and dashboards](#your-sp-account) |
 
-All public data: no API keys, one config entry, and a diagnostics download when something looks off.
-
-**Optional: your SP Group account.** Add your SP e-account to the same entry to get your own
-electricity, water and gas usage (half-hourly smart-meter data where available), bills, amount due,
-meter readings and Green Goals, plus Energy-dashboard statistics. See [SP Group e-account](#sp-group-e-account-optional).
-This part is built on [maci0/home-assistant-sp](https://github.com/maci0/home-assistant-sp) by
-[@maci0](https://github.com/maci0). See [Credits](#credits).
+The public data needs no API keys and no account: one config entry, and a diagnostics download when
+something looks off. Linking your SP Group e-account is optional ([how](#optional-link-your-sp-group-e-account));
+that part is built on [maci0/home-assistant-sp](https://github.com/maci0/home-assistant-sp) by
+[@maci0](https://github.com/maci0) ([Credits](#credits)).
 
 ## Installation
 
@@ -238,6 +236,102 @@ actions:
 ```
 </details>
 
+#### With a linked SP account
+
+Replace `1_example_road_singapore` with your SP account device's slug (it's named after your
+premise address; the device page shows the entity IDs).
+
+<details>
+<summary><b>🧾 Tell me when a new SP bill arrives</b></summary>
+
+```yaml
+alias: New SP bill
+triggers:
+  - trigger: state
+    entity_id: sensor.1_example_road_singapore_last_bill
+    attribute: bill_date
+conditions:
+  # Skip restarts: only a real change from one bill to the next.
+  - condition: template
+    value_template: >-
+      {{ trigger.from_state is not none
+         and trigger.from_state.attributes.get('bill_date') is not none }}
+actions:
+  - action: notify.notify
+    data:
+      title: New SP bill
+      message: >-
+        {% set due = state_attr('sensor.1_example_road_singapore_last_bill', 'due_date') %}
+        {{ states('sensor.1_example_road_singapore_last_bill') }} SGD{% if due %},
+        due {{ (as_datetime(due) | as_local).strftime('%-d %b') }}{% endif %}.
+```
+</details>
+
+<details>
+<summary><b>💸 Remind me to pay before the due date (skips GIRO)</b></summary>
+
+```yaml
+alias: SP bill due soon
+triggers:
+  - trigger: time
+    at: "09:00:00"
+conditions:
+  - condition: numeric_state
+    entity_id: sensor.1_example_road_singapore_amount_due
+    above: 0
+  - condition: template
+    value_template: >-
+      {% set due = state_attr('sensor.1_example_road_singapore_last_bill', 'due_date') %}
+      {{ due is not none
+         and not state_attr('sensor.1_example_road_singapore_amount_due', 'giro_enabled')
+         and (as_datetime(due) - now()).days < 3 }}
+actions:
+  - action: notify.notify
+    data:
+      title: SP bill due soon
+      message: "{{ states('sensor.1_example_road_singapore_amount_due') }} SGD outstanding."
+```
+</details>
+
+<details>
+<summary><b>🎯 Warn me when I pass my Green Goals target</b></summary>
+
+```yaml
+alias: Over the Green Goals target
+triggers:
+  - trigger: template
+    value_template: >-
+      {{ states('sensor.1_example_road_singapore_electricity_this_month') | float(0)
+         > state_attr('sensor.1_example_road_singapore_electricity_this_month', 'goal_target') | float(1e9) }}
+actions:
+  - action: notify.notify
+    data:
+      title: Over this month's electricity target
+      message: >-
+        {{ states('sensor.1_example_road_singapore_electricity_this_month') }} kWh used,
+        target {{ state_attr('sensor.1_example_road_singapore_electricity_this_month', 'goal_target') }} kWh.
+```
+</details>
+
+<details>
+<summary><b>🪫 Prepaid credit running low</b></summary>
+
+For prepaid (PPMS) accounts only; the sensor exists when SP reports a prepaid balance.
+
+```yaml
+alias: SP prepaid credit low
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.1_example_road_singapore_prepaid_credit
+    below: 20
+actions:
+  - action: notify.notify
+    data:
+      title: SP prepaid credit low
+      message: "{{ states('sensor.1_example_road_singapore_prepaid_credit') }} SGD left. Top up in the SP app."
+```
+</details>
+
 ## Dashboard ideas
 
 **Copy the whole dashboard:** [`examples/dashboard.yaml`](examples/dashboard.yaml) builds the dashboard
@@ -253,6 +347,50 @@ also carries `latitude`/`longitude`, so you can put them on a Map card instead (
   <br>
   <sub>Real LTA stills from data.gov.sg, Friday 13 November 2026, 16:50.</sub>
 </p>
+
+### Your SP account
+
+With an SP account linked, **[`examples/sp_account_dashboard.yaml`](examples/sp_account_dashboard.yaml)**
+adds an *SP account* dashboard built only from built-in cards. Find-and-replace its two
+placeholders (your device slug and premise ID, explained at the top of the file), then paste it in.
+It shows:
+
+- **This month:** kWh used and the estimated cost so far (Statistic cards on the imported
+  statistics), last month's kWh for comparison, the current SP tariff, and today's usage.
+- **Usage:** daily bars for the last 30 days, and hourly bars for the last 3 days from the
+  smart meter. That's where the evening air-con hours show up.
+- **Bills:** amount due, the last bill, a bar chart of every bill in the
+  past year, your Green Goals usage against its target, and the meter reading.
+
+A test runs the example against a real Home Assistant, so every entity and statistic in it exists
+on a new install.
+
+**The Energy dashboard** is the other half: under **Settings → Dashboards → Energy**, add
+**SP Group electricity** as grid consumption and **SP Group electricity cost** as its cost (details
+in the [entity reference](#sp-group-e-account-optional)). You then get Home Assistant's own
+usage, cost and comparison views for your flat or house.
+
+**Today's estimated cost.** Combine the account's usage with the tariff the integration
+scrapes, using a template sensor in `configuration.yaml`:
+
+```yaml
+template:
+  - sensor:
+      - name: Electricity cost today
+        unique_id: sp_electricity_cost_today
+        unit_of_measurement: SGD
+        device_class: monetary
+        state: >-
+          {{ (states('sensor.1_example_road_singapore_electricity_today') | float(0)
+              * states('sensor.energy_electricity_tariff') | float(0) / 100) | round(2) }}
+        availability: >-
+          {{ has_value('sensor.1_example_road_singapore_electricity_today')
+             and has_value('sensor.energy_electricity_tariff') }}
+```
+
+**Weather and usage together.** A History graph card with **Electricity last 30 min** and
+`sensor.weather_temperature` shows how much a hot afternoon costs you in air-con. Put both
+on one card.
 
 ## Entity reference
 
