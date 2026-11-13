@@ -56,7 +56,16 @@ tests_ha/                        # Runs against a REAL Home Assistant (no module
 └── test_integration.py          # Full entry setup/unload, config flow, diagnostics
 
 .github/workflows/tests.yml   # CI: unit tests, real-HA compat matrix, e2e scrape, ruff lint
+
+examples/dashboard.yaml          # Built-in-cards dashboard shown in images/hero.jpg
+docs/mockups/                    # HTML sources for the README images (node build.mjs → images/*.png)
+└── fetch_cameras.py             # uv run: pulls real checkpoint stills into docs/mockups/cameras/
 ```
+
+README images must only show what Home Assistant really renders from this integration's
+entities with built-in cards (no custom cards, invented attributes or reworded states), and
+`hero.html` must stay in sync with `examples/dashboard.yaml`. Camera stills are real LTA images,
+not illustrations.
 
 Entry data is stored on `entry.runtime_data` as a `SingaporeData` dataclass (not
 `hass.data[DOMAIN]`, which is the legacy pattern):

@@ -1,0 +1,13 @@
+{
+  "name": "singapore-homeassistant-mockups",
+  "private": true,
+  "description": "Renders the README mock-up images",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "@mdi/js": "7.4.47",
+    "playwright": "1.63.0"
+  }
+}
