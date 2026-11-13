@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="custom_components/singapore/images/icon.png" alt="Singapore Home Assistant integration logo" width="160">
-</p>
-
 <h1 align="center">Singapore for Home Assistant</h1>
 
 <p align="center">
