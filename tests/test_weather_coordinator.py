@@ -392,7 +392,7 @@ async def test_weather_coordinator_fetches_four_day():
 
 @pytest.mark.asyncio
 async def test_weather_coordinator_releases_both_responses_on_two_hr_error():
-    """Regression test: both responses must be released even if two_hr fails.
+    """Regression test: every response must be released even if two_hr fails.
 
     The original code only released four_day_resp on the two_hr-status
     error path, leaking the two_hr response's connection.
@@ -414,10 +414,13 @@ async def test_weather_coordinator_releases_both_responses_on_two_hr_error():
 
     two_hr_resp = _MockResponse(503)
     four_day_resp = _MockResponse(200, {})
+    day_resp = _MockResponse(200, {})
 
     async def _mock_get(url, timeout=None):
         if "four-day" in url:
             return four_day_resp
+        if "twenty-four" in url:
+            return day_resp
         return two_hr_resp
 
     mock_session = MagicMock()
@@ -434,6 +437,7 @@ async def test_weather_coordinator_releases_both_responses_on_two_hr_error():
     assert coordinator.last_update_success is False
     two_hr_resp.release.assert_called_once()
     four_day_resp.release.assert_called_once()
+    day_resp.release.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -490,3 +494,205 @@ async def test_weather_coordinator_four_day_http_error_is_soft():
 
     assert coordinator.last_update_success is True
     assert coordinator.data.four_day_forecast is None
+
+
+# ---------------------------------------------------------------------------
+# 24-hour regional forecast + area region tests
+# ---------------------------------------------------------------------------
+
+
+def test_parse_twenty_four_hour_v2_shape():
+    from custom_components.singapore.weather_coordinator import (
+        _parse_twenty_four_hour,
+    )
+
+    payload = {
+        "code": 0,
+        "data": {
+            "records": [
+                {
+                    "date": "2026-11-13",
+                    "periods": [
+                        {
+                            "regions": {
+                                "east": {"code": "CL", "text": "Cloudy"},
+                                "west": {"code": "TL", "text": "Thundery Showers"},
+                            },
+                            "timePeriod": {
+                                "text": "6 pm 13 Nov to 6 am 14 Nov",
+                                "start": "2026-11-13T18:00:00+08:00",
+                                "end": "2026-11-14T06:00:00+08:00",
+                            },
+                        },
+                        {"regions": {"east": {"text": "Cloudy"}}, "timePeriod": {}},
+                    ],
+                }
+            ]
+        },
+    }
+
+    periods = _parse_twenty_four_hour(payload)
+
+    assert len(periods) == 1  # second period has no times
+    assert periods[0].start == datetime.fromisoformat("2026-11-13T18:00:00+08:00")
+    assert periods[0].regions == {"east": "Cloudy", "west": "Thundery Showers"}
+
+
+def test_parse_twenty_four_hour_v1_shape():
+    from custom_components.singapore.weather_coordinator import (
+        _parse_twenty_four_hour,
+    )
+
+    payload = {
+        "items": [
+            {
+                "periods": [
+                    {
+                        "time": {
+                            "start": "2026-11-14T06:00:00+08:00",
+                            "end": "2026-11-14T12:00:00+08:00",
+                        },
+                        "regions": {"North": "Partly Cloudy (Day)"},
+                    }
+                ]
+            }
+        ]
+    }
+
+    periods = _parse_twenty_four_hour(payload)
+
+    assert periods[0].regions == {"north": "Partly Cloudy (Day)"}
+
+
+def test_parse_twenty_four_hour_empty_payload():
+    from custom_components.singapore.weather_coordinator import (
+        _parse_twenty_four_hour,
+    )
+
+    assert _parse_twenty_four_hour({}) == []
+
+
+@pytest.mark.parametrize(
+    ("area", "lat", "lon", "region"),
+    [
+        ("Bedok", 1.321, 103.924, "east"),
+        ("Changi", 1.357, 103.987, "east"),
+        ("Woodlands", 1.432, 103.786, "north"),
+        ("Jurong West", 1.34, 103.705, "west"),
+        ("City", 1.292, 103.844, "south"),
+        ("Toa Payoh", 1.343, 103.856, "central"),
+    ],
+)
+def test_parse_weather_assigns_nearest_region(area, lat, lon, region):
+    from custom_components.singapore.weather_coordinator import _parse_weather
+
+    payload = {
+        "code": 0,
+        "data": {
+            "area_metadata": [
+                {"name": area, "label_location": {"latitude": lat, "longitude": lon}}
+            ],
+            "items": [
+                {
+                    "timestamp": "2026-11-13T17:00:00+08:00",
+                    "valid_period": {
+                        "start": "2026-11-13T17:00:00+08:00",
+                        "end": "2026-11-13T19:00:00+08:00",
+                    },
+                    "forecasts": [{"area": area, "forecast": "Cloudy"}],
+                }
+            ],
+        },
+    }
+
+    assert _parse_weather(payload).areas[area].region == region
+
+
+def test_parse_weather_region_none_without_metadata():
+    from custom_components.singapore.weather_coordinator import _parse_weather
+
+    payload = {
+        "items": [
+            {
+                "valid_period": {
+                    "start": "2026-11-13T17:00:00+08:00",
+                    "end": "2026-11-13T19:00:00+08:00",
+                },
+                "forecasts": [{"area": "Bedok", "forecast": "Cloudy"}],
+            }
+        ]
+    }
+
+    assert _parse_weather(payload).areas["Bedok"].region is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("day_status", [200, 503])
+async def test_weather_coordinator_twenty_four_hour(day_status):
+    from custom_components.singapore.weather_coordinator import (
+        SingaporeWeatherCoordinator,
+    )
+
+    two_hr_payload = {
+        "items": [
+            {
+                "valid_period": {
+                    "start": "2026-11-13T17:00:00+08:00",
+                    "end": "2026-11-13T19:00:00+08:00",
+                },
+                "forecasts": [{"area": "Bedok", "forecast": "Cloudy"}],
+            }
+        ]
+    }
+    day_payload = {
+        "data": {
+            "records": [
+                {
+                    "periods": [
+                        {
+                            "timePeriod": {
+                                "start": "2026-11-13T18:00:00+08:00",
+                                "end": "2026-11-14T06:00:00+08:00",
+                            },
+                            "regions": {"east": {"text": "Cloudy"}},
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+
+    class _MockResponse:
+        def __init__(self, status=200, json_data=None):
+            self.status = status
+            self._json_data = json_data
+
+        async def json(self):
+            return self._json_data
+
+        def release(self):
+            pass
+
+    async def _mock_get(url, timeout=None):
+        if "twenty-four" in url:
+            return _MockResponse(day_status, day_payload)
+        if "two-hr" in url:
+            return _MockResponse(200, two_hr_payload)
+        return _MockResponse(404)
+
+    mock_session = MagicMock()
+    mock_session.get = _mock_get
+    coordinator = SingaporeWeatherCoordinator(MagicMock())
+
+    with patch(
+        "custom_components.singapore.weather_coordinator.async_get_clientsession",
+        return_value=mock_session,
+    ):
+        await coordinator.async_refresh()
+
+    # A 24-hour forecast outage must not fail the whole weather update.
+    assert coordinator.last_update_success is True
+    if day_status == 200:
+        assert coordinator.data.regional_forecast[0].regions == {"east": "Cloudy"}
+    else:
+        assert coordinator.data.regional_forecast is None

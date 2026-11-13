@@ -257,6 +257,12 @@ def _dt_now():
     return datetime.now()
 
 
+def _dt_utcnow():
+    from datetime import UTC, datetime
+
+    return datetime.now(UTC)
+
+
 # ---------------------------------------------------------------------------
 # Build fake module tree and inject into sys.modules
 # ---------------------------------------------------------------------------
@@ -282,6 +288,7 @@ _HA_MODULES: dict[str, ModuleType] = {
         UnitOfPrecipitationDepth=UnitOfPrecipitationDepth,
         UnitOfLength=UnitOfLength,
         PERCENTAGE=PERCENTAGE,
+        UV_INDEX="UV index",
         DEGREE=DEGREE,
         ATTR_LATITUDE=ATTR_LATITUDE,
         ATTR_LONGITUDE=ATTR_LONGITUDE,
@@ -316,7 +323,11 @@ _HA_MODULES: dict[str, ModuleType] = {
         DeviceEntryType=DeviceEntryType,
     ),
     "homeassistant.util": _mod("homeassistant.util"),
-    "homeassistant.util.dt": _mod("homeassistant.util.dt", now=_dt_now),
+    "homeassistant.util.dt": _mod(
+        "homeassistant.util.dt",
+        now=_dt_now,
+        utcnow=_dt_utcnow,
+    ),
     "homeassistant.components": _mod("homeassistant.components"),
     "homeassistant.components.weather": _mod(
         "homeassistant.components.weather",

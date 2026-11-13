@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS Custom"></a>
+  <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-Default-41BDF5.svg" alt="HACS Default"></a>
   <a href="https://github.com/kianhean/singapore-homeassistant/releases"><img src="https://img.shields.io/github/v/release/kianhean/singapore-homeassistant" alt="Latest release"></a>
   <a href="https://github.com/kianhean/singapore-homeassistant/actions/workflows/tests.yml"><img src="https://github.com/kianhean/singapore-homeassistant/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <img src="https://img.shields.io/badge/Home%20Assistant-2025.4%2B-41BDF5?logo=home-assistant&logoColor=white" alt="Home Assistant 2025.4 or newer">
@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <img src="images/hero.jpg" alt="Example Singapore dashboard: Bedok weather with a 4-day forecast, PSI gauge and PSI by region, MRT/LRT line status, live Woodlands Causeway and Tuas Checkpoint camera stills, nearest lightning and dengue cluster distances, flood alerts, utility tariffs and COE prices" width="100%">
+  <img src="images/hero.jpg" alt="Example Singapore dashboard: Bedok weather with a 4-day forecast, rainfall, wind, UV index and UV exposure, PSI gauge and PSI by region, MRT/LRT line status, live Woodlands Causeway and Tuas Checkpoint camera stills, nearest lightning and dengue cluster distances, flood alerts, utility tariffs and COE prices" width="100%">
   <br>
   <sub>An example dashboard built only from Home Assistant's built-in cards. The integration provides the entities; <a href="examples/dashboard.yaml">this YAML</a> builds the dashboard. Camera stills are real LTA images.</sub>
 </p>
@@ -28,21 +28,21 @@
 
 | | | |
 |---|---|---|
-| 🌦️ **Weather**<br>A weather entity for every NEA forecast area, 4-day forecast, live temperature, humidity, wind and rain | 😷 **Air quality**<br>PSI and six pollutants, overall and per region, ready for a Map card | 🚇 **MRT/LRT**<br>Network and per-line status (normal, planned works, disruption) with LTA's message |
+| 🌦️ **Weather**<br>A weather entity for every NEA forecast area, with hourly and 4-day forecasts, live temperature, humidity, wind and rain | 😷 **Air quality**<br>PSI and six pollutants, overall and per region, ready for a Map card | ☀️ **UV index**<br>NEA's hourly UV index and exposure level (low to extreme), with today's peak |
+| 🚇 **MRT/LRT**<br>Network and per-line status (normal, planned works, disruption) with LTA's message | 🛂 **Checkpoints**<br>Woodlands and Tuas traffic camera stills as camera entities | 🚗 **COE**<br>Category A–E premiums, refreshed after each bidding exercise |
 | ⚡ **Lightning**<br>Live strikes and the distance to the nearest one from your home | 🦟 **Dengue**<br>Active NEA clusters and how far the nearest is from your home | 🌊 **Flash floods**<br>PUB flood alerts as they're issued and cancelled |
-| 🚗 **COE**<br>Category A–E premiums, refreshed after each bidding exercise | 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🛂 **Checkpoints**<br>Woodlands and Tuas traffic camera stills as camera entities |
-| 🎉 **Public holidays**<br>MOM's holiday list as a calendar | 🔑 **No setup pain**<br>All public data, no API keys, one config entry | 🛠️ **Easy to debug**<br>Built-in diagnostics download and background loading |
+| 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🎉 **Public holidays**<br>MOM's holiday list as a calendar | 🧩 **Blueprints**<br>[One-click automations](#one-click-blueprints) for lightning, MRT disruptions, floods, haze and COE |
+
+All public data: no API keys, one config entry, and a diagnostics download when something looks off.
 
 ## Installation
 
-The quickest way is the **Open in HACS** button above. To do it by hand:
+The integration is in the default HACS store. Use the **Open in HACS** button above, or:
 
 1. Open **HACS** in Home Assistant.
-2. Open the three-dot menu (top-right) → **Custom repositories**.
-3. Repository: `https://github.com/kianhean/singapore-homeassistant`, category: **Integration** → **Add**.
-4. Search for **Singapore** in HACS, install it, and restart Home Assistant.
+2. Search for **Singapore** and install it.
+3. Restart Home Assistant.
 
-The integration isn't in the default HACS store yet, so it has to be added as a custom repository first.
 Requires **Home Assistant 2025.4** or newer.
 
 ## Setup
@@ -68,10 +68,32 @@ The lightning and dengue distances are measured from the home location in
 <p align="center">
   <img src="images/alerts.png" alt="Phone lock screen with Home Assistant notifications for nearby lightning, a PUB flood alert, a Circle Line disruption and new COE results, next to the NEA, PUB and MRT/LRT sensors that triggered them" width="100%">
   <br>
-  <sub>Notifications like these come from the automations below. Change <code>notify.notify</code> to your phone's notify action (for example <code>notify.mobile_app_your_phone</code>).</sub>
+  <sub>Notifications like these come from the blueprints and automations below.</sub>
 </p>
 
-<details open>
+### One-click blueprints
+
+Import a blueprint, then create an automation from it and pick your lines, distance, purifier
+and so on from drop-downs. For the notify action, enter your phone's, for example
+`notify.mobile_app_your_phone`.
+
+| Blueprint | What it does | |
+|---|---|---|
+| ⚡ **Lightning nearby** | Notify when lightning strikes within a distance of home that you choose | <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Flightning_nearby.yaml"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Import the lightning_nearby.yaml blueprint"></a> |
+| 🚇 **MRT/LRT line disruption** | Notify when your lines are disrupted (optionally planned works too) during your travel hours, and when service resumes | <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fmrt_line_disruption.yaml"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Import the mrt_line_disruption.yaml blueprint"></a> |
+| 🌊 **PUB flash-flood alert** | Notify for each new flash-flood alert, anywhere or only near home | <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fflood_alert.yaml"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Import the flood_alert.yaml blueprint"></a> |
+| 😷 **Haze mode** | Turn purifiers or fans on above a PSI level and off when the air clears | <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fhaze_purifier.yaml"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Import the haze_purifier.yaml blueprint"></a> |
+| 🚗 **COE results** | One notification with every category's premium after each bidding exercise | <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fcoe_results.yaml"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Import the coe_results.yaml blueprint"></a> |
+
+The blueprints live in [`blueprints/automation/singapore/`](blueprints/automation/singapore) and
+need Home Assistant 2025.4 or newer.
+
+### Or copy the YAML
+
+Simpler versions to paste into an automation's YAML editor. Change `notify.notify` to your
+phone's notify action.
+
+<details>
 <summary><b>⚡ Warn me when lightning is close</b></summary>
 
 ```yaml
@@ -171,6 +193,28 @@ actions:
         Cat A {{ '{:,}'.format(states('sensor.coe_category_a') | int) }} SGD ·
         Cat B {{ '{:,}'.format(states('sensor.coe_category_b') | int) }} SGD ·
         Cat E {{ '{:,}'.format(states('sensor.coe_category_e') | int) }} SGD
+```
+</details>
+
+<details>
+<summary><b>☀️ Sunscreen reminder when the UV is high</b></summary>
+
+```yaml
+alias: High UV
+triggers:
+  - trigger: state
+    entity_id: sensor.nea_uv_exposure
+    to: [high, very_high, extreme]
+conditions:
+  - condition: time
+    weekday: [sat, sun]
+actions:
+  - action: notify.notify
+    data:
+      title: UV is {{ states('sensor.nea_uv_exposure') | replace('_', ' ') }}
+      message: >-
+        UV index {{ states('sensor.nea_uv_index') }}. Sunscreen and a hat if you're
+        heading out.
 ```
 </details>
 
@@ -281,9 +325,14 @@ Example entities: `weather.weather_bedok`, `weather.weather_ang_mo_kio`,
 - **Current temperature, humidity and wind** come from the live readings above.
 - **Daily forecast** is NEA's Singapore-wide 4-day outlook, with high/low temperature,
   humidity and wind for each day. It is the same for every area.
+- **Hourly forecast** is NEA's 24-hour forecast for the area's region (north, south, east,
+  west or central): one entry per forecast period, usually 6 pm–6 am, 6 am–midday and
+  midday–6 pm. NEA gives no temperature per period, so entries carry a condition only. Each
+  area is assigned to the region whose centre is nearest its NEA map location, which can be
+  a judgement call for areas near a boundary (the `forecast_region` attribute shows which).
 
-Attributes: `forecast_area`, `raw_condition` (NEA's original text), `valid_start` /
-`valid_end` (the 2-hour forecast window), plus the live readings.
+Attributes: `forecast_area`, `forecast_region`, `raw_condition` (NEA's original text),
+`valid_start` / `valid_end` (the 2-hour forecast window), plus the live readings.
 
 <p align="center">
   <img src="images/weather-forecast-bedok.jpeg" alt="Singapore Weather Bedok forecast card showing current condition and multi-day forecast" width="320">
@@ -436,6 +485,24 @@ See [Recipes](#recipes) for a lightning warning automation.
 
 </details>
 
+### UV index
+
+Updated every **15 minutes** from [NEA's hourly UV index via data.gov.sg](https://api-open.data.gov.sg/v2/real-time/api/uv).
+NEA publishes one reading an hour from 7 am to 7 pm, so overnight the sensors show the
+last reading of the evening.
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.nea_uv_index` | NEA UV Index | UV index | Latest hourly UV index; attributes `hour` (the reading's hour), `exposure`, `peak` / `peak_hour` (today's highest) and `readings` (today's hourly values) |
+| `sensor.nea_uv_exposure` | NEA UV Exposure | — | NEA's exposure level for the latest reading: `low` (0–2), `moderate` (3–5), `high` (6–7), `very_high` (8–10) or `extreme` (11+) |
+
+See [Recipes](#recipes) for a sunscreen reminder.
+
+</details>
+
 ### Public holidays
 
 Updated every 24 hours from [MOM](https://www.mom.gov.sg/employment-practices/public-holidays).
@@ -494,6 +561,21 @@ sensor.weather_temperature:
   attributes:
     source: data.gov.sg / NEA (collection 1459)
 
+sensor.nea_uv_index:
+  state: 6
+  unit_of_measurement: UV index
+  attributes:
+    hour: "2026-11-13T14:00:00+08:00"
+    exposure: high
+    peak: 6
+    peak_hour: "2026-11-13T14:00:00+08:00"
+    readings:
+      - hour: "2026-11-13T13:00:00+08:00"
+        value: 4
+      - hour: "2026-11-13T14:00:00+08:00"
+        value: 6
+    source: NEA via data.gov.sg
+
 sensor.air_quality_psi_east:
   state: 39
   attributes:
@@ -520,7 +602,7 @@ sensor.air_quality_psi_east:
 - **Diagnostics:** on the Singapore integration page, open the three-dot menu and choose
   **Download diagnostics**. The file shows each data source's last update result, error
   and parsed data. Attach it when opening an issue.
-- **Unavailable sensors:** flood alerts, traffic cameras, dengue clusters, lightning, PSI and COE
+- **Unavailable sensors:** flood alerts, traffic cameras, dengue clusters, lightning, UV, PSI, COE and SP Group tariffs
   load in the background, so the rest of the integration still starts if one of those
   sources is down. Their sensors show as unavailable until a fetch succeeds.
 - **HTTP 429 in the log:** data.gov.sg rate-limits bursts of requests, which can happen
@@ -533,13 +615,14 @@ sensor.air_quality_psi_east:
 |--------|------|---------|
 | [SP Group](https://www.spgroup.com.sg/our-services/utilities/tariff-information) | Electricity, gas, water tariffs | Every 24 h |
 | [data.gov.sg / LTA](https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view) | COE bidding results | Daily at 19:30 |
-| [data.gov.sg / NEA (collection 1456)](https://data.gov.sg/collections/1456/view) | 2-hour area forecasts and 4-day outlook | Every 10 min |
+| [data.gov.sg / NEA (collection 1456)](https://data.gov.sg/collections/1456/view) | 2-hour area forecasts, 24-hour regional forecast and 4-day outlook | Every 10 min |
 | [data.gov.sg / NEA (collection 1459)](https://data.gov.sg/collections/1459/view) | Realtime weather readings | Every 10 min |
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_fe37906a0182569d891506e815e819b7/view) | PSI and pollutant readings | Every 15 min |
 | [data.gov.sg / PUB](https://data.gov.sg/datasets/d_f1404e08587ce555b9ea3f565e2eb9a3/view) | Flash-flood alerts | Every 2 min |
 | [data.gov.sg / LTA](https://data.gov.sg/datasets/d_6cdb6b405b25aaaacbaf7689bcc6fae0/view) | Woodlands & Tuas checkpoint camera images | Every 2 min |
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_dbfabf16158d1b0e1c420627c0819168/view) | Dengue clusters | Every 6 h |
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_08238953fe0f6dd13f10714ebfbcb9f9/view) | Lightning observations | Every 2 min |
+| [data.gov.sg / NEA](https://api-open.data.gov.sg/v2/real-time/api/uv) | Hourly UV index | Every 15 min |
 | [MOM](https://www.mom.gov.sg/employment-practices/public-holidays) | Public holidays | Every 24 h |
 | [mytransport.sg](https://www.mytransport.sg/trainstatus) | MRT/LRT train status | Every 5 min |
 

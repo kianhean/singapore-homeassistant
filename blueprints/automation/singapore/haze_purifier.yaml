@@ -1,0 +1,112 @@
+blueprint:
+  name: Singapore – haze mode
+  description: >-
+    Turn on your air purifier (or anything else) when the 24-hour PSI goes
+    above a level you choose, and optionally turn it off again once the air
+    has cleared. Uses the **Air Quality PSI** sensor (highest region).
+  domain: automation
+  author: Singapore for Home Assistant
+  source_url: https://github.com/kianhean/singapore-homeassistant/blob/main/blueprints/automation/singapore/haze_purifier.yaml
+  homeassistant:
+    min_version: 2025.4.0
+  input:
+    psi_sensor:
+      name: PSI sensor
+      description: The Singapore-wide PSI, or one region's PSI sensor.
+      default: sensor.air_quality_psi
+      selector:
+        entity:
+          filter:
+            - integration: singapore
+              domain: sensor
+              device_class: aqi
+    on_above:
+      name: Turn on above
+      description: NEA's bands are good (0–50), moderate (51–100), unhealthy (101–200).
+      default: 100
+      selector:
+        number:
+          min: 0
+          max: 300
+          step: 1
+    turn_off:
+      name: Turn off again when the air clears
+      default: true
+      selector:
+        boolean: {}
+    off_below:
+      name: Turn off below
+      default: 50
+      selector:
+        number:
+          min: 0
+          max: 300
+          step: 1
+    devices:
+      name: Purifiers or fans
+      selector:
+        target:
+          entity:
+            - domain: [fan, switch, humidifier, climate]
+    notify:
+      name: Send a notification too
+      default: true
+      selector:
+        boolean: {}
+    notify_action:
+      name: Notify action
+      description: >-
+        The action that sends the notification, for example
+        notify.mobile_app_your_phone. Leave as notify.notify to use the default.
+      default: notify.notify
+      selector:
+        text: {}
+
+mode: queued
+max: 5
+
+variables:
+  psi_sensor: !input psi_sensor
+  turn_off: !input turn_off
+  notify: !input notify
+
+triggers:
+  - trigger: numeric_state
+    entity_id: !input psi_sensor
+    above: !input on_above
+    id: haze
+  - trigger: numeric_state
+    entity_id: !input psi_sensor
+    below: !input off_below
+    id: clear
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: haze
+        sequence:
+          - action: homeassistant.turn_on
+            target: !input devices
+          - if: "{{ notify }}"
+            then:
+              - action: !input notify_action
+                data:
+                  title: Haze mode on
+                  message: >-
+                    PSI is {{ states(psi_sensor) }}
+                    ({{ (state_attr(psi_sensor, 'band') or '') | replace('_', ' ') }}).
+                    Purifiers on.
+      - conditions:
+          - condition: trigger
+            id: clear
+          - "{{ turn_off }}"
+        sequence:
+          - action: homeassistant.turn_off
+            target: !input devices
+          - if: "{{ notify }}"
+            then:
+              - action: !input notify_action
+                data:
+                  title: Haze mode off
+                  message: PSI is down to {{ states(psi_sensor) }}. Purifiers off.

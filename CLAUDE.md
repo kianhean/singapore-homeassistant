@@ -19,12 +19,13 @@ custom_components/singapore/
 ├── traffic_coordinator.py  # TrafficImagesCoordinator: LTA checkpoint camera stills (Woodlands/Tuas)
 ├── dengue_coordinator.py   # DengueClusterCoordinator: NEA dengue cluster GeoJSON + distance helpers
 ├── lightning_coordinator.py # LightningCoordinator: NEA lightning strikes, 30-min rolling window
+├── uv_coordinator.py       # UvCoordinator: NEA hourly UV index + exposure bands
 ├── camera.py               # Camera entities (Woodlands/Tuas checkpoint traffic cameras)
 ├── calendar.py             # Calendar entity (Singapore public holidays)
 ├── weather.py              # Weather entities (one per Singapore forecast area)
 ├── config_flow.py          # UI config flow (name input; single instance via manifest)
 ├── diagnostics.py          # "Download diagnostics": coordinator status + parsed data
-├── sensor.py               # Sensor entities (tariff + COE + weather + PSI + train status)
+├── sensor.py               # Sensor entities (tariff, COE, weather, PSI, trains, flood, dengue, lightning, UV)
 ├── manifest.json           # Integration metadata; declares beautifulsoup4 dep, single_config_entry
 ├── icons.json              # Icon translations (entity icons live here, not in _attr_icon)
 ├── strings.json            # Config flow UI strings + entity names + enum state names
@@ -45,6 +46,7 @@ tests/
 ├── test_traffic_cameras.py      # Traffic images parser, coordinator, camera entity + image cache
 ├── test_dengue_coordinator.py   # Dengue GeoJSON parser, distance math, coordinator, sensors
 ├── test_lightning_coordinator.py # Lightning parser, rolling window, coordinator, sensors
+├── test_uv_coordinator.py       # UV parser (v1/v2), exposure bands, coordinator, sensors
 ├── test_calendar.py             # Calendar event and range query tests
 ├── test_sensor.py               # Sensor value, unit, attributes, unique_id, None-safety
 ├── test_weather.py              # Weather entity condition mapping + forecast tests
@@ -57,6 +59,8 @@ tests_ha/                        # Runs against a REAL Home Assistant (no module
 
 .github/workflows/tests.yml   # CI: unit tests, real-HA compat matrix, e2e scrape, ruff lint
 
+blueprints/automation/singapore/  # Importable automation blueprints (README "Import" buttons)
+tests_ha/test_blueprints.py      # Runs every blueprint in real HA (one test per blueprint, required)
 examples/dashboard.yaml          # Built-in-cards dashboard shown in images/hero.jpg
 docs/mockups/                    # HTML sources for the README images (node build.mjs → images/*.png)
 └── fetch_cameras.py             # uv run: pulls real checkpoint stills into docs/mockups/cameras/
@@ -82,6 +86,7 @@ class SingaporeData:
     traffic: TrafficImagesCoordinator
     dengue: DengueClusterCoordinator
     lightning: LightningCoordinator
+    uv: UvCoordinator
 
 type SingaporeConfigEntry = ConfigEntry[SingaporeData]
 ```
@@ -149,7 +154,8 @@ migration) keep their legacy `sensor.singapore_*` IDs because the unique IDs did
 One `weather` entity is created per forecast area (e.g. `weather.weather_bedok`; the name is
 the raw area via `_attr_name`, under the *Weather* device). Current condition comes from the
 area's 2-hour forecast; current temperature/humidity/wind from the collection 1459 readings.
-Forecasts are `FORECAST_DAILY` only, from the Singapore-wide 4-day outlook (same for every area).
+`FORECAST_DAILY` comes from the Singapore-wide 4-day outlook (same for every area);
+`FORECAST_HOURLY` from the 24-hour forecast for the area's region (see below).
 
 ### Train Status Sensors
 
@@ -283,7 +289,8 @@ Forecast parsing supports both common payload styles:
 - `data.records[0].periods[0].regions` (newer shape)
 
 The 2-hour forecast sets each area entity's current condition. The four-day outlook
-(see below) feeds `_async_forecast_daily()`; there is no hourly forecast.
+(see below) feeds `_async_forecast_daily()`; the 24-hour forecast feeds
+`_async_forecast_hourly()`.
 
 ### Forecast Subscription Pattern
 
@@ -295,15 +302,29 @@ do not override `_handle_coordinator_update` to push listeners manually.
 
 ### Collection 1456 — Other Forecast APIs
 
-`four-day-outlook` is integrated (daily forecasts); `twenty-four-hr-forecast` is not:
+Both are integrated: `four-day-outlook` → daily forecasts, `twenty-four-hr-forecast` → hourly:
 
 | Endpoint | Coverage | Periods | Has temp/humidity? |
 |----------|----------|---------|-------------------|
 | `twenty-four-hr-forecast` | 5 regions (N/S/E/W/central) | ~4 × 6-hour periods | No |
 | `four-day-outlook` | Singapore-wide | 4 daily forecasts | Yes (high/low ranges) |
 
-The 24-hour forecast adds regional granularity for hourly forecasts beyond the current
-2-hour window, but provides no temperature/humidity data.
+`twenty-four-hr-forecast` (v2: `data.records[0].periods[]` with `timePeriod{start,end}` and
+`regions{<region>: {code, text}}`) is parsed into `RegionalForecastPeriod`s. Each 2-hour
+area gets a `region` from `_area_regions()`: the nearest PSI region centre
+(`DEFAULT_REGION_LOCATIONS`) to the area's `area_metadata[].label_location`. Hourly
+forecast = one entry per period that hasn't ended, condition only (NEA gives no per-period
+temperature). A non-200 24-hour response is soft (logged, `regional_forecast = None`), like
+the four-day outlook.
+
+## Blueprints
+
+`blueprints/automation/singapore/*.yaml` are automation blueprints linked from the README
+with my.home-assistant.io import buttons (which point at `main`). Each sets
+`homeassistant.min_version` to the minimum supported HA version and takes the notify action
+as a text input (default `notify.notify`). `tests_ha/test_blueprints.py` loads each one
+with `use_blueprint` and drives sensor states, so it runs on every HA version in the CI
+matrix; `test_every_blueprint_is_tested` fails if a blueprint has no test.
 
 #### four-day-outlook payload caveat (2026-04-06)
 
@@ -426,6 +447,18 @@ than `STRIKE_WINDOW` (30 min), also on failed polls. `sensor.nea_lightning_strik
 window; `sensor.nea_nearest_lightning` = haversine km from `hass.config` home to the nearest
 strike (`None` when there are none) plus `strikes_within_10_km`. Both sit on the shared *NEA*
 device with the dengue sensors (`_nea_device_info` in `sensor.py`).
+
+## How the UV Coordinator Works
+
+`uv_coordinator.py` GETs `https://api-open.data.gov.sg/v2/real-time/api/uv` every
+**15 minutes**. NEA publishes one reading per hour from 7 am to 7 pm, ~10 min after the hour.
+Payload (v2): `data.records[0].index[{hour, value}]`, newest first; v1 (`items[0].index[{timestamp,
+value}]`) is also parsed. `UvData.readings` is today's readings oldest-first (`latest`, `peak`
+properties; ties keep the earliest hour). A payload with no `index` list raises `UpdateFailed`;
+an empty list is valid. `sensor.nea_uv_index` (unit `UV_INDEX`, measurement) and
+`sensor.nea_uv_exposure` (ENUM, `UV_EXPOSURE_OPTIONS`: low/moderate/high/very_high/extreme,
+NEA's WHO-based bands via `uv_exposure()`) sit on the shared *NEA* device. First refresh runs
+in the background.
 
 ### Camera platform test dependency
 

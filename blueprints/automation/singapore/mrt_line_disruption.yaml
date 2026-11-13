@@ -1,0 +1,130 @@
+blueprint:
+  name: Singapore – MRT/LRT line disruption
+  description: >-
+    Get a notification when the MRT or LRT lines you use are disrupted (and,
+    if you like, when there are planned works), with LTA's message, during the
+    hours you travel. Optionally tells you when service is back to normal.
+  domain: automation
+  author: Singapore for Home Assistant
+  source_url: https://github.com/kianhean/singapore-homeassistant/blob/main/blueprints/automation/singapore/mrt_line_disruption.yaml
+  homeassistant:
+    min_version: 2025.4.0
+  input:
+    line_sensors:
+      name: Lines
+      description: The line status sensors to watch.
+      default:
+        - sensor.mrt_lrt_circle_line_status
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - integration: singapore
+              domain: sensor
+              device_class: enum
+    network_sensor:
+      name: Overall MRT/LRT status sensor
+      description: Its details attribute holds LTA's message for the notification.
+      default: sensor.mrt_lrt_status
+      selector:
+        entity:
+          filter:
+            - integration: singapore
+              domain: sensor
+              device_class: enum
+    include_planned:
+      name: Also notify about planned works
+      default: false
+      selector:
+        boolean: {}
+    notify_resolved:
+      name: Notify when service is back to normal
+      default: true
+      selector:
+        boolean: {}
+    start_time:
+      name: From
+      description: Only notify after this time. Use 00:00:00 for all day.
+      default: "06:00:00"
+      selector:
+        time: {}
+    end_time:
+      name: Until
+      description: Only notify before this time. Use 23:59:59 for all day.
+      default: "10:00:00"
+      selector:
+        time: {}
+    weekdays:
+      name: Days
+      default: [mon, tue, wed, thu, fri]
+      selector:
+        select:
+          multiple: true
+          mode: list
+          options:
+            - { label: Monday, value: mon }
+            - { label: Tuesday, value: tue }
+            - { label: Wednesday, value: wed }
+            - { label: Thursday, value: thu }
+            - { label: Friday, value: fri }
+            - { label: Saturday, value: sat }
+            - { label: Sunday, value: sun }
+    notify_action:
+      name: Notify action
+      description: >-
+        The action that sends the notification, for example
+        notify.mobile_app_your_phone. Leave as notify.notify to use the default.
+      default: notify.notify
+      selector:
+        text: {}
+
+mode: queued
+max: 10
+
+variables:
+  network_sensor: !input network_sensor
+  include_planned: !input include_planned
+  notify_resolved: !input notify_resolved
+  watched: "{{ ['disruption', 'planned'] if include_planned else ['disruption'] }}"
+  line: >-
+    {{ trigger.to_state.name | replace('MRT/LRT ', '') | replace(' Status', '') }}
+
+triggers:
+  - trigger: state
+    entity_id: !input line_sensors
+    to: [disruption, planned]
+    id: problem
+  - trigger: state
+    entity_id: !input line_sensors
+    from: [disruption, planned]
+    to: normal
+    id: resolved
+
+conditions:
+  - condition: time
+    after: !input start_time
+    before: !input end_time
+    weekday: !input weekdays
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: problem
+          - "{{ trigger.to_state.state in watched }}"
+        sequence:
+          - action: !input notify_action
+            data:
+              title: "{{ line }}: {{ state_translated(trigger.entity_id) }}"
+              message: >-
+                {{ state_attr(network_sensor, 'details')
+                   or 'Check LTA or the operator for details.' }}
+      - conditions:
+          - condition: trigger
+            id: resolved
+          - "{{ notify_resolved and trigger.from_state.state in watched }}"
+        sequence:
+          - action: !input notify_action
+            data:
+              title: "{{ line }}: back to normal"
+              message: Train service has resumed.

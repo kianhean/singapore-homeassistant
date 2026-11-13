@@ -33,6 +33,7 @@ async def async_get_config_entry_diagnostics(
             "traffic": _coordinator_diagnostics(data.traffic),
             "dengue": _coordinator_diagnostics(data.dengue),
             "lightning": _coordinator_diagnostics(data.lightning),
+            "uv": _coordinator_diagnostics(data.uv),
         },
     }
 

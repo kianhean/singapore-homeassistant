@@ -1,6 +1,6 @@
 """Tests for Singapore weather entity behavior."""
 
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
@@ -8,6 +8,7 @@ import pytest
 from custom_components.singapore.weather import SingaporeAreaWeatherEntity
 from custom_components.singapore.weather_coordinator import (
     FourDayForecastEntry,
+    RegionalForecastPeriod,
     WeatherAreaData,
     WeatherData,
     WeatherReadings,
@@ -237,7 +238,7 @@ async def test_weather_entity_coordinator_update_notifies_forecast_listeners():
     await captured["coro"]
 
 
-def test_weather_entity_supports_daily_feature_only():
+def test_weather_entity_supports_daily_and_hourly_forecasts():
     from custom_components.singapore.weather import WeatherEntityFeature
 
     data = WeatherData(
@@ -254,4 +255,73 @@ def test_weather_entity_supports_daily_feature_only():
     )
     ent = SingaporeAreaWeatherEntity(_coordinator(data), "entry1", "Bedok")
     assert ent._attr_supported_features & WeatherEntityFeature.FORECAST_DAILY
-    assert not (ent._attr_supported_features & WeatherEntityFeature.FORECAST_HOURLY)
+    assert ent._attr_supported_features & WeatherEntityFeature.FORECAST_HOURLY
+
+
+# ---------------------------------------------------------------------------
+# Hourly forecast (24-hour regional forecast) tests
+# ---------------------------------------------------------------------------
+
+
+def _hourly_data(region="east", periods=None):
+    now = datetime.now(UTC)
+    if periods is None:
+        periods = [
+            # Already over: must be skipped.
+            RegionalForecastPeriod(
+                start=now - timedelta(hours=12),
+                end=now - timedelta(hours=6),
+                regions={"east": "Fair (Day)"},
+            ),
+            # In progress: kept.
+            RegionalForecastPeriod(
+                start=now - timedelta(hours=1),
+                end=now + timedelta(hours=5),
+                regions={"east": "Thundery Showers", "west": "Cloudy"},
+            ),
+            RegionalForecastPeriod(
+                start=now + timedelta(hours=5),
+                end=now + timedelta(hours=11),
+                regions={"east": "Partly Cloudy (Night)", "west": "Cloudy"},
+            ),
+        ]
+    return WeatherData(
+        areas={
+            "Bedok": WeatherAreaData(
+                area="Bedok",
+                condition_text="Cloudy",
+                valid_start=now,
+                valid_end=now + timedelta(hours=2),
+                region=region,
+            )
+        },
+        updated_at=None,
+        readings=WeatherReadings(),
+        regional_forecast=periods,
+    )
+
+
+def test_hourly_forecast_uses_area_region_and_skips_past_periods():
+    data = _hourly_data()
+    ent = SingaporeAreaWeatherEntity(_coordinator(data), "entry1", "Bedok")
+
+    fc = ent._async_forecast_hourly()
+
+    assert [f["condition"] for f in fc] == ["lightning-rainy", "partlycloudy"]
+    assert fc[0]["datetime"] == data.regional_forecast[1].start.isoformat()
+    assert "native_temperature" not in fc[0]
+    assert ent.extra_state_attributes["forecast_region"] == "east"
+
+
+def test_hourly_forecast_none_without_region():
+    ent = SingaporeAreaWeatherEntity(
+        _coordinator(_hourly_data(region=None)), "entry1", "Bedok"
+    )
+    assert ent._async_forecast_hourly() is None
+
+
+def test_hourly_forecast_none_without_regional_data():
+    ent = SingaporeAreaWeatherEntity(
+        _coordinator(_hourly_data(periods=[])), "entry1", "Bedok"
+    )
+    assert ent._async_forecast_hourly() is None

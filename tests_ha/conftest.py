@@ -23,9 +23,11 @@ from custom_components.singapore.lightning_coordinator import LIGHTNING_URL
 from custom_components.singapore.psi_coordinator import PSI_URL
 from custom_components.singapore.traffic_coordinator import TRAFFIC_IMAGES_URL
 from custom_components.singapore.train_coordinator import TRAIN_STATUS_URL
+from custom_components.singapore.uv_coordinator import UV_URL
 from custom_components.singapore.weather_coordinator import (
     _READINGS_ENDPOINTS,
     FOUR_DAY_URL,
+    TWENTY_FOUR_HR_URL,
     WEATHER_URL,
 )
 
@@ -61,6 +63,13 @@ _COE_PAYLOAD = {
 }
 
 _TWO_HR_PAYLOAD = {
+    "area_metadata": [
+        {"name": "Bedok", "label_location": {"latitude": 1.321, "longitude": 103.924}},
+        {
+            "name": "Woodlands",
+            "label_location": {"latitude": 1.432, "longitude": 103.786},
+        },
+    ],
     "items": [
         {
             "timestamp": "2026-04-05T08:00:00+08:00",
@@ -73,7 +82,40 @@ _TWO_HR_PAYLOAD = {
                 {"area": "Woodlands", "forecast": "Partly Cloudy (Day)"},
             ],
         }
-    ]
+    ],
+}
+
+# Periods are far in the future so none has ended when the test runs.
+_TWENTY_FOUR_HR_PAYLOAD = {
+    "code": 0,
+    "data": {
+        "records": [
+            {
+                "periods": [
+                    {
+                        "timePeriod": {
+                            "start": "2099-01-01T18:00:00+08:00",
+                            "end": "2099-01-02T06:00:00+08:00",
+                        },
+                        "regions": {
+                            "east": {"code": "TL", "text": "Thundery Showers"},
+                            "north": {"code": "CL", "text": "Cloudy"},
+                        },
+                    },
+                    {
+                        "timePeriod": {
+                            "start": "2099-01-02T06:00:00+08:00",
+                            "end": "2099-01-02T12:00:00+08:00",
+                        },
+                        "regions": {
+                            "east": {"code": "FD", "text": "Fair (Day)"},
+                            "north": {"code": "CL", "text": "Cloudy"},
+                        },
+                    },
+                ]
+            }
+        ]
+    },
 }
 
 _TRAIN_PAYLOAD = {
@@ -279,6 +321,23 @@ def mock_sources(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
     aioclient_mock.get(COE_API_URL, json=_COE_PAYLOAD)
     aioclient_mock.get(WEATHER_URL, json=_TWO_HR_PAYLOAD)
     aioclient_mock.get(FOUR_DAY_URL, status=404)
+    aioclient_mock.get(TWENTY_FOUR_HR_URL, json=_TWENTY_FOUR_HR_PAYLOAD)
+    aioclient_mock.get(
+        UV_URL,
+        json={
+            "code": 0,
+            "data": {
+                "records": [
+                    {
+                        "index": [
+                            {"hour": "2026-11-13T13:00:00+08:00", "value": 9},
+                            {"hour": "2026-11-13T12:00:00+08:00", "value": 7},
+                        ]
+                    }
+                ]
+            },
+        },
+    )
     for url in _READINGS_ENDPOINTS.values():
         aioclient_mock.get(
             url, json={"items": [{"readings": [{"value": 30}, {"value": 32}]}]}

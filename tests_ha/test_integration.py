@@ -123,6 +123,23 @@ async def test_setup_creates_entities_and_unloads(
     assert lightning.attributes["type"] == "cloud_to_ground"
     assert lightning.attributes["strikes_within_10_km"] == 1
 
+    uv = hass.states.get("sensor.nea_uv_index")
+    assert uv is not None
+    assert uv.state == "9"
+    assert uv.attributes["unit_of_measurement"] == "UV index"
+    assert uv.attributes["state_class"] == "measurement"
+    assert uv.attributes["peak_hour"] == "2026-11-13T13:00:00+08:00"
+    exposure = hass.states.get("sensor.nea_uv_exposure")
+    assert exposure is not None
+    assert exposure.state == "very_high"
+    assert exposure.attributes["options"] == [
+        "low",
+        "moderate",
+        "high",
+        "very_high",
+        "extreme",
+    ]
+
     # Every entity must use a stable, entry-scoped unique ID.
     registry = er.async_get(hass)
     entities = er.async_entries_for_config_entry(registry, entry.entry_id)
@@ -132,6 +149,32 @@ async def test_setup_creates_entities_and_unloads(
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.NOT_LOADED
+
+
+async def test_hourly_forecast_uses_area_region(
+    hass: HomeAssistant, mock_sources
+) -> None:
+    await _setup(hass)
+
+    bedok_state = hass.states.get("weather.weather_bedok")
+    assert bedok_state.attributes["forecast_region"] == "east"
+
+    response = await hass.services.async_call(
+        "weather",
+        "get_forecasts",
+        {
+            "entity_id": ["weather.weather_bedok", "weather.weather_woodlands"],
+            "type": "hourly",
+        },
+        blocking=True,
+        return_response=True,
+    )
+
+    bedok = response["weather.weather_bedok"]["forecast"]
+    assert [f["condition"] for f in bedok] == ["lightning-rainy", "sunny"]
+    assert bedok[0]["datetime"] == "2099-01-01T18:00:00+08:00"
+    woodlands = response["weather.weather_woodlands"]["forecast"]
+    assert [f["condition"] for f in woodlands] == ["cloudy", "cloudy"]
 
 
 async def test_setup_retries_when_source_unavailable(

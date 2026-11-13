@@ -1,0 +1,60 @@
+blueprint:
+  name: Singapore – COE results
+  description: >-
+    Get the latest COE premiums in one notification when LTA publishes the
+    results of a bidding exercise.
+  domain: automation
+  author: Singapore for Home Assistant
+  source_url: https://github.com/kianhean/singapore-homeassistant/blob/main/blueprints/automation/singapore/coe_results.yaml
+  homeassistant:
+    min_version: 2025.4.0
+  input:
+    coe_sensors:
+      name: Categories
+      default:
+        - sensor.coe_category_a
+        - sensor.coe_category_b
+        - sensor.coe_category_c
+        - sensor.coe_category_d
+        - sensor.coe_category_e
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - integration: singapore
+              domain: sensor
+    notify_action:
+      name: Notify action
+      description: >-
+        The action that sends the notification, for example
+        notify.mobile_app_your_phone. Leave as notify.notify to use the default.
+      default: notify.notify
+      selector:
+        text: {}
+
+# All categories update together, so wait briefly and send one message.
+mode: single
+max_exceeded: silent
+
+variables:
+  coe_sensors: !input coe_sensors
+
+triggers:
+  - trigger: state
+    entity_id: !input coe_sensors
+    not_from: [unavailable, unknown]
+    not_to: [unavailable, unknown]
+
+actions:
+  - delay: 5
+  - action: !input notify_action
+    data:
+      title: COE results
+      message: |-
+        {%- set first = coe_sensors | first %}
+        {%- if state_attr(first, 'month') %}
+        {{ state_attr(first, 'month') }}, bidding {{ state_attr(first, 'bidding_no') }}
+        {%- endif %}
+        {%- for s in coe_sensors %}
+        {{ state_attr(s, 'category') or s }}: {{ '{:,}'.format(states(s) | int(0)) }} SGD
+        {%- endfor %}
