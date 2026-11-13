@@ -101,6 +101,22 @@ async def test_setup_creates_entities_and_unloads(
     image = await async_get_image(hass, "camera.traffic_cameras_woodlands_causeway")
     assert image.content == b"jpeg-2701"
 
+    radar = hass.states.get("camera.weather_rain_radar_70_km")
+    assert radar is not None
+    assert radar.state == "idle"
+    assert radar.attributes["range"] == "70 km"
+    assert radar.attributes["north"] == 1.97854
+    assert hass.states.get("camera.weather_rain_radar_240_km").state == "idle"
+    # No NEA map for 480 km, so that camera is registered but disabled by default.
+    assert hass.states.get("camera.weather_rain_radar_480_km") is None
+    radar_480 = er.async_get(hass).async_get("camera.weather_rain_radar_480_km")
+    assert radar_480 is not None
+    assert radar_480.disabled_by is er.RegistryEntryDisabler.INTEGRATION
+    radar_image = await async_get_image(hass, "camera.weather_rain_radar_70_km")
+    # Drawn on NEA's 853 x 479 Singapore base map.
+    assert radar_image.content_type == "image/jpeg"
+    assert radar_image.content[:3] == b"\xff\xd8\xff"
+
     dengue = hass.states.get("sensor.nea_dengue_clusters")
     assert dengue is not None
     assert dengue.state == "2"

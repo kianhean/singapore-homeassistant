@@ -104,6 +104,9 @@
     "camera": {
       "checkpoint_camera": {
         "default": "mdi:cctv"
+      },
+      "rain_radar": {
+        "default": "mdi:radar"
       }
     }
   }

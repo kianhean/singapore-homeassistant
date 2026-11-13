@@ -317,6 +317,50 @@ def test_e2e_traffic_images_checkpoint_cameras():
         assert cam.image_url.startswith("https://"), cam.image_url
 
 
+def test_e2e_rain_radar_images():
+    """Fetch the live NEA radar feed for every range and assert it still parses."""
+    from custom_components.singapore.radar_coordinator import (
+        RADAR_RANGES,
+        RADAR_URL,
+        _parse_radar,
+    )
+
+    for radar_range in RADAR_RANGES:
+        try:
+            payload = asyncio.run(_async_get_json(RADAR_URL.format(range=radar_range)))
+        except Exception as err:
+            pytest.skip(f"Skipping e2e due to network error: {err}")
+        image = _parse_radar(payload, radar_range)
+        assert image.image_url.startswith("https://"), image.image_url
+        assert image.timestamp is not None
+        assert image.north is not None and image.south is not None
+
+
+def test_e2e_rain_radar_nea_basemaps():
+    """NEA's rain-areas base maps must still exist at the size the crop assumes."""
+    import io
+
+    from PIL import Image
+
+    from custom_components.singapore.radar_image import BASEMAPS
+
+    async def _get_bytes(url: str) -> bytes:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                url, timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
+                response.raise_for_status()
+                return await response.read()
+
+    expected = {"70km": (853, 479), "240km": (853, 853)}
+    for radar_range, spec in BASEMAPS.items():
+        try:
+            body = asyncio.run(_get_bytes(spec.url))
+        except Exception as err:
+            pytest.skip(f"Skipping e2e due to network error: {err}")
+        assert Image.open(io.BytesIO(body)).size == expected[radar_range]
+
+
 def test_e2e_dengue_clusters_download_and_parse():
     """Download the live NEA dengue clusters GeoJSON and assert it parses."""
     from custom_components.singapore.dengue_coordinator import (

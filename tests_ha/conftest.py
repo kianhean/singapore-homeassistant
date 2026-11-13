@@ -8,8 +8,11 @@ HTTP is still mocked so the suite stays offline and deterministic.
 
 from __future__ import annotations
 
+import io
+
 import pytest
 from homeassistant.util import dt as dt_util
+from PIL import Image
 from pytest_homeassistant_custom_component.test_util.aiohttp import (
     AiohttpClientMocker,
 )
@@ -21,6 +24,8 @@ from custom_components.singapore.flood_coordinator import FLOOD_ALERTS_URL
 from custom_components.singapore.holiday_coordinator import PUBLIC_HOLIDAYS_URL
 from custom_components.singapore.lightning_coordinator import LIGHTNING_URL
 from custom_components.singapore.psi_coordinator import PSI_URL
+from custom_components.singapore.radar_coordinator import RADAR_URL
+from custom_components.singapore.radar_image import BASEMAPS
 from custom_components.singapore.traffic_coordinator import TRAFFIC_IMAGES_URL
 from custom_components.singapore.train_coordinator import TRAIN_STATUS_URL
 from custom_components.singapore.uv_coordinator import UV_URL
@@ -308,6 +313,12 @@ def _holiday_html() -> str:
 """
 
 
+def _png(size: tuple[int, int]) -> bytes:
+    out = io.BytesIO()
+    Image.new("RGBA", size).save(out, format="PNG")
+    return out.getvalue()
+
+
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Allow Home Assistant to load custom_components/singapore."""
@@ -358,4 +369,30 @@ def mock_sources(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
     )
     aioclient_mock.get(_DENGUE_FILE_URL, json=_DENGUE_GEOJSON)
     aioclient_mock.get(LIGHTNING_URL, json=_lightning_payload())
+    for radar_range in ("70km", "240km"):
+        aioclient_mock.get(
+            RADAR_URL.format(range=radar_range),
+            json={
+                "code": 0,
+                "data": {
+                    "boundaryBox": {
+                        "upperLeft": {"longitude": 103.342685, "latitude": 1.97854},
+                        "lowerRight": {"longitude": 104.602315, "latitude": 0.719515},
+                    },
+                    "records": [
+                        {
+                            "timestamp": "2026-11-13T22:25:00+08:00",
+                            "image": {
+                                "url": f"https://radar.example/{radar_range}.png",
+                                "format": "png",
+                            },
+                        }
+                    ],
+                },
+            },
+        )
+    # 480 km failing: its (disabled-by-default) camera has no image to show.
+    aioclient_mock.get(RADAR_URL.format(range="480km"), status=429)
+    aioclient_mock.get("https://radar.example/70km.png", content=_png((480, 480)))
+    aioclient_mock.get(BASEMAPS["70km"].url, content=_png((853, 479)))
     return aioclient_mock
