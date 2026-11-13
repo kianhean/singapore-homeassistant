@@ -246,6 +246,10 @@ Quarter is inferred from date strings in two formats:
 
 Solar export price = total electricity tariff − network costs.
 
+The tariff first refresh runs as a background task (like COE/PSI), so an unreachable
+SP Group site (e.g. the TLS handshake failures in issue #44) never blocks integration setup;
+the tariff sensors just stay unavailable until a fetch succeeds.
+
 ## How the Weather Coordinator Works
 
 `weather_coordinator.py` fetches (every **10 minutes**):
