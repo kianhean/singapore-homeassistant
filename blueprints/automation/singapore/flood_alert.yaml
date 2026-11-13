@@ -1,0 +1,74 @@
+blueprint:
+  name: Singapore – PUB flash-flood alert
+  description: >-
+    Get a notification for each new PUB flash-flood alert, optionally only for
+    alerts within a distance of your home (measured from the home location in
+    Settings → System → General).
+  domain: automation
+  author: Singapore for Home Assistant
+  source_url: https://github.com/kianhean/singapore-homeassistant/blob/main/blueprints/automation/singapore/flood_alert.yaml
+  homeassistant:
+    min_version: 2025.4.0
+  input:
+    flood_sensor:
+      name: Flood alerts sensor
+      default: sensor.pub_flood_alerts
+      selector:
+        entity:
+          filter:
+            - integration: singapore
+              domain: sensor
+    radius:
+      name: Only alerts within
+      description: Set to 0 to be told about flash floods anywhere in Singapore.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 30
+          step: 0.5
+          unit_of_measurement: km
+    notify_action:
+      name: Notify action
+      description: >-
+        The action that sends the notification, for example
+        notify.mobile_app_your_phone. Leave as notify.notify to use the default.
+      default: notify.notify
+      selector:
+        text: {}
+
+mode: queued
+max: 10
+
+variables:
+  radius: !input radius
+  new_alerts: >-
+    {% set before = trigger.from_state.attributes.get('alerts', []) or [] %}
+    {% set old_ids = before | map(attribute='identifier') | list %}
+    {% set ns = namespace(found=[]) %}
+    {% for alert in trigger.to_state.attributes.get('alerts', []) or [] %}
+      {% if alert.identifier not in old_ids
+            and (radius | float(0) == 0
+                 or (alert.latitude is not none
+                     and distance(alert.latitude, alert.longitude) <= radius | float(0))) %}
+        {% set ns.found = ns.found + [alert.description or alert.area] %}
+      {% endif %}
+    {% endfor %}
+    {{ ns.found }}
+
+triggers:
+  - trigger: state
+    entity_id: !input flood_sensor
+    attribute: alerts
+
+conditions:
+  # Skip the jump from unavailable at startup, which would re-announce old alerts.
+  - "{{ trigger.from_state is not none
+        and trigger.from_state.state not in ['unavailable', 'unknown'] }}"
+  - "{{ new_alerts | count > 0 }}"
+
+actions:
+  - action: !input notify_action
+    data:
+      title: PUB flood alert
+      message: "{{ new_alerts | join('; ') }}"
