@@ -2,7 +2,8 @@
 
 <p align="center">
   Weather, PSI, MRT status, COE prices, utility tariffs, flash floods, dengue and lightning,<br>
-  straight from official Singapore government sources. No API keys, no accounts.
+  straight from official Singapore government sources. No API keys, no accounts.<br>
+  Optionally, link your SP Group e-account for your own electricity, water and bill readings.
 </p>
 
 <p align="center">
@@ -35,6 +36,12 @@
 
 All public data: no API keys, one config entry, and a diagnostics download when something looks off.
 
+**Optional: your SP Group account.** Add your SP e-account to the same entry to get your own
+electricity, water and gas usage (half-hourly smart-meter data where available), bills, amount due,
+meter readings and Green Goals, plus Energy-dashboard statistics. See [SP Group e-account](#sp-group-e-account-optional).
+This part is built on [maci0/home-assistant-sp](https://github.com/maci0/home-assistant-sp) by
+[@maci0](https://github.com/maci0). See [Credits](#credits).
+
 ## Installation
 
 The integration is in the default HACS store. Use the **Open in HACS** button above, or:
@@ -56,6 +63,18 @@ Weather, MRT/LRT, Air Quality, PUB, NEA, Traffic Cameras, Public Holidays).
 
 The lightning and dengue distances are measured from the home location in
 **Settings → System → General**, so make sure it's set.
+
+### Optional: link your SP Group e-account
+
+1. Open **Settings → Devices & Services → Singapore**.
+2. Click **Add SP account** and sign in with the email and password you use in the SP app.
+   If your account has MFA, you'll be asked for the code from SMS, email or your authenticator app.
+3. Optionally enter a fixed electricity price (SGD/kWh incl. GST) to get a cost series for the
+   Energy dashboard. You can change it later from the account's **Reconfigure** menu.
+
+The password is never stored: only the session tokens SP returns are kept, and they renew
+themselves. You can add more than one account. Each one gets its own device, named after the
+premise address.
 
 > **Entity IDs on older installs:** since v0.3.0, entity names come from their device
 > (for example *Energy Electricity Tariff*). New installs get IDs like
@@ -259,6 +278,51 @@ The solar export price sensor also includes `network_cost` and `total_tariff`.
 <p align="center">
   <img src="images/energy-sensors.jpeg" alt="Singapore Energy device page showing electricity, gas, solar export, and water tariff sensors" width="320">
 </p>
+
+</details>
+
+### SP Group e-account (optional)
+
+Your own SP account data, read from the same APIs the SP Group app uses (Auth0 sign-in, then
+the Jarvis and Njord services) every 30 minutes. Added per account with **Add SP account**
+(see [Setup](#optional-link-your-sp-group-e-account)). The device is named after the premise
+address, so entity IDs look like `sensor.<your_address>_electricity_today`.
+
+<details>
+<summary>Entities, attributes and the Energy dashboard</summary>
+
+Sensors are only created for what your account has (for example, gas and the EV sensors
+appear only when SP returns data for them). New ones are added without a reload.
+
+| Name | What it is |
+|------|------------|
+| Electricity cumulative | Smart-meter (AMI) or billed total for the loaded window (~13 months) |
+| Electricity last billed / Water last billed / Gas last billed | Latest billed month |
+| Electricity today | AMI kWh for today (SGT) |
+| Electricity last 30 min | Last published AMI half-hour slot (lags a few hours) |
+| Water / Gas | Sum of billed months |
+| Last bill | Latest bill in SGD |
+| Amount due | Outstanding amount; negative is a credit |
+| Prepaid credit | PPMS balance, when the account is prepaid |
+| Electricity meter / Water meter | Last actual meter register reading |
+| Electricity this month / Water this month | Green Goals usage, with `goal_target` and `percent_difference` attributes |
+| GreenUP points, EV wallet, EV session, EV last charge, EV unpaid | When you use those SP services |
+| Unread notifications, Bill delivery, FCU (Tengah cooling), SP tariff | When SP returns them |
+| Account | Account status; carries the address, account number and retailer as attributes |
+
+**Energy dashboard.** After the first poll, long-term statistics are imported:
+
+- Grid consumption: pick the statistic **SP Group electricity**
+  (`singapore:<premise_id>_electricity`), not a sensor. It is built from the AMI half-hours
+  (folded to hours) where available, else billed months.
+- Cost: with an electricity price set, pick **SP Group electricity cost**
+  (`singapore:<premise_id>_electricity_cost`) as the grid source's cost. Changing the price
+  rewrites that series.
+- Gas: **SP Group gas** (`singapore:<premise_id>_gas`) when SP returns gas data.
+- **SP Group bill** (`singapore:<premise_id>_last_bill`) has one point per billed month.
+- Don't use *Electricity cumulative*, *Electricity last billed*, *Electricity meter* or
+  *Electricity this month* as a grid source. They measure different things.
+- Leave water out of Energy: SP bills water monthly, so there's no hourly series.
 
 </details>
 
@@ -605,6 +669,12 @@ sensor.air_quality_psi_east:
 - **Unavailable sensors:** flood alerts, traffic cameras, dengue clusters, lightning, UV, PSI, COE and SP Group tariffs
   load in the background, so the rest of the integration still starts if one of those
   sources is down. Their sensors show as unavailable until a fetch succeeds.
+- **SP account sensors unavailable:** if SP rejects the stored session, a repair appears under
+  **Settings → Repairs**. Open the account under the Singapore integration and choose
+  **Reconfigure → Sign in again**. If SP says the sign-in looks suspicious, sign in once in the
+  SP app, wait a few minutes, then try again. After a wrong password the next attempt waits
+  60 seconds, so Auth0 doesn't lock the account. The rest of the integration keeps working
+  either way.
 - **HTTP 429 in the log:** data.gov.sg rate-limits bursts of requests, which can happen
   when Home Assistant starts. Weather and dengue requests retry right away; other
   sources try again on their next scheduled update.
@@ -625,6 +695,7 @@ sensor.air_quality_psi_east:
 | [data.gov.sg / NEA](https://api-open.data.gov.sg/v2/real-time/api/uv) | Hourly UV index | Every 15 min |
 | [MOM](https://www.mom.gov.sg/employment-practices/public-holidays) | Public holidays | Every 24 h |
 | [mytransport.sg](https://www.mytransport.sg/trainstatus) | MRT/LRT train status | Every 5 min |
+| SP Group app APIs (optional, your e-account) | Your usage, bills, meters, Green Goals | Every 30 min |
 
 ## Development
 
@@ -649,9 +720,24 @@ Bug reports, data source ideas and pull requests are welcome. When something loo
 the **Download diagnostics** file to your [issue](https://github.com/kianhean/singapore-homeassistant/issues).
 If the integration is useful to you, a ⭐ on GitHub helps other Singapore Home Assistant users find it.
 
+## Credits
+
+The SP Group e-account support is built on
+**[maci0/home-assistant-sp](https://github.com/maci0/home-assistant-sp)** by
+**Marcel W. Wysocki ([@maci0](https://github.com/maci0))**. The SP API client, sign-in and
+MFA handling, sensor mapping, Energy statistics logic and their tests are vendored from its
+v1.8.0 release under the MIT License, in
+[`custom_components/singapore/sp_account/`](custom_components/singapore/sp_account) with
+the original [LICENSE](custom_components/singapore/sp_account/LICENSE). This port fixes its
+"Config flow could not be loaded: 500" error
+([maci0/home-assistant-sp#21](https://github.com/maci0/home-assistant-sp/issues/21)) by
+keeping every form field serializable. If you only want SP account data, use the original
+integration. Thank you, Marcel!
+
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENSE). The vendored SP Group client in
+`custom_components/singapore/sp_account/` is MIT licensed, Copyright (c) 2026 Marcel W. Wysocki.
 
 Data and the checkpoint camera stills in the README come from data.gov.sg, LTA, NEA, PUB, MOM and
 SP Group, and remain theirs (data.gov.sg data is under the

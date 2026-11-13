@@ -18,7 +18,10 @@ from unittest.mock import MagicMock
 
 
 class UpdateFailed(Exception):
-    pass
+    def __init__(self, *args, **translation_kwargs):
+        # Real HA accepts translation_domain/_key/_placeholders kwargs.
+        super().__init__(*args)
+        self.translation_kwargs = translation_kwargs
 
 
 class ConfigEntryNotReady(Exception):
@@ -112,7 +115,7 @@ class SensorEntity:
         return getattr(self, "_attr_device_class", None)
 
 
-class SensorDeviceClass:
+class SensorDeviceClass(str):
     ENUM = "enum"
     TEMPERATURE = "temperature"
     HUMIDITY = "humidity"
@@ -128,7 +131,7 @@ class SensorDeviceClass:
     DISTANCE = "distance"
 
 
-class SensorStateClass:
+class SensorStateClass(str):
     MEASUREMENT = "measurement"
     MEASUREMENT_ANGLE = "measurement_angle"
 
@@ -153,10 +156,15 @@ class ConfigEntry:
         self.title = "Singapore"
         self.version = 1
         self.runtime_data = None
+        self.subentries: dict = {}
         self._on_unload: list = []
 
     def async_on_unload(self, func):
         self._on_unload.append(func)
+
+    def add_update_listener(self, listener):
+        self.update_listeners = [*getattr(self, "update_listeners", []), listener]
+        return lambda: None
 
     def async_create_background_task(self, hass, coro, name):
         import asyncio
@@ -172,6 +180,60 @@ class ConfigEntry:
 class ConfigFlow:
     def __init_subclass__(cls, domain=None, **kwargs):
         super().__init_subclass__(**kwargs)
+
+
+class ConfigSubentry:
+    def __init__(
+        self, *, data, subentry_type, title, unique_id=None, subentry_id="sub1"
+    ):
+        self.data = data
+        self.subentry_type = subentry_type
+        self.title = title
+        self.unique_id = unique_id
+        self.subentry_id = subentry_id
+
+
+class ConfigSubentryFlow:
+    pass
+
+
+class SensorEntityDescription:
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+
+class EntityCategory(str):
+    DIAGNOSTIC = "diagnostic"
+    CONFIG = "config"
+
+
+class UnitOfEnergy:
+    KILO_WATT_HOUR = "kWh"
+
+
+class UnitOfVolume:
+    CUBIC_METERS = "m³"
+
+
+class IssueSeverity:
+    ERROR = "error"
+    WARNING = "warning"
+
+
+class _Selector:
+    def __init__(self, config=None):
+        self.config = config
+
+
+class _SelectorConfig(dict):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+
+class _SelectorEnum:
+    EMAIL = "email"
+    PASSWORD = "password"
+    BOX = "box"
 
 
 class AddConfigEntryEntitiesCallback:
@@ -283,6 +345,11 @@ _HA_MODULES: dict[str, ModuleType] = {
         "homeassistant.const",
         Platform=Platform,
         CONF_NAME="name",
+        CONF_USERNAME="username",
+        CONF_PASSWORD="password",
+        EntityCategory=EntityCategory,
+        UnitOfEnergy=UnitOfEnergy,
+        UnitOfVolume=UnitOfVolume,
         UnitOfTemperature=UnitOfTemperature,
         UnitOfSpeed=UnitOfSpeed,
         UnitOfPrecipitationDepth=UnitOfPrecipitationDepth,
@@ -317,6 +384,21 @@ _HA_MODULES: dict[str, ModuleType] = {
         "homeassistant.helpers.event",
         async_track_time_change=MagicMock(return_value=MagicMock()),
     ),
+    "homeassistant.helpers.issue_registry": _mod(
+        "homeassistant.helpers.issue_registry",
+        async_create_issue=MagicMock(),
+        async_delete_issue=MagicMock(),
+        IssueSeverity=IssueSeverity,
+    ),
+    "homeassistant.helpers.selector": _mod(
+        "homeassistant.helpers.selector",
+        TextSelector=_Selector,
+        TextSelectorConfig=_SelectorConfig,
+        TextSelectorType=_SelectorEnum,
+        NumberSelector=_Selector,
+        NumberSelectorConfig=_SelectorConfig,
+        NumberSelectorMode=_SelectorEnum,
+    ),
     "homeassistant.helpers.device_registry": _mod(
         "homeassistant.helpers.device_registry",
         DeviceInfo=DeviceInfo,
@@ -348,13 +430,18 @@ _HA_MODULES: dict[str, ModuleType] = {
         SensorEntity=SensorEntity,
         SensorDeviceClass=SensorDeviceClass,
         SensorStateClass=SensorStateClass,
+        SensorEntityDescription=SensorEntityDescription,
     ),
     "homeassistant.config_entries": _mod(
         "homeassistant.config_entries",
         ConfigEntry=ConfigEntry,
         ConfigFlow=ConfigFlow,
         ConfigFlowResult=dict,
+        ConfigSubentry=ConfigSubentry,
+        ConfigSubentryFlow=ConfigSubentryFlow,
+        SubentryFlowResult=dict,
         SOURCE_USER="user",
+        SOURCE_RECONFIGURE="reconfigure",
     ),
 }
 

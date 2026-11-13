@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -19,6 +19,7 @@ from .flood_coordinator import FloodAlertCoordinator
 from .holiday_coordinator import PublicHolidayCoordinator
 from .lightning_coordinator import LightningCoordinator
 from .psi_coordinator import PsiCoordinator
+from .sp_account_coordinator import SUBENTRY_TYPE_SP_ACCOUNT, SpAccountCoordinator
 from .traffic_coordinator import TrafficImagesCoordinator
 from .train_coordinator import TrainStatusCoordinator
 from .uv_coordinator import UvCoordinator
@@ -50,6 +51,8 @@ class SingaporeData:
     dengue: DengueClusterCoordinator
     lightning: LightningCoordinator
     uv: UvCoordinator
+    # One per SP Group e-account subentry, keyed by subentry id.
+    sp_accounts: dict[str, SpAccountCoordinator] = field(default_factory=dict)
 
 
 type SingaporeConfigEntry = ConfigEntry[SingaporeData]
@@ -144,6 +147,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
     )
     entry.async_on_unload(unsub_coe)
 
+    # SP Group e-accounts (config subentries). Like the other optional sources,
+    # their first poll runs in the background so an SP outage or an expired
+    # login never blocks setup; sensors appear once the first poll succeeds.
+    sp_accounts: dict[str, SpAccountCoordinator] = {}
+    for subentry in entry.subentries.values():
+        if subentry.subentry_type != SUBENTRY_TYPE_SP_ACCOUNT:
+            continue
+        sp_coordinator = SpAccountCoordinator(hass, entry, subentry)
+        sp_accounts[subentry.subentry_id] = sp_coordinator
+        entry.async_create_background_task(
+            hass,
+            _initial_refresh(sp_coordinator, "SP account"),
+            f"singapore_sp_account_{subentry.subentry_id}_initial_refresh",
+        )
+
     entry.runtime_data = SingaporeData(
         tariff=tariff_coordinator,
         coe=coe_coordinator,
@@ -156,12 +174,38 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
         dengue=dengue_coordinator,
         lightning=lightning_coordinator,
         uv=uv_coordinator,
+        sp_accounts=sp_accounts,
     )
+    entry.async_on_unload(entry.add_update_listener(_async_entry_updated))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
+async def _async_entry_updated(
+    hass: HomeAssistant, entry: SingaporeConfigEntry
+) -> None:
+    """Reload when an SP account was added or removed; else update in place.
+
+    The SP coordinators persist refreshed tokens on their subentry, which also
+    fires this listener, so a reload on every change would restart the whole
+    integration twice an hour. Only a changed set of accounts needs one.
+    """
+    accounts = entry.runtime_data.sp_accounts
+    current = {
+        subentry_id
+        for subentry_id, subentry in entry.subentries.items()
+        if subentry.subentry_type == SUBENTRY_TYPE_SP_ACCOUNT
+    }
+    if current != set(accounts):
+        hass.config_entries.async_schedule_reload(entry.entry_id)
+        return
+    for coordinator in accounts.values():
+        await coordinator.async_subentry_updated()
+
+
 async def async_unload_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) -> bool:
     """Unload a config entry."""
+    for coordinator in entry.runtime_data.sp_accounts.values():
+        await coordinator.async_stop_stats_import()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

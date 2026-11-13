@@ -20,10 +20,16 @@ custom_components/singapore/
 ├── dengue_coordinator.py   # DengueClusterCoordinator: NEA dengue cluster GeoJSON + distance helpers
 ├── lightning_coordinator.py # LightningCoordinator: NEA lightning strikes, 30-min rolling window
 ├── uv_coordinator.py       # UvCoordinator: NEA hourly UV index + exposure bands
+├── sp_account_coordinator.py # SpAccountCoordinator: one per SP e-account subentry (usage, bills, stats)
+├── sp_account_sensor.py    # SP e-account sensors built from mapper SensorSpecs (added dynamically)
+├── sp_account/             # Vendored from maci0/home-assistant-sp (MIT, see its LICENSE); no HA imports
+│   ├── client.py           # Sync urllib Auth0/Jarvis/Njord client (runs in the executor), MFA, cooldown
+│   ├── const.py / models.py / mapper.py / history.py  # constants, dataclasses, specs, statistics
+│   └── LICENSE             # Upstream MIT licence: must ship with the vendored code
 ├── camera.py               # Camera entities (Woodlands/Tuas checkpoint traffic cameras)
 ├── calendar.py             # Calendar entity (Singapore public holidays)
 ├── weather.py              # Weather entities (one per Singapore forecast area)
-├── config_flow.py          # UI config flow (name input; single instance via manifest)
+├── config_flow.py          # UI config flow (name; single instance) + SP account subentry flow
 ├── diagnostics.py          # "Download diagnostics": coordinator status + parsed data
 ├── sensor.py               # Sensor entities (tariff, COE, weather, PSI, trains, flood, dengue, lightning, UV)
 ├── manifest.json           # Integration metadata; declares beautifulsoup4 dep, single_config_entry
@@ -47,6 +53,8 @@ tests/
 ├── test_dengue_coordinator.py   # Dengue GeoJSON parser, distance math, coordinator, sensors
 ├── test_lightning_coordinator.py # Lightning parser, rolling window, coordinator, sensors
 ├── test_uv_coordinator.py       # UV parser (v1/v2), exposure bands, coordinator, sensors
+├── test_sp_account.py           # SP account coordinator, sensors, flow helpers, reload listener
+├── sp_account/                  # Vendored upstream client/mapper/history tests + recorded fixtures
 ├── test_calendar.py             # Calendar event and range query tests
 ├── test_sensor.py               # Sensor value, unit, attributes, unique_id, None-safety
 ├── test_weather.py              # Weather entity condition mapping + forecast tests
@@ -55,7 +63,9 @@ tests/
 
 tests_ha/                        # Runs against a REAL Home Assistant (no module mocks)
 ├── conftest.py                  # pytest-homeassistant-custom-component + canned HTTP responses
-└── test_integration.py          # Full entry setup/unload, config flow, diagnostics
+├── test_integration.py          # Full entry setup/unload, config flow, diagnostics
+├── test_sp_account.py           # SP subentry flow over HTTP (schema serialization), MFA, repairs
+└── test_sp_account_statistics.py # SP Energy statistics land in a real recorder
 
 .github/workflows/tests.yml   # CI: unit tests, real-HA compat matrix, e2e scrape, ruff lint
 
@@ -87,6 +97,7 @@ class SingaporeData:
     dengue: DengueClusterCoordinator
     lightning: LightningCoordinator
     uv: UvCoordinator
+    sp_accounts: dict[str, SpAccountCoordinator]  # keyed by subentry id
 
 type SingaporeConfigEntry = ConfigEntry[SingaporeData]
 ```
@@ -459,6 +470,46 @@ an empty list is valid. `sensor.nea_uv_index` (unit `UV_INDEX`, measurement) and
 `sensor.nea_uv_exposure` (ENUM, `UV_EXPOSURE_OPTIONS`: low/moderate/high/very_high/extreme,
 NEA's WHO-based bands via `uv_exposure()`) sit on the shared *NEA* device. First refresh runs
 in the background.
+
+## How the SP Group e-account support works
+
+Credit: built on [maci0/home-assistant-sp](https://github.com/maci0/home-assistant-sp) by
+Marcel W. Wysocki (MIT). Keep the attribution (README "Credits", `sp_account/LICENSE`, file
+headers) when touching this code.
+
+- `sp_account/` is vendored from upstream v1.8.0 with minimal changes (listed in its
+  `__init__.py`) so upstream fixes can be diffed in. It must not import Home Assistant
+  (`tests/sp_account/test_layering.py`). Its client is synchronous `urllib` and runs via
+  `hass.async_add_executor_job`; this is the one deliberate exception to the aiohttp
+  convention (rewriting a 2,000-line protocol client was not worth the risk).
+- Each e-account is a **config subentry** (`subentry_type = "sp_account"`) of the single
+  `singapore` entry, offered by `async_get_supported_subentry_types`. Subentry data holds the
+  username, Auth0 tokens and optional `electricity_price`, never the password.
+- `SpAccountSubentryFlow`: `user` (credentials + optional price) → `mfa` when Auth0 says
+  `mfa_required` (TOTP preferred, SMS/email OOB otherwise) → subentry. `reconfigure` is a menu:
+  `credentials` (sign in again; unique id must match) or `price`.
+- **Form schemas must be serializable** (upstream issue #21: a bare function validator made HA
+  return 500 "Unable to convert schema" when the form loaded). Use selectors / plain types only
+  and run custom rules in the step handler, reporting field errors.
+  `tests_ha/test_sp_account.py::test_subentry_forms_serialize_over_http` loads every form via
+  the HTTP API to guard this.
+- `SpAccountCoordinator` polls every 30 min (first refresh in the background). An Auth0
+  rejection raises `UpdateFailed` and opens the `sp_account_auth_failed_<subentry_id>` repair
+  issue (never `ConfigEntryAuthFailed`, which would reauth the whole entry and take every other
+  sensor down); success deletes it. Refreshed tokens are persisted with
+  `async_update_subentry`, which fires the entry update listener: `_async_entry_updated`
+  reloads only when the set of SP subentries changed, otherwise it calls
+  `coordinator.async_subentry_updated()` (new tokens → new client + refresh; new price →
+  re-import cost statistics).
+- Energy statistics are imported with `async_add_external_statistics` as
+  `singapore:<premise_id>_<key>` (`electricity`, `electricity_cost`, `gas`, `last_bill`).
+  `unit_class` is only included when the running HA's `StatisticMetaData` has it (2025.4
+  rejects it, newer HA warns without it). The poll passes its readings into the import task
+  because HA starts tasks eagerly, before `coordinator.data` is set.
+- Sensor translation keys are the mapper keys prefixed with `sp_` (`entity.sensor.sp_*`);
+  unique ids are `{entry_id}_sp_{premise_id}_{key}`; entities are added with
+  `config_subentry_id`. Diagnostics report SP accounts as flags/counts only (no address,
+  account number, premise id, username or tokens).
 
 ### Camera platform test dependency
 

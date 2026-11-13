@@ -122,12 +122,183 @@
           "very_high": "Very high",
           "extreme": "Extreme"
         }
+      },
+      "sp_electricity": {
+        "name": "Electricity cumulative"
+      },
+      "sp_water": {
+        "name": "Water"
+      },
+      "sp_gas": {
+        "name": "Gas"
+      },
+      "sp_electricity_last_period": {
+        "name": "Electricity last billed"
+      },
+      "sp_electricity_today": {
+        "name": "Electricity today"
+      },
+      "sp_electricity_last_hour": {
+        "name": "Electricity last 30 min"
+      },
+      "sp_water_last_period": {
+        "name": "Water last billed"
+      },
+      "sp_gas_last_period": {
+        "name": "Gas last billed"
+      },
+      "sp_account": {
+        "name": "Account",
+        "state": {
+          "unknown": "Unknown"
+        }
+      },
+      "sp_ppms_credit": {
+        "name": "Prepaid credit"
+      },
+      "sp_last_bill": {
+        "name": "Last bill"
+      },
+      "sp_amount_due": {
+        "name": "Amount due"
+      },
+      "sp_electricity_meter": {
+        "name": "Electricity meter"
+      },
+      "sp_water_meter": {
+        "name": "Water meter"
+      },
+      "sp_electricity_goal": {
+        "name": "Electricity this month"
+      },
+      "sp_water_goal": {
+        "name": "Water this month"
+      },
+      "sp_greenup_points": {
+        "name": "GreenUP points"
+      },
+      "sp_ev_wallet": {
+        "name": "EV wallet"
+      },
+      "sp_ev_session": {
+        "name": "EV session",
+        "state": {
+          "unknown": "Unknown"
+        }
+      },
+      "sp_ev_last_charge": {
+        "name": "EV last charge"
+      },
+      "sp_ev_unpaid": {
+        "name": "EV unpaid"
+      },
+      "sp_unread_notifications": {
+        "name": "Unread notifications"
+      },
+      "sp_bill_delivery": {
+        "name": "Bill delivery",
+        "state": {
+          "ebill": "E-bill",
+          "paper": "Paper"
+        }
+      },
+      "sp_fcu": {
+        "name": "FCU",
+        "state": {
+          "on": "On",
+          "off": "Off"
+        }
+      },
+      "sp_tariff": {
+        "name": "SP tariff"
       }
     },
     "camera": {
       "checkpoint_camera": {
         "name": "{location}"
       }
+    }
+  },
+  "config_subentries": {
+    "sp_account": {
+      "initiate_flow": {
+        "user": "Add SP account"
+      },
+      "entry_type": "SP account",
+      "step": {
+        "user": {
+          "title": "Add SP Group e-account",
+          "description": "Sign in with the same e-account email and password used in the SP app. The password is not stored: only the session tokens SP returns are kept.",
+          "data": {
+            "username": "Email",
+            "password": "Password",
+            "electricity_price": "Electricity price (optional)"
+          },
+          "data_description": {
+            "electricity_price": "Fixed SGD/kWh incl. GST. When set, an 'SP Group electricity cost' statistic is written for the Energy dashboard. Leave empty to skip."
+          }
+        },
+        "mfa": {
+          "title": "SP Group verification",
+          "description": "Enter the one-time verification code.",
+          "data": {
+            "mfa_code": "Verification code"
+          }
+        },
+        "reconfigure": {
+          "title": "SP Group e-account",
+          "description": "What would you like to change?",
+          "menu_options": {
+            "credentials": "Sign in again",
+            "price": "Electricity price"
+          }
+        },
+        "credentials": {
+          "title": "Sign in to SP Group again",
+          "description": "Use this when the session expired or the password changed.",
+          "data": {
+            "username": "Email",
+            "password": "Password"
+          }
+        },
+        "price": {
+          "title": "Electricity price",
+          "description": "Optional fixed electricity price. When set, an 'SP Group electricity cost' statistic is written for the Energy dashboard (pick it under 'Use an entity tracking the total costs'). Leave empty to disable.",
+          "data": {
+            "electricity_price": "Electricity price (SGD per kWh, incl. GST)"
+          }
+        }
+      },
+      "error": {
+        "invalid_auth": "Invalid e-account email or password.",
+        "cannot_connect": "Could not reach SP Group.",
+        "requires_verification": "SP flagged this login as suspicious. Sign in once in the SP app, wait a few minutes, then try again.",
+        "too_many_attempts": "Too many sign-in attempts. Wait a minute before trying again.",
+        "invalid_username": "Enter a valid e-account email (at most 254 bytes).",
+        "invalid_password": "Enter your password (at most 1024 characters)."
+      },
+      "abort": {
+        "already_configured": "This SP e-account is already added.",
+        "reconfigure_successful": "Saved.",
+        "unique_id_mismatch": "The email does not match this SP e-account. Add it as a new account instead."
+      }
+    }
+  },
+  "exceptions": {
+    "auth_failed": {
+      "message": "SP Group rejected the stored e-account credentials: {error}"
+    },
+    "requires_verification": {
+      "message": "SP flagged this login as suspicious. Sign in once in the SP app, wait a few minutes, then retry: {error}"
+    },
+    "usage_failed": {
+      "message": "Could not fetch usage from SP Group: {error}"
+    }
+  },
+  "issues": {
+    "sp_account_auth_failed": {
+      "title": "SP account {title} needs you to sign in again",
+      "description": "SP Group rejected the stored session for {title}. Go to Settings → Devices & services → Singapore, open the {title} SP account entry, choose Reconfigure → Sign in again. Its sensors stay unavailable until then; the rest of the integration keeps working."
     }
   }
 }

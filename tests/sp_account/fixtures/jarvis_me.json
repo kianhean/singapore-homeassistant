@@ -1,0 +1,47 @@
+{
+  "status": "ACTIVE",
+  "bp_numbers": [
+    {
+      "bp_number": "7000000000",
+      "bp_type": "PERSON",
+      "system": "EBS"
+    }
+  ],
+  "premises": [
+    {
+      "id": "premise-001",
+      "address": "1 Example Road, Singapore",
+      "active": true,
+      "type": "HDB 5-Room Flat",
+      "oem_eligible": true,
+      "ppms_details": {
+        "exists": false,
+        "account_number": ""
+      },
+      "meter_details": {
+        "ami_elec": true,
+        "interval_utilities": ["electric"]
+      },
+      "accounts": [
+        {
+          "account_number": "1234567890",
+          "account_status": "Active",
+          "account_type": "DOM",
+          "system": "EBS",
+          "utilities": ["electric", "water"],
+          "address": "1 Example Road, Singapore",
+          "move_in_date": "2020-01-01"
+        }
+      ],
+      "contestable_details": {
+        "signed_up": true,
+        "retailer_name": "Example Retailer"
+      },
+      "address_details": {
+        "block": "1",
+        "street": "Example Road",
+        "country": "SG"
+      }
+    }
+  ]
+}

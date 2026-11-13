@@ -1,6 +1,9 @@
 {
   "domain": "singapore",
   "name": "Singapore",
+  "after_dependencies": [
+    "recorder"
+  ],
   "codeowners": [
     "@kianhean"
   ],
@@ -14,5 +17,5 @@
     "beautifulsoup4>=4.12.3"
   ],
   "single_config_entry": true,
-  "version": "0.9.0"
+  "version": "0.10.0"
 }

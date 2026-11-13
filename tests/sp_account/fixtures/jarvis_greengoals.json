@@ -1,0 +1,38 @@
+{
+  "goals": [
+    {
+      "id": 1,
+      "type": "elec",
+      "unit": "kWh",
+      "month": "August 2026",
+      "premises": [
+        {
+          "id": "premise-001",
+          "data": {
+            "used": 1160.77,
+            "target": 672.47
+          },
+          "consumption_percentage_difference": 42.8,
+          "cost_difference_in_cents": 10310
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "water",
+      "unit": "Cu M",
+      "month": "August 2026",
+      "premises": [
+        {
+          "id": "premise-001",
+          "data": {
+            "used": 0,
+            "target": 0
+          },
+          "consumption_percentage_difference": -5.13,
+          "cost_difference_in_cents": -26
+        }
+      ]
+    }
+  ]
+}
