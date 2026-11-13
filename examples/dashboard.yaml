@@ -51,6 +51,19 @@ views:
             name: PM10
             color: green
             grid_options: { columns: 6 }
+          - type: entities
+            title: PSI by region
+            entities:
+              - entity: sensor.air_quality_psi_north
+                name: North
+              - entity: sensor.air_quality_psi_south
+                name: South
+              - entity: sensor.air_quality_psi_east
+                name: East
+              - entity: sensor.air_quality_psi_west
+                name: West
+              - entity: sensor.air_quality_psi_central
+                name: Central
 
       - type: grid
         cards:

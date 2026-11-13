@@ -15,7 +15,6 @@ const out = join(here, "..", "..", "images");
 
 const pages = [
   { src: "hero.html", out: "hero.jpg", width: 1280 },
-  { src: "psi-map.html", out: "psi-map.png", width: 900 },
   { src: "alerts.html", out: "alerts.png", width: 1200 },
   { src: "cameras.html", out: "checkpoint-cameras.jpg", width: 900 },
   { src: "social.html", out: "social-preview.png", width: 1280, height: 640, scale: 1 },

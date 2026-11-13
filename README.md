@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="images/hero.jpg" alt="Example Singapore dashboard: Bedok weather with a 4-day forecast, PSI gauge, MRT/LRT line status, live Woodlands Causeway and Tuas Checkpoint camera stills, nearest lightning and dengue cluster distances, flood alerts, utility tariffs and COE prices" width="100%">
+  <img src="images/hero.jpg" alt="Example Singapore dashboard: Bedok weather with a 4-day forecast, PSI gauge and PSI by region, MRT/LRT line status, live Woodlands Causeway and Tuas Checkpoint camera stills, nearest lightning and dengue cluster distances, flood alerts, utility tariffs and COE prices" width="100%">
   <br>
   <sub>An example dashboard built only from Home Assistant's built-in cards. The integration provides the entities; <a href="examples/dashboard.yaml">this YAML</a> builds the dashboard. Camera stills are real LTA images.</sub>
 </p>
@@ -183,14 +183,8 @@ actions:
 **Copy the whole dashboard:** [`examples/dashboard.yaml`](examples/dashboard.yaml) builds the dashboard
 at the top of this page. Paste it into a new dashboard's raw configuration editor.
 
-**PSI on a map:** each regional PSI sensor carries `latitude`/`longitude`, so a Map card shows the
-PSI number for each region ([YAML below](#psi-on-the-map)).
-
-<p align="center">
-  <img src="images/psi-map.png" alt="Map card with one PSI circle per Singapore region (north, south, east, west, central)" width="640">
-  <br>
-  <sub>Illustration of the Map card layout. In Home Assistant the circles sit on the regular map tiles.</sub>
-</p>
+**PSI by region:** the hero dashboard lists the 24-hour PSI for each region. Each regional sensor
+also carries `latitude`/`longitude`, so you can put them on a Map card instead ([YAML below](#psi-on-the-map)).
 
 **Checkpoint cameras:** a picture-entity card per camera gives you a quick look at the Causeway and Second Link queues.
 
