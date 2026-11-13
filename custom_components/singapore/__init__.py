@@ -71,7 +71,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
     # even if a sibling fails, instead of orphaning them mid-flight when
     # gather() propagates the first exception.
     results = await asyncio.gather(
-        tariff_coordinator.async_config_entry_first_refresh(),
         weather_coordinator.async_config_entry_first_refresh(),
         holiday_coordinator.async_config_entry_first_refresh(),
         train_coordinator.async_config_entry_first_refresh(),
@@ -112,9 +111,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
                 "Initial %s refresh failed; continuing setup and retrying later", label
             )
 
-    # Flood alerts, traffic cameras, dengue clusters and lightning are supplementary;
-    # don't block setup on data.gov.sg availability/rate limits.
+    # SP Group tariffs are scraped from a third-party site that can be unreachable
+    # for long stretches (e.g. TLS handshake failures, issue #44); flood alerts,
+    # traffic cameras, dengue clusters and lightning are supplementary. None of
+    # them may block setup: their entities show unavailable until data arrives.
     for coordinator, label in (
+        (tariff_coordinator, "SP Group tariff"),
         (flood_coordinator, "flood alert"),
         (traffic_coordinator, "traffic camera"),
         (dengue_coordinator, "dengue cluster"),
@@ -123,7 +125,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
         entry.async_create_background_task(
             hass,
             _initial_refresh(coordinator, label),
-            f"singapore_{label.replace(' ', '_')}_initial_refresh",
+            f"singapore_{label.lower().replace(' ', '_')}_initial_refresh",
         )
 
     async def _refresh_coe(_now) -> None:
