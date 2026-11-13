@@ -19,12 +19,13 @@ custom_components/singapore/
 ├── traffic_coordinator.py  # TrafficImagesCoordinator: LTA checkpoint camera stills (Woodlands/Tuas)
 ├── dengue_coordinator.py   # DengueClusterCoordinator: NEA dengue cluster GeoJSON + distance helpers
 ├── lightning_coordinator.py # LightningCoordinator: NEA lightning strikes, 30-min rolling window
+├── uv_coordinator.py       # UvCoordinator: NEA hourly UV index + exposure bands
 ├── camera.py               # Camera entities (Woodlands/Tuas checkpoint traffic cameras)
 ├── calendar.py             # Calendar entity (Singapore public holidays)
 ├── weather.py              # Weather entities (one per Singapore forecast area)
 ├── config_flow.py          # UI config flow (name input; single instance via manifest)
 ├── diagnostics.py          # "Download diagnostics": coordinator status + parsed data
-├── sensor.py               # Sensor entities (tariff + COE + weather + PSI + train status)
+├── sensor.py               # Sensor entities (tariff, COE, weather, PSI, trains, flood, dengue, lightning, UV)
 ├── manifest.json           # Integration metadata; declares beautifulsoup4 dep, single_config_entry
 ├── icons.json              # Icon translations (entity icons live here, not in _attr_icon)
 ├── strings.json            # Config flow UI strings + entity names + enum state names
@@ -45,6 +46,7 @@ tests/
 ├── test_traffic_cameras.py      # Traffic images parser, coordinator, camera entity + image cache
 ├── test_dengue_coordinator.py   # Dengue GeoJSON parser, distance math, coordinator, sensors
 ├── test_lightning_coordinator.py # Lightning parser, rolling window, coordinator, sensors
+├── test_uv_coordinator.py       # UV parser (v1/v2), exposure bands, coordinator, sensors
 ├── test_calendar.py             # Calendar event and range query tests
 ├── test_sensor.py               # Sensor value, unit, attributes, unique_id, None-safety
 ├── test_weather.py              # Weather entity condition mapping + forecast tests
@@ -84,6 +86,7 @@ class SingaporeData:
     traffic: TrafficImagesCoordinator
     dengue: DengueClusterCoordinator
     lightning: LightningCoordinator
+    uv: UvCoordinator
 
 type SingaporeConfigEntry = ConfigEntry[SingaporeData]
 ```
@@ -444,6 +447,18 @@ than `STRIKE_WINDOW` (30 min), also on failed polls. `sensor.nea_lightning_strik
 window; `sensor.nea_nearest_lightning` = haversine km from `hass.config` home to the nearest
 strike (`None` when there are none) plus `strikes_within_10_km`. Both sit on the shared *NEA*
 device with the dengue sensors (`_nea_device_info` in `sensor.py`).
+
+## How the UV Coordinator Works
+
+`uv_coordinator.py` GETs `https://api-open.data.gov.sg/v2/real-time/api/uv` every
+**15 minutes**. NEA publishes one reading per hour from 7 am to 7 pm, ~10 min after the hour.
+Payload (v2): `data.records[0].index[{hour, value}]`, newest first; v1 (`items[0].index[{timestamp,
+value}]`) is also parsed. `UvData.readings` is today's readings oldest-first (`latest`, `peak`
+properties; ties keep the earliest hour). A payload with no `index` list raises `UpdateFailed`;
+an empty list is valid. `sensor.nea_uv_index` (unit `UV_INDEX`, measurement) and
+`sensor.nea_uv_exposure` (ENUM, `UV_EXPOSURE_OPTIONS`: low/moderate/high/very_high/extreme,
+NEA's WHO-based bands via `uv_exposure()`) sit on the shared *NEA* device. First refresh runs
+in the background.
 
 ### Camera platform test dependency
 

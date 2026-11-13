@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <img src="images/hero.jpg" alt="Example Singapore dashboard: Bedok weather with a 4-day forecast, PSI gauge and PSI by region, MRT/LRT line status, live Woodlands Causeway and Tuas Checkpoint camera stills, nearest lightning and dengue cluster distances, flood alerts, utility tariffs and COE prices" width="100%">
+  <img src="images/hero.jpg" alt="Example Singapore dashboard: Bedok weather with a 4-day forecast, rainfall, wind, UV index and UV exposure, PSI gauge and PSI by region, MRT/LRT line status, live Woodlands Causeway and Tuas Checkpoint camera stills, nearest lightning and dengue cluster distances, flood alerts, utility tariffs and COE prices" width="100%">
   <br>
   <sub>An example dashboard built only from Home Assistant's built-in cards. The integration provides the entities; <a href="examples/dashboard.yaml">this YAML</a> builds the dashboard. Camera stills are real LTA images.</sub>
 </p>
@@ -28,10 +28,12 @@
 
 | | | |
 |---|---|---|
-| 🌦️ **Weather**<br>A weather entity for every NEA forecast area, with hourly and 4-day forecasts, live temperature, humidity, wind and rain | 😷 **Air quality**<br>PSI and six pollutants, overall and per region, ready for a Map card | 🚇 **MRT/LRT**<br>Network and per-line status (normal, planned works, disruption) with LTA's message |
+| 🌦️ **Weather**<br>A weather entity for every NEA forecast area, with hourly and 4-day forecasts, live temperature, humidity, wind and rain | 😷 **Air quality**<br>PSI and six pollutants, overall and per region, ready for a Map card | ☀️ **UV index**<br>NEA's hourly UV index and exposure level (low to extreme), with today's peak |
+| 🚇 **MRT/LRT**<br>Network and per-line status (normal, planned works, disruption) with LTA's message | 🛂 **Checkpoints**<br>Woodlands and Tuas traffic camera stills as camera entities | 🚗 **COE**<br>Category A–E premiums, refreshed after each bidding exercise |
 | ⚡ **Lightning**<br>Live strikes and the distance to the nearest one from your home | 🦟 **Dengue**<br>Active NEA clusters and how far the nearest is from your home | 🌊 **Flash floods**<br>PUB flood alerts as they're issued and cancelled |
-| 🚗 **COE**<br>Category A–E premiums, refreshed after each bidding exercise | 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🛂 **Checkpoints**<br>Woodlands and Tuas traffic camera stills as camera entities |
-| 🎉 **Public holidays**<br>MOM's holiday list as a calendar | 🔑 **No setup pain**<br>All public data, no API keys, one config entry | 🛠️ **Easy to debug**<br>Built-in diagnostics download and background loading |
+| 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🎉 **Public holidays**<br>MOM's holiday list as a calendar | 🧩 **Blueprints**<br>[One-click automations](#one-click-blueprints) for lightning, MRT disruptions, floods, haze and COE |
+
+All public data: no API keys, one config entry, and a diagnostics download when something looks off.
 
 ## Installation
 
@@ -191,6 +193,28 @@ actions:
         Cat A {{ '{:,}'.format(states('sensor.coe_category_a') | int) }} SGD ·
         Cat B {{ '{:,}'.format(states('sensor.coe_category_b') | int) }} SGD ·
         Cat E {{ '{:,}'.format(states('sensor.coe_category_e') | int) }} SGD
+```
+</details>
+
+<details>
+<summary><b>☀️ Sunscreen reminder when the UV is high</b></summary>
+
+```yaml
+alias: High UV
+triggers:
+  - trigger: state
+    entity_id: sensor.nea_uv_exposure
+    to: [high, very_high, extreme]
+conditions:
+  - condition: time
+    weekday: [sat, sun]
+actions:
+  - action: notify.notify
+    data:
+      title: UV is {{ states('sensor.nea_uv_exposure') | replace('_', ' ') }}
+      message: >-
+        UV index {{ states('sensor.nea_uv_index') }}. Sunscreen and a hat if you're
+        heading out.
 ```
 </details>
 
@@ -461,6 +485,24 @@ See [Recipes](#recipes) for a lightning warning automation.
 
 </details>
 
+### UV index
+
+Updated every **15 minutes** from [NEA's hourly UV index via data.gov.sg](https://api-open.data.gov.sg/v2/real-time/api/uv).
+NEA publishes one reading an hour from 7 am to 7 pm, so overnight the sensors show the
+last reading of the evening.
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.nea_uv_index` | NEA UV Index | UV index | Latest hourly UV index; attributes `hour` (the reading's hour), `exposure`, `peak` / `peak_hour` (today's highest) and `readings` (today's hourly values) |
+| `sensor.nea_uv_exposure` | NEA UV Exposure | — | NEA's exposure level for the latest reading: `low` (0–2), `moderate` (3–5), `high` (6–7), `very_high` (8–10) or `extreme` (11+) |
+
+See [Recipes](#recipes) for a sunscreen reminder.
+
+</details>
+
 ### Public holidays
 
 Updated every 24 hours from [MOM](https://www.mom.gov.sg/employment-practices/public-holidays).
@@ -519,6 +561,21 @@ sensor.weather_temperature:
   attributes:
     source: data.gov.sg / NEA (collection 1459)
 
+sensor.nea_uv_index:
+  state: 6
+  unit_of_measurement: UV index
+  attributes:
+    hour: "2026-11-13T14:00:00+08:00"
+    exposure: high
+    peak: 6
+    peak_hour: "2026-11-13T14:00:00+08:00"
+    readings:
+      - hour: "2026-11-13T13:00:00+08:00"
+        value: 4
+      - hour: "2026-11-13T14:00:00+08:00"
+        value: 6
+    source: NEA via data.gov.sg
+
 sensor.air_quality_psi_east:
   state: 39
   attributes:
@@ -545,7 +602,7 @@ sensor.air_quality_psi_east:
 - **Diagnostics:** on the Singapore integration page, open the three-dot menu and choose
   **Download diagnostics**. The file shows each data source's last update result, error
   and parsed data. Attach it when opening an issue.
-- **Unavailable sensors:** flood alerts, traffic cameras, dengue clusters, lightning, PSI and COE
+- **Unavailable sensors:** flood alerts, traffic cameras, dengue clusters, lightning, UV, PSI, COE and SP Group tariffs
   load in the background, so the rest of the integration still starts if one of those
   sources is down. Their sensors show as unavailable until a fetch succeeds.
 - **HTTP 429 in the log:** data.gov.sg rate-limits bursts of requests, which can happen
@@ -565,6 +622,7 @@ sensor.air_quality_psi_east:
 | [data.gov.sg / LTA](https://data.gov.sg/datasets/d_6cdb6b405b25aaaacbaf7689bcc6fae0/view) | Woodlands & Tuas checkpoint camera images | Every 2 min |
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_dbfabf16158d1b0e1c420627c0819168/view) | Dengue clusters | Every 6 h |
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_08238953fe0f6dd13f10714ebfbcb9f9/view) | Lightning observations | Every 2 min |
+| [data.gov.sg / NEA](https://api-open.data.gov.sg/v2/real-time/api/uv) | Hourly UV index | Every 15 min |
 | [MOM](https://www.mom.gov.sg/employment-practices/public-holidays) | Public holidays | Every 24 h |
 | [mytransport.sg](https://www.mytransport.sg/trainstatus) | MRT/LRT train status | Every 5 min |
 
