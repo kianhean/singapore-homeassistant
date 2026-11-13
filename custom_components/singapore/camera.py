@@ -1,4 +1,4 @@
-"""Camera platform for LTA checkpoint traffic cameras (Woodlands & Tuas)."""
+"""Camera platform: LTA checkpoint traffic cameras and NEA rain radar images."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SingaporeConfigEntry
 from .const import DOMAIN
+from .radar_coordinator import RADAR_RANGES, RadarCoordinator, RadarImage
 from .traffic_coordinator import CHECKPOINT_CAMERAS, TrafficImagesCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -26,12 +27,37 @@ async def async_setup_entry(
     entry: SingaporeConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up one camera entity per checkpoint traffic camera."""
+    """Set up the checkpoint traffic cameras and the rain radar cameras."""
     coordinator = entry.runtime_data.traffic
+    radar = entry.runtime_data.radar
     async_add_entities(
-        SingaporeCheckpointCamera(coordinator, entry.entry_id, camera_id)
-        for camera_id in CHECKPOINT_CAMERAS
+        [
+            *(
+                SingaporeCheckpointCamera(coordinator, entry.entry_id, camera_id)
+                for camera_id in CHECKPOINT_CAMERAS
+            ),
+            *(
+                SingaporeRainRadarCamera(radar, entry.entry_id, radar_range)
+                for radar_range in RADAR_RANGES
+            ),
+        ]
     )
+
+
+async def _download_image(hass: HomeAssistant, url: str, label: str) -> bytes | None:
+    """Download an image, returning None (with a warning) on any failure."""
+    session = async_get_clientsession(hass)
+    try:
+        async with session.get(
+            url, timeout=aiohttp.ClientTimeout(total=30)
+        ) as response:
+            if response.status != 200:
+                _LOGGER.warning("%s image returned HTTP %s", label, response.status)
+                return None
+            return await response.read()
+    except (aiohttp.ClientError, TimeoutError) as err:
+        _LOGGER.warning("Error fetching %s image: %s", label, err)
+        return None
 
 
 class SingaporeCheckpointCamera(CoordinatorEntity[TrafficImagesCoordinator], Camera):
@@ -91,23 +117,10 @@ class SingaporeCheckpointCamera(CoordinatorEntity[TrafficImagesCoordinator], Cam
         if cam.image_url == self._cached_url and self._cached_image is not None:
             return self._cached_image
 
-        session = async_get_clientsession(self.hass)
-        try:
-            async with session.get(
-                cam.image_url, timeout=aiohttp.ClientTimeout(total=30)
-            ) as response:
-                if response.status != 200:
-                    _LOGGER.warning(
-                        "Traffic camera %s image returned HTTP %s",
-                        self._camera_id,
-                        response.status,
-                    )
-                    return self._cached_image
-                image = await response.read()
-        except (aiohttp.ClientError, TimeoutError) as err:
-            _LOGGER.warning(
-                "Error fetching traffic camera %s image: %s", self._camera_id, err
-            )
+        image = await _download_image(
+            self.hass, cam.image_url, f"Traffic camera {self._camera_id}"
+        )
+        if image is None:
             return self._cached_image
 
         self._cached_url = cam.image_url
@@ -125,4 +138,87 @@ class SingaporeCheckpointCamera(CoordinatorEntity[TrafficImagesCoordinator], Cam
             configuration_url=(
                 "https://data.gov.sg/datasets/d_6cdb6b405b25aaaacbaf7689bcc6fae0/view"
             ),
+        )
+
+
+class SingaporeRainRadarCamera(CoordinatorEntity[RadarCoordinator], Camera):
+    """Latest NEA rain radar image (transparent PNG) for one radar range."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "rain_radar"
+    _attr_attribution = "Data provided by NEA via data.gov.sg"
+
+    def __init__(
+        self, coordinator: RadarCoordinator, entry_id: str, radar_range: str
+    ) -> None:
+        super().__init__(coordinator)
+        Camera.__init__(self)
+        self.content_type = "image/png"
+        self._entry_id = entry_id
+        self._range = radar_range
+        self._attr_unique_id = f"{entry_id}_rain_radar_{radar_range}"
+        self._attr_translation_placeholders = {"range": RADAR_RANGES[radar_range]}
+        self._cached_key: object = None
+        self._cached_image: bytes | None = None
+
+    @property
+    def _radar(self) -> RadarImage | None:
+        data = self.coordinator.data
+        return data.images.get(self._range) if data is not None else None
+
+    @property
+    def available(self) -> bool:
+        return super().available and self._radar is not None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs: dict = {"range": RADAR_RANGES[self._range]}
+        radar = self._radar
+        if radar is not None:
+            attrs["image_timestamp"] = (
+                radar.timestamp.isoformat() if radar.timestamp else None
+            )
+            attrs["north"] = radar.north
+            attrs["south"] = radar.south
+            attrs["east"] = radar.east
+            attrs["west"] = radar.west
+            attrs["center_latitude"] = radar.center_latitude
+            attrs["center_longitude"] = radar.center_longitude
+        return attrs
+
+    async def async_camera_image(
+        self, width: int | None = None, height: int | None = None
+    ) -> bytes | None:
+        """Return the latest radar image.
+
+        The presigned URL changes on every poll, so the cache is keyed by the
+        capture timestamp (falling back to the URL if NEA omits it).
+        """
+        radar = self._radar
+        if radar is None:
+            return self._cached_image
+        key = radar.timestamp or radar.image_url
+        if key == self._cached_key and self._cached_image is not None:
+            return self._cached_image
+
+        image = await _download_image(
+            self.hass, radar.image_url, f"Rain radar {self._range}"
+        )
+        if image is None:
+            return self._cached_image
+
+        self._cached_key = key
+        self._cached_image = image
+        return image
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        # Same device as the weather entities and readings sensors.
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{self._entry_id}_weather")},
+            name="Weather",
+            manufacturer="Singapore",
+            model="NEA Weather",
+            entry_type=DeviceEntryType.SERVICE,
+            configuration_url="https://www.nea.gov.sg",
         )

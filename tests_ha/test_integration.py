@@ -101,6 +101,17 @@ async def test_setup_creates_entities_and_unloads(
     image = await async_get_image(hass, "camera.traffic_cameras_woodlands_causeway")
     assert image.content == b"jpeg-2701"
 
+    radar = hass.states.get("camera.weather_rain_radar_70_km")
+    assert radar is not None
+    assert radar.state == "idle"
+    assert radar.attributes["range"] == "70 km"
+    assert radar.attributes["north"] == 1.97854
+    assert hass.states.get("camera.weather_rain_radar_240_km").state == "idle"
+    assert hass.states.get("camera.weather_rain_radar_480_km").state == "unavailable"
+    radar_image = await async_get_image(hass, "camera.weather_rain_radar_70_km")
+    assert radar_image.content == b"png-70km"
+    assert radar_image.content_type == "image/png"
+
     dengue = hass.states.get("sensor.nea_dengue_clusters")
     assert dengue is not None
     assert dengue.state == "2"

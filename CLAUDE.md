@@ -20,7 +20,8 @@ custom_components/singapore/
 ├── dengue_coordinator.py   # DengueClusterCoordinator: NEA dengue cluster GeoJSON + distance helpers
 ├── lightning_coordinator.py # LightningCoordinator: NEA lightning strikes, 30-min rolling window
 ├── uv_coordinator.py       # UvCoordinator: NEA hourly UV index + exposure bands
-├── camera.py               # Camera entities (Woodlands/Tuas checkpoint traffic cameras)
+├── radar_coordinator.py    # RadarCoordinator: NEA rain radar PNGs (70/240/480 km)
+├── camera.py               # Camera entities (checkpoint traffic cameras + rain radar)
 ├── calendar.py             # Calendar entity (Singapore public holidays)
 ├── weather.py              # Weather entities (one per Singapore forecast area)
 ├── config_flow.py          # UI config flow (name input; single instance via manifest)
@@ -47,6 +48,7 @@ tests/
 ├── test_dengue_coordinator.py   # Dengue GeoJSON parser, distance math, coordinator, sensors
 ├── test_lightning_coordinator.py # Lightning parser, rolling window, coordinator, sensors
 ├── test_uv_coordinator.py       # UV parser (v1/v2), exposure bands, coordinator, sensors
+├── test_radar.py                # Radar parser, per-range fallback, radar camera entity + cache
 ├── test_calendar.py             # Calendar event and range query tests
 ├── test_sensor.py               # Sensor value, unit, attributes, unique_id, None-safety
 ├── test_weather.py              # Weather entity condition mapping + forecast tests
@@ -63,7 +65,8 @@ blueprints/automation/singapore/  # Importable automation blueprints (README "Im
 tests_ha/test_blueprints.py      # Runs every blueprint in real HA (one test per blueprint, required)
 examples/dashboard.yaml          # Built-in-cards dashboard shown in images/hero.jpg
 docs/mockups/                    # HTML sources for the README images (node build.mjs → images/*.png)
-└── fetch_cameras.py             # uv run: pulls real checkpoint stills into docs/mockups/cameras/
+├── fetch_cameras.py             # uv run: pulls real checkpoint stills into docs/mockups/cameras/
+└── fetch_radar.py               # uv run: pulls real radar PNGs into docs/mockups/radar/
 ```
 
 README images must only show what Home Assistant really renders from this integration's
@@ -87,6 +90,7 @@ class SingaporeData:
     dengue: DengueClusterCoordinator
     lightning: LightningCoordinator
     uv: UvCoordinator
+    radar: RadarCoordinator
 
 type SingaporeConfigEntry = ConfigEntry[SingaporeData]
 ```
@@ -459,6 +463,23 @@ an empty list is valid. `sensor.nea_uv_index` (unit `UV_INDEX`, measurement) and
 `sensor.nea_uv_exposure` (ENUM, `UV_EXPOSURE_OPTIONS`: low/moderate/high/very_high/extreme,
 NEA's WHO-based bands via `uv_exposure()`) sit on the shared *NEA* device. First refresh runs
 in the background.
+
+## How the Rain Radar Coordinator Works
+
+`radar_coordinator.py` GETs `https://api-open.data.gov.sg/v2/real-time/api/weather-radar-images/{range}`
+for each range in `RADAR_RANGES` (`70km`, `240km`, `480km`) every **5 minutes**, sequentially
+(data.gov.sg rate-limits bursts). Dataset `d_418e9ac3414fd927b7405631e0a7bc82` (beta); its
+OpenAPI spec is the dataset download. Payload: `data.records[0]` with `timestamp` and
+`image.url` (presigned S3 PNG, **expires ~20 min** after the call, so the URL changes every poll)
+plus `data.boundaryBox` (EPSG:4326 upper-left / lower-right) and `data.projection.center`.
+
+A range whose fetch fails (HTTP error/429, network) keeps its previous `RadarImage`; only when
+every range fails with nothing cached does the update fail. A payload with no record/image URL
+raises `UpdateFailed` (parse errors propagate). `SingaporeRainRadarCamera` (`camera.py`, on the
+*Weather* device, `content_type = "image/png"`) caches the PNG keyed by capture `timestamp`,
+not URL, because the URL is re-signed on every poll. Images are transparent overlays (no
+basemap); the rainfall colour legend is in the spec. data.gov.sg returns 403 to urllib's
+default User-Agent (aiohttp's is fine), which is why `fetch_radar.py` sets one.
 
 ### Camera platform test dependency
 

@@ -21,6 +21,7 @@ from custom_components.singapore.flood_coordinator import FLOOD_ALERTS_URL
 from custom_components.singapore.holiday_coordinator import PUBLIC_HOLIDAYS_URL
 from custom_components.singapore.lightning_coordinator import LIGHTNING_URL
 from custom_components.singapore.psi_coordinator import PSI_URL
+from custom_components.singapore.radar_coordinator import RADAR_URL
 from custom_components.singapore.traffic_coordinator import TRAFFIC_IMAGES_URL
 from custom_components.singapore.train_coordinator import TRAIN_STATUS_URL
 from custom_components.singapore.uv_coordinator import UV_URL
@@ -358,4 +359,29 @@ def mock_sources(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
     )
     aioclient_mock.get(_DENGUE_FILE_URL, json=_DENGUE_GEOJSON)
     aioclient_mock.get(LIGHTNING_URL, json=_lightning_payload())
+    for radar_range in ("70km", "240km"):
+        aioclient_mock.get(
+            RADAR_URL.format(range=radar_range),
+            json={
+                "code": 0,
+                "data": {
+                    "boundaryBox": {
+                        "upperLeft": {"longitude": 103.342685, "latitude": 1.97854},
+                        "lowerRight": {"longitude": 104.602315, "latitude": 0.719515},
+                    },
+                    "records": [
+                        {
+                            "timestamp": "2026-11-13T22:25:00+08:00",
+                            "image": {
+                                "url": f"https://radar.example/{radar_range}.png",
+                                "format": "png",
+                            },
+                        }
+                    ],
+                },
+            },
+        )
+    # 480 km deliberately failing: its camera must go unavailable.
+    aioclient_mock.get(RADAR_URL.format(range="480km"), status=429)
+    aioclient_mock.get("https://radar.example/70km.png", content=b"png-70km")
     return aioclient_mock

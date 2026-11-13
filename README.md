@@ -28,7 +28,7 @@
 
 | | | |
 |---|---|---|
-| 🌦️ **Weather**<br>A weather entity for every NEA forecast area, with hourly and 4-day forecasts, live temperature, humidity, wind and rain | 😷 **Air quality**<br>PSI and six pollutants, overall and per region, ready for a Map card | ☀️ **UV index**<br>NEA's hourly UV index and exposure level (low to extreme), with today's peak |
+| 🌦️ **Weather**<br>A weather entity for every NEA forecast area, with hourly and 4-day forecasts, live temperature, humidity, wind and rain, plus NEA rain radar images | 😷 **Air quality**<br>PSI and six pollutants, overall and per region, ready for a Map card | ☀️ **UV index**<br>NEA's hourly UV index and exposure level (low to extreme), with today's peak |
 | 🚇 **MRT/LRT**<br>Network and per-line status (normal, planned works, disruption) with LTA's message | 🛂 **Checkpoints**<br>Woodlands and Tuas traffic camera stills as camera entities | 🚗 **COE**<br>Category A–E premiums, refreshed after each bidding exercise |
 | ⚡ **Lightning**<br>Live strikes and the distance to the nearest one from your home | 🦟 **Dengue**<br>Active NEA clusters and how far the nearest is from your home | 🌊 **Flash floods**<br>PUB flood alerts as they're issued and cancelled |
 | 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🎉 **Public holidays**<br>MOM's holiday list as a calendar | 🧩 **Blueprints**<br>[One-click automations](#one-click-blueprints) for lightning, MRT disruptions, floods, haze and COE |
@@ -232,6 +232,33 @@ also carries `latitude`/`longitude`, so you can put them on a Map card instead (
   <img src="images/checkpoint-cameras.jpg" alt="Four picture-entity cards showing live LTA stills of Woodlands Causeway, Woodlands Checkpoint, Tuas Second Link and Tuas Checkpoint, with heavy traffic towards Johor" width="640">
   <br>
   <sub>Real LTA stills from data.gov.sg, Friday 13 November 2026, 16:50.</sub>
+</p>
+
+**Rain radar:** a picture-entity card per radar range shows where it's raining right now.
+
+```yaml
+type: grid
+columns: 3
+square: false
+cards:
+  - type: picture-entity
+    entity: camera.weather_rain_radar_70_km
+    name: Rain Radar 70 km
+    show_state: false
+  - type: picture-entity
+    entity: camera.weather_rain_radar_240_km
+    name: Rain Radar 240 km
+    show_state: false
+  - type: picture-entity
+    entity: camera.weather_rain_radar_480_km
+    name: Rain Radar 480 km
+    show_state: false
+```
+
+<p align="center">
+  <img src="images/rain-radar.jpg" alt="Three picture-entity cards showing NEA rain radar images at 70 km, 240 km and 480 km range, with showers scattered north-east and east of Singapore" width="720">
+  <br>
+  <sub>Real NEA radar images from data.gov.sg, Friday 13 November 2026, 22:30. NEA's images are transparent rain overlays with no map underneath.</sub>
 </p>
 
 ## Entity reference
@@ -447,6 +474,30 @@ A camera shows as unavailable while LTA leaves it out of the feed.
 
 </details>
 
+### Rain radar
+
+Updated every **5 minutes** from [NEA's weather radar images via data.gov.sg](https://data.gov.sg/datasets/d_418e9ac3414fd927b7405631e0a7bc82/view)
+(a beta dataset). Three `camera` entities on the *Weather* device show the latest radar image,
+centred on Singapore, at each range NEA publishes.
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Range | Coverage (lat / lon) |
+|-----------|-------|----------------------|
+| `camera.weather_rain_radar_70_km` | 70 km | 0.72–1.98 N, 103.34–104.60 E |
+| `camera.weather_rain_radar_240_km` | 240 km | 0.81 S–3.51 N, 101.81–106.13 E |
+| `camera.weather_rain_radar_480_km` | 480 km | 2.97 S–5.66 N, 99.64–108.29 E |
+
+Each image is a 480 × 480 transparent PNG: coloured pixels are rain (cyan/green light, yellow
+moderate, orange/red/magenta heavy) and everything else is see-through, with no map underneath.
+Attributes: `range`, `image_timestamp` (the radar capture time), the image's bounding box as
+`north` / `south` / `east` / `west`, and the radar station's `center_latitude` /
+`center_longitude`. A radar camera shows as unavailable until its first image loads, and keeps
+its last image if a later fetch fails.
+
+</details>
+
 ### Dengue clusters
 
 Updated every **6 hours** from [NEA via data.gov.sg](https://data.gov.sg/datasets/d_dbfabf16158d1b0e1c420627c0819168/view).
@@ -602,7 +653,7 @@ sensor.air_quality_psi_east:
 - **Diagnostics:** on the Singapore integration page, open the three-dot menu and choose
   **Download diagnostics**. The file shows each data source's last update result, error
   and parsed data. Attach it when opening an issue.
-- **Unavailable sensors:** flood alerts, traffic cameras, dengue clusters, lightning, UV, PSI, COE and SP Group tariffs
+- **Unavailable sensors:** flood alerts, traffic cameras, rain radar, dengue clusters, lightning, UV, PSI, COE and SP Group tariffs
   load in the background, so the rest of the integration still starts if one of those
   sources is down. Their sensors show as unavailable until a fetch succeeds.
 - **HTTP 429 in the log:** data.gov.sg rate-limits bursts of requests, which can happen
@@ -623,6 +674,7 @@ sensor.air_quality_psi_east:
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_dbfabf16158d1b0e1c420627c0819168/view) | Dengue clusters | Every 6 h |
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_08238953fe0f6dd13f10714ebfbcb9f9/view) | Lightning observations | Every 2 min |
 | [data.gov.sg / NEA](https://api-open.data.gov.sg/v2/real-time/api/uv) | Hourly UV index | Every 15 min |
+| [data.gov.sg / NEA](https://data.gov.sg/datasets/d_418e9ac3414fd927b7405631e0a7bc82/view) | Rain radar images (70 / 240 / 480 km) | Every 5 min |
 | [MOM](https://www.mom.gov.sg/employment-practices/public-holidays) | Public holidays | Every 24 h |
 | [mytransport.sg](https://www.mytransport.sg/trainstatus) | MRT/LRT train status | Every 5 min |
 
@@ -639,7 +691,7 @@ pytest tests/ -v -m "not e2e"
 hits the live data sources. See CLAUDE.md for both.
 
 The README images are rendered from HTML in [`docs/mockups/`](docs/mockups): run
-`uv run docs/mockups/fetch_cameras.py` for fresh camera stills, then
+`uv run docs/mockups/fetch_cameras.py` for fresh camera stills (`fetch_radar.py` for radar images), then
 `cd docs/mockups && npm install && node build.mjs`. Keep `hero.html` in sync with
 [`examples/dashboard.yaml`](examples/dashboard.yaml).
 

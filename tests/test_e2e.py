@@ -317,6 +317,25 @@ def test_e2e_traffic_images_checkpoint_cameras():
         assert cam.image_url.startswith("https://"), cam.image_url
 
 
+def test_e2e_rain_radar_images():
+    """Fetch the live NEA radar feed for every range and assert it still parses."""
+    from custom_components.singapore.radar_coordinator import (
+        RADAR_RANGES,
+        RADAR_URL,
+        _parse_radar,
+    )
+
+    for radar_range in RADAR_RANGES:
+        try:
+            payload = asyncio.run(_async_get_json(RADAR_URL.format(range=radar_range)))
+        except Exception as err:
+            pytest.skip(f"Skipping e2e due to network error: {err}")
+        image = _parse_radar(payload, radar_range)
+        assert image.image_url.startswith("https://"), image.image_url
+        assert image.timestamp is not None
+        assert image.north is not None and image.south is not None
+
+
 def test_e2e_dengue_clusters_download_and_parse():
     """Download the live NEA dengue clusters GeoJSON and assert it parses."""
     from custom_components.singapore.dengue_coordinator import (
