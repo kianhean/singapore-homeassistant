@@ -27,7 +27,7 @@ async def test_energy_statistics_are_imported(
     recorder_mock, hass: HomeAssistant, mock_sources, sp_transport
 ) -> None:
     entry = await _setup(hass)
-    await _add_account(hass, entry, electricity_price=0.3)
+    await _add_account(hass, entry)  # cost priced from the scraped tariff
     await hass.async_block_till_done(wait_background_tasks=True)
     await async_wait_recording_done(hass)
 

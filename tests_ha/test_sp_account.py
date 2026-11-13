@@ -89,7 +89,6 @@ async def test_subentry_forms_serialize_over_http(
     assert {field["name"] for field in body["data_schema"]} == {
         "username",
         "password",
-        "electricity_price",
     }
 
     # MFA form, reached via the same HTTP view.
@@ -106,29 +105,27 @@ async def test_subentry_forms_serialize_over_http(
     await hass.async_block_till_done(wait_background_tasks=True)
 
     subentry_id = next(iter(entry.subentries))
-    for step in ("credentials", "price"):
-        resp = await client.post(
-            url,
-            json={
-                "handler": [entry.entry_id, SUBENTRY_TYPE_SP_ACCOUNT],
-                "subentry_id": subentry_id,
-            },
-        )
-        assert resp.status == HTTPStatus.OK, await resp.text()
-        menu = await resp.json()
-        assert menu["type"] == "menu"
-        resp = await client.post(
-            f"{url}/{menu['flow_id']}", json={"next_step_id": step}
-        )
-        assert resp.status == HTTPStatus.OK, await resp.text()
-        assert (await resp.json())["step_id"] == step
+    resp = await client.post(
+        url,
+        json={
+            "handler": [entry.entry_id, SUBENTRY_TYPE_SP_ACCOUNT],
+            "subentry_id": subentry_id,
+        },
+    )
+    assert resp.status == HTTPStatus.OK, await resp.text()
+    body = await resp.json()
+    assert body["step_id"] == "reconfigure"
+    assert {field["name"] for field in body["data_schema"]} == {
+        "username",
+        "password",
+    }
 
 
 async def test_add_account_creates_sensors_without_storing_password(
     hass: HomeAssistant, mock_sources, sp_transport
 ) -> None:
     entry = await _setup(hass)
-    result = await _add_account(hass, entry, electricity_price=0.3)
+    result = await _add_account(hass, entry)
     assert result["type"] is FlowResultType.CREATE_ENTRY
 
     subentry = next(iter(entry.subentries.values()))
@@ -136,7 +133,10 @@ async def test_add_account_creates_sensors_without_storing_password(
     assert subentry.unique_id == USERNAME
     assert "password" not in subentry.data
     assert subentry.data["access_token"]
-    assert subentry.data["electricity_price"] == 0.3
+    assert "electricity_price" not in subentry.data
+    # The cost series is priced from the scraped tariff (29.29 ¢/kWh).
+    coordinator = entry.runtime_data.sp_accounts[subentry.subentry_id]
+    assert coordinator.electricity_price == 0.2929
 
     entities = _sp_entities(hass, entry)
     assert entities, "SP account sensors were not created"
@@ -213,10 +213,8 @@ async def test_rejected_session_opens_repair_issue_and_reconfigure_fixes_it(
         (entry.entry_id, SUBENTRY_TYPE_SP_ACCOUNT),
         context={"source": SOURCE_RECONFIGURE, "subentry_id": subentry_id},
     )
-    assert result["type"] is FlowResultType.MENU
-    result = await hass.config_entries.subentries.async_configure(
-        result["flow_id"], {"next_step_id": "credentials"}
-    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "reconfigure"
     result = await hass.config_entries.subentries.async_configure(
         result["flow_id"], CREDENTIALS
     )
@@ -231,7 +229,7 @@ async def test_rejected_session_opens_repair_issue_and_reconfigure_fixes_it(
     assert _sp_entities(hass, entry)
 
 
-async def test_reconfigure_price_and_remove_account(
+async def test_reconfigure_with_other_email_is_refused_and_remove_account(
     hass: HomeAssistant, mock_sources, sp_transport
 ) -> None:
     entry = await _setup(hass)
@@ -243,14 +241,10 @@ async def test_reconfigure_price_and_remove_account(
         context={"source": SOURCE_RECONFIGURE, "subentry_id": subentry_id},
     )
     result = await hass.config_entries.subentries.async_configure(
-        result["flow_id"], {"next_step_id": "price"}
+        result["flow_id"], {"username": "other@example.com", "password": "secret"}
     )
-    result = await hass.config_entries.subentries.async_configure(
-        result["flow_id"], {"electricity_price": 0.29}
-    )
-    assert result["reason"] == "reconfigure_successful"
-    assert entry.subentries[subentry_id].data["electricity_price"] == 0.29
-    assert entry.subentries[subentry_id].data["access_token"]
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "unique_id_mismatch"
 
     assert hass.config_entries.async_remove_subentry(entry, subentry_id)
     await hass.async_block_till_done(wait_background_tasks=True)

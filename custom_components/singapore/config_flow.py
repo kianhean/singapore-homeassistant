@@ -18,9 +18,6 @@ from homeassistant.config_entries import (
 from homeassistant.const import CONF_NAME, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.helpers.selector import (
-    NumberSelector,
-    NumberSelectorConfig,
-    NumberSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
@@ -34,12 +31,10 @@ from .sp_account.client import (
     session_entry_data,
 )
 from .sp_account.const import (
-    CONF_ELECTRICITY_PRICE,
     CONF_MFA_CODE,
     OAUTH_ERROR_MFA_REQUIRED,
     OAUTH_ERROR_REQUIRES_VERIFICATION,
     fold_text,
-    parse_electricity_price,
     validate_username,
 )
 from .sp_account_coordinator import SUBENTRY_TYPE_SP_ACCOUNT
@@ -60,21 +55,12 @@ MAX_PASSWORD_CHARS = 1024
 # the frontend, and a bare function validator raises "Unable to convert
 # schema", which the UI shows as a 500 when the form loads. That was
 # maci0/home-assistant-sp issue #21. Rules that need code (the username's
-# octet limit, the price) run in the step handler instead and report a
-# field error.
+# octet limit) run in the step handler instead and report a field error.
 _USERNAME_SELECTOR = TextSelector(
     TextSelectorConfig(type=TextSelectorType.EMAIL, autocomplete="username")
 )
 _PASSWORD_SELECTOR = TextSelector(
     TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="current-password")
-)
-_PRICE_SELECTOR = NumberSelector(
-    NumberSelectorConfig(
-        min=0,
-        step="any",
-        mode=NumberSelectorMode.BOX,
-        unit_of_measurement="SGD/kWh",
-    )
 )
 
 
@@ -89,18 +75,6 @@ def credentials_schema(username: str | None = None) -> vol.Schema:
         {
             username_key: _USERNAME_SELECTOR,
             vol.Required(CONF_PASSWORD): _PASSWORD_SELECTOR,
-        }
-    )
-
-
-def price_schema(current: float | None) -> vol.Schema:
-    """The optional fixed electricity price form."""
-    return vol.Schema(
-        {
-            vol.Optional(
-                CONF_ELECTRICITY_PRICE,
-                description={"suggested_value": current},
-            ): _PRICE_SELECTOR,
         }
     )
 
@@ -168,7 +142,7 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class SpAccountSubentryFlow(ConfigSubentryFlow):
-    """Sign in to an SP Group e-account (with MFA), or change its settings.
+    """Sign in to an SP Group e-account (with MFA), or sign in to it again.
 
     Ported from maci0/home-assistant-sp's config flow. Only the tokens are
     stored, never the password: it buys one session and the refresh token
@@ -177,7 +151,6 @@ class SpAccountSubentryFlow(ConfigSubentryFlow):
 
     def __init__(self) -> None:
         self._mfa_context: dict[str, Any] = {}
-        self._price: float | None = None
 
     # -- helpers ----------------------------------------------------------
 
@@ -235,22 +208,13 @@ class SpAccountSubentryFlow(ConfigSubentryFlow):
         """Create the subentry, or store a new login on the one being edited."""
         username = data[CONF_USERNAME]
         if self.source == SOURCE_USER:
-            if self._price is not None:
-                data = {**data, CONF_ELECTRICITY_PRICE: self._price}
             return self.async_create_entry(
                 title=username, data=data, unique_id=fold_text(username)
             )
         subentry = self._get_reconfigure_subentry()
         if subentry.unique_id and subentry.unique_id != fold_text(username):
             return self.async_abort(reason="unique_id_mismatch")
-        kept = {
-            key: value
-            for key, value in subentry.data.items()
-            if key == CONF_ELECTRICITY_PRICE
-        }
-        return self.async_update_and_abort(
-            self._get_entry(), subentry, data={**kept, **data}
-        )
+        return self.async_update_and_abort(self._get_entry(), subentry, data=data)
 
     def _already_configured(self, username: str) -> bool:
         folded = fold_text(username)
@@ -267,13 +231,10 @@ class SpAccountSubentryFlow(ConfigSubentryFlow):
     ) -> SubentryFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None and _check_credentials(user_input, errors):
-            if step_id == "user":
-                if self._already_configured(user_input[CONF_USERNAME]):
-                    return self.async_abort(reason="already_configured")
-                if CONF_ELECTRICITY_PRICE in user_input:
-                    self._price = parse_electricity_price(
-                        user_input[CONF_ELECTRICITY_PRICE]
-                    )
+            if step_id == "user" and self._already_configured(
+                user_input[CONF_USERNAME]
+            ):
+                return self.async_abort(reason="already_configured")
             try:
                 data = await self._login(
                     user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
@@ -289,8 +250,6 @@ class SpAccountSubentryFlow(ConfigSubentryFlow):
         schema = credentials_schema(
             (user_input or {}).get(CONF_USERNAME) or default_username
         )
-        if step_id == "user":
-            schema = schema.extend(price_schema(self._price).schema)
         return self.async_show_form(step_id=step_id, data_schema=schema, errors=errors)
 
     # -- steps ------------------------------------------------------------
@@ -334,37 +293,8 @@ class SpAccountSubentryFlow(ConfigSubentryFlow):
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        """Sign in again, or change the electricity price."""
-        return self.async_show_menu(
-            step_id="reconfigure", menu_options=["credentials", "price"]
-        )
-
-    async def async_step_credentials(
-        self, user_input: dict[str, Any] | None = None
-    ) -> SubentryFlowResult:
         """Sign in again (expired session, changed password or MFA)."""
         subentry = self._get_reconfigure_subentry()
         return await self._credentials_step(
-            "credentials", user_input, subentry.data.get(CONF_USERNAME)
+            "reconfigure", user_input, subentry.data.get(CONF_USERNAME)
         )
-
-    async def async_step_price(
-        self, user_input: dict[str, Any] | None = None
-    ) -> SubentryFlowResult:
-        """Set or clear the fixed electricity price used for the cost series."""
-        subentry = self._get_reconfigure_subentry()
-        if user_input is not None:
-            price = parse_electricity_price(user_input.get(CONF_ELECTRICITY_PRICE))
-            data = {
-                key: value
-                for key, value in subentry.data.items()
-                if key != CONF_ELECTRICITY_PRICE
-            }
-            if price is not None:
-                data[CONF_ELECTRICITY_PRICE] = price
-            return self.async_update_and_abort(self._get_entry(), subentry, data=data)
-        try:
-            current = parse_electricity_price(subentry.data.get(CONF_ELECTRICITY_PRICE))
-        except ValueError:
-            current = None
-        return self.async_show_form(step_id="price", data_schema=price_schema(current))

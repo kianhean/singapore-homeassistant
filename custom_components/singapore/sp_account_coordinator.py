@@ -36,6 +36,7 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DOMAIN
+from .coordinator import SPGroupCoordinator
 from .sp_account.client import (
     AuthError,
     Session,
@@ -45,7 +46,6 @@ from .sp_account.client import (
 )
 from .sp_account.const import (
     CONF_ACCESS_TOKEN,
-    CONF_ELECTRICITY_PRICE,
     CONF_ID_TOKEN,
     CONF_REFRESH_TOKEN,
     OAUTH_ERROR_REQUIRES_VERIFICATION,
@@ -61,7 +61,6 @@ from .sp_account.const import (
     UNIT_KWH,
     UNIT_SGD,
     UPDATE_INTERVAL,
-    parse_electricity_price,
     translated_error,
 )
 from .sp_account.history import (
@@ -130,6 +129,7 @@ class SpAccountCoordinator(DataUpdateCoordinator[UsageReadings]):
         hass: HomeAssistant,
         entry: ConfigEntry,
         subentry: ConfigSubentry,
+        tariff: SPGroupCoordinator | None = None,
         client: SpGroupClient | None = None,
     ) -> None:
         super().__init__(
@@ -141,6 +141,8 @@ class SpAccountCoordinator(DataUpdateCoordinator[UsageReadings]):
         )
         self.entry = entry
         self.subentry_id = subentry.subentry_id
+        # The integration's own SP Group tariff scrape prices the cost series.
+        self.tariff = tariff
         self.client = client or SpGroupClient(session=session_from_data(subentry.data))
         self.last_error: str | None = None
         self.last_poll_ms: int | None = None
@@ -195,14 +197,16 @@ class SpAccountCoordinator(DataUpdateCoordinator[UsageReadings]):
 
     @property
     def electricity_price(self) -> float | None:
-        """Fixed SGD/kWh price from the subentry, or None when unset."""
-        subentry = self.subentry
-        raw = subentry.data.get(CONF_ELECTRICITY_PRICE) if subentry else None
-        try:
-            return parse_electricity_price(raw)
-        except ValueError as exc:
-            _LOGGER.warning("%s; no electricity cost series will be written", exc)
+        """SGD/kWh for the cost series: the scraped SP Group tariff (incl. GST).
+
+        Upstream asked the user for a fixed price; this integration already
+        scrapes the regulated tariff (in ¢/kWh), so it is used instead. None
+        until the tariff has loaded, which skips the cost series.
+        """
+        data = self.tariff.data if self.tariff is not None else None
+        if data is None or not data.electricity_price:
             return None
+        return round(data.electricity_price / 100, 6)
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -212,9 +216,8 @@ class SpAccountCoordinator(DataUpdateCoordinator[UsageReadings]):
         """React to a subentry change without reloading the whole integration.
 
         Two things change the subentry: this coordinator persisting a refreshed
-        session (nothing to do), and the reconfigure flow storing a new login
-        or price. A new login replaces the client's session and polls at once;
-        a new price re-imports the cost series.
+        session (nothing to do), and the reconfigure flow storing a new login,
+        which replaces the client's session and polls at once.
         """
         subentry = self.subentry
         if subentry is None:
@@ -223,7 +226,9 @@ class SpAccountCoordinator(DataUpdateCoordinator[UsageReadings]):
         if stored is not None and not same_tokens(stored, self.client.session):
             self.client = SpGroupClient(session=stored)
             await self.async_request_refresh()
-            return
+
+    async def async_tariff_updated(self) -> None:
+        """Re-price the cost series when the scraped tariff changes (quarterly)."""
         if self.electricity_price != self._imported_price:
             await self.async_import_billed_history()
 

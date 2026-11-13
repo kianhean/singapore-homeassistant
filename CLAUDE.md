@@ -484,10 +484,15 @@ headers) when touching this code.
   convention (rewriting a 2,000-line protocol client was not worth the risk).
 - Each e-account is a **config subentry** (`subentry_type = "sp_account"`) of the single
   `singapore` entry, offered by `async_get_supported_subentry_types`. Subentry data holds the
-  username, Auth0 tokens and optional `electricity_price`, never the password.
-- `SpAccountSubentryFlow`: `user` (credentials + optional price) → `mfa` when Auth0 says
-  `mfa_required` (TOTP preferred, SMS/email OOB otherwise) → subentry. `reconfigure` is a menu:
-  `credentials` (sign in again; unique id must match) or `price`.
+  username and Auth0 tokens, never the password.
+- `SpAccountSubentryFlow`: `user` (credentials) → `mfa` when Auth0 says `mfa_required` (TOTP
+  preferred, SMS/email OOB otherwise) → subentry. `reconfigure` is the same sign-in form
+  (unique id must match).
+- No price input (upstream had an "electricity price" option): the cost series is priced from
+  the integration's own tariff scrape, `SpAccountCoordinator.electricity_price` =
+  `SPGroupCoordinator.data.electricity_price / 100` (¢ → SGD/kWh). `__init__.py` adds a tariff
+  coordinator listener that calls `async_tariff_updated()` on each account, which re-imports
+  the cost series when the price changed. No tariff yet → the cost series is skipped.
 - **Form schemas must be serializable** (upstream issue #21: a bare function validator made HA
   return 500 "Unable to convert schema" when the form loaded). Use selectors / plain types only
   and run custom rules in the step handler, reporting field errors.
@@ -499,8 +504,7 @@ headers) when touching this code.
   sensor down); success deletes it. Refreshed tokens are persisted with
   `async_update_subentry`, which fires the entry update listener: `_async_entry_updated`
   reloads only when the set of SP subentries changed, otherwise it calls
-  `coordinator.async_subentry_updated()` (new tokens → new client + refresh; new price →
-  re-import cost statistics).
+  `coordinator.async_subentry_updated()` (new tokens → new client + refresh).
 - Energy statistics are imported with `async_add_external_statistics` as
   `singapore:<premise_id>_<key>` (`electricity`, `electricity_cost`, `gas`, `last_bill`).
   `unit_class` is only included when the running HA's `StatisticMetaData` has it (2025.4

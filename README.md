@@ -69,8 +69,9 @@ The lightning and dengue distances are measured from the home location in
 1. Open **Settings → Devices & Services → Singapore**.
 2. Click **Add SP account** and sign in with the email and password you use in the SP app.
    If your account has MFA, you'll be asked for the code from SMS, email or your authenticator app.
-3. Optionally enter a fixed electricity price (SGD/kWh incl. GST) to get a cost series for the
-   Energy dashboard. You can change it later from the account's **Reconfigure** menu.
+
+There's no price to enter: the electricity cost for the Energy dashboard uses the SP Group
+tariff this integration already reads (`sensor.energy_electricity_tariff`).
 
 The password is never stored: only the session tokens SP returns are kept, and they renew
 themselves. You can add more than one account. Each one gets its own device, named after the
@@ -315,9 +316,11 @@ appear only when SP returns data for them). New ones are added without a reload.
 - Grid consumption: pick the statistic **SP Group electricity**
   (`singapore:<premise_id>_electricity`), not a sensor. It is built from the AMI half-hours
   (folded to hours) where available, else billed months.
-- Cost: with an electricity price set, pick **SP Group electricity cost**
-  (`singapore:<premise_id>_electricity_cost`) as the grid source's cost. Changing the price
-  rewrites that series.
+- Cost: pick **SP Group electricity cost** (`singapore:<premise_id>_electricity_cost`) as the
+  grid source's cost. It's priced at the SP Group regulated tariff (incl. GST) this integration
+  scrapes, and the whole series is re-priced when the tariff changes each quarter, so past
+  quarters show at the current rate. If you buy from an Open Electricity Market retailer, your
+  real rate differs; use your bills (**Last bill**) for exact amounts.
 - Gas: **SP Group gas** (`singapore:<premise_id>_gas`) when SP returns gas data.
 - **SP Group bill** (`singapore:<premise_id>_last_bill`) has one point per billed month.
 - Don't use *Electricity cumulative*, *Electricity last billed*, *Electricity meter* or
@@ -671,7 +674,7 @@ sensor.air_quality_psi_east:
   sources is down. Their sensors show as unavailable until a fetch succeeds.
 - **SP account sensors unavailable:** if SP rejects the stored session, a repair appears under
   **Settings → Repairs**. Open the account under the Singapore integration and choose
-  **Reconfigure → Sign in again**. If SP says the sign-in looks suspicious, sign in once in the
+  **Reconfigure** and sign in again. If SP says the sign-in looks suspicious, sign in once in the
   SP app, wait a few minutes, then try again. After a wrong password the next attempt waits
   60 seconds, so Auth0 doesn't lock the account. The rest of the integration keeps working
   either way.

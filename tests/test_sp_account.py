@@ -209,21 +209,25 @@ async def test_subentry_update_with_new_tokens_swaps_client_and_refreshes():
     coordinator.async_request_refresh.assert_awaited_once()
 
 
-async def test_subentry_update_with_new_price_reimports_statistics():
-    _hass_, entry, sub, coordinator = _coordinator(fixture_client())
+async def test_price_comes_from_scraped_tariff_in_sgd():
+    _hass_, _entry_, _sub, coordinator = _coordinator(fixture_client())
+    assert coordinator.electricity_price is None  # no tariff coordinator
+    coordinator.tariff = MagicMock(data=None)
+    assert coordinator.electricity_price is None  # tariff not loaded yet
+    coordinator.tariff.data = MagicMock(electricity_price=29.29)  # ¢/kWh
+    assert coordinator.electricity_price == 0.2929
+
+
+async def test_tariff_change_reprices_cost_series():
+    _hass_, _entry_, _sub, coordinator = _coordinator(fixture_client())
     coordinator.async_import_billed_history = AsyncMock()
-    session = coordinator.client.session
-    entry.subentries[sub.subentry_id] = _subentry(
-        {
-            "username": "user@example.com",
-            CONF_ACCESS_TOKEN: session.access_token,
-            CONF_ID_TOKEN: session.id_token,
-            CONF_REFRESH_TOKEN: session.refresh_token,
-            "electricity_price": 0.3,
-        }
-    )
-    assert coordinator.electricity_price == 0.3
-    await coordinator.async_subentry_updated()
+    coordinator.tariff = MagicMock(data=MagicMock(electricity_price=29.29))
+    await coordinator.async_tariff_updated()
+    coordinator.async_import_billed_history.assert_awaited_once()
+
+    # Same price as already imported: nothing to re-write.
+    coordinator._imported_price = 0.2929
+    await coordinator.async_tariff_updated()
     coordinator.async_import_billed_history.assert_awaited_once()
 
 
@@ -369,8 +373,8 @@ def test_every_sp_sensor_key_has_translation_and_strings_mirror_en():
         key = f"{TRANSLATION_PREFIX}{spec.translation_key}"
         assert key in strings["entity"]["sensor"], key
     sub = strings["config_subentries"][SUBENTRY_TYPE_SP_ACCOUNT]
-    for step in ("user", "mfa", "reconfigure", "credentials", "price"):
-        assert step in sub["step"]
+    assert set(sub["step"]) == {"user", "mfa", "reconfigure"}
+    assert "electricity_price" not in sub["step"]["user"]["data"]
     assert ISSUE_AUTH_FAILED in strings["issues"]
     for key in ("auth_failed", "requires_verification", "usage_failed"):
         assert key in strings["exceptions"]

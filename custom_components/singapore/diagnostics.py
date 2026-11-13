@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from . import SingaporeConfigEntry
-from .sp_account.const import CONF_ELECTRICITY_PRICE, CONF_REFRESH_TOKEN
+from .sp_account.const import CONF_REFRESH_TOKEN
 from .sp_account_coordinator import SpAccountCoordinator
 
 
@@ -60,7 +60,7 @@ def _sp_account_diagnostics(coordinator: SpAccountCoordinator) -> dict[str, Any]
         ),
         "failed_reads": coordinator.client.read_failures,
         "has_refresh_token": bool(stored.get(CONF_REFRESH_TOKEN)),
-        "has_electricity_price": stored.get(CONF_ELECTRICITY_PRICE) is not None,
+        "electricity_price_sgd_kwh": coordinator.electricity_price,
     }
     if usage is None:
         return {**status, "usage": None}

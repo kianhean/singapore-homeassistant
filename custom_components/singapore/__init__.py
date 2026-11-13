@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_change
 
 from .coe_coordinator import CoeCoordinator
@@ -154,13 +154,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
     for subentry in entry.subentries.values():
         if subentry.subentry_type != SUBENTRY_TYPE_SP_ACCOUNT:
             continue
-        sp_coordinator = SpAccountCoordinator(hass, entry, subentry)
+        sp_coordinator = SpAccountCoordinator(
+            hass, entry, subentry, tariff=tariff_coordinator
+        )
         sp_accounts[subentry.subentry_id] = sp_coordinator
         entry.async_create_background_task(
             hass,
             _initial_refresh(sp_coordinator, "SP account"),
             f"singapore_sp_account_{subentry.subentry_id}_initial_refresh",
         )
+
+    if sp_accounts:
+
+        @callback
+        def _tariff_updated() -> None:
+            # A new quarter's tariff re-prices each account's cost series.
+            for account in sp_accounts.values():
+                hass.async_create_task(account.async_tariff_updated())
+
+        entry.async_on_unload(tariff_coordinator.async_add_listener(_tariff_updated))
 
     entry.runtime_data = SingaporeData(
         tariff=tariff_coordinator,
