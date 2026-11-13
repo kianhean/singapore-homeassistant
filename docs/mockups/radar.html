@@ -1,20 +1,24 @@
 <!doctype html>
-<!-- Real NEA rain radar images from data.gov.sg (radar/*.png), shown in picture-entity
-     cards. NEA's PNGs are transparent rain overlays with no basemap, so the card's own
-     background shows through. Refresh them with fetch_radar.py. -->
+<!-- Real NEA rain radar from data.gov.sg, rendered by fetch_radar.py with the
+     integration's own radar_image.composite_radar (70 km / 240 km on NEA's base maps;
+     480 km has no NEA map, so it's the bare transparent overlay), in picture-entity cards
+     laid out as in the README YAML. -->
 <html><head><meta charset="utf-8"><link rel="stylesheet" href="ha.css">
 <style>
   body { padding: 20px; }
-  .g { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .cam { position: relative; aspect-ratio: 1; }
-  .cam img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
-  .cam .bar { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 14px; background: rgba(0,0,0,.55); font-size: 14px; font-weight: 500; }
+  .stack { display: grid; gap: 12px; }
+  .g { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .cam { position: relative; overflow: hidden; }
+  .cam img { width: 100%; display: block; }
+  .cam .bar { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 14px; background: rgba(0,0,0,.55); font-size: 14px; font-weight: 500; color: #fff; }
 </style></head>
 <body>
 <div class="heading" style="margin-bottom:8px"><i m="mdiRadar"></i>Rain radar</div>
-<div class="g">
-  <div class="card cam"><img src="radar/70km.png" alt=""><div class="bar">Rain Radar 70 km</div></div>
-  <div class="card cam"><img src="radar/240km.png" alt=""><div class="bar">Rain Radar 240 km</div></div>
-  <div class="card cam"><img src="radar/480km.png" alt=""><div class="bar">Rain Radar 480 km</div></div>
+<div class="stack">
+  <div class="card cam"><img src="radar/70km.jpg" alt=""><div class="bar">Rain Radar 70 km</div></div>
+  <div class="g">
+    <div class="card cam"><img src="radar/240km.jpg" alt=""><div class="bar">Rain Radar 240 km</div></div>
+    <div class="card cam"><img src="radar/480km.png" alt=""><div class="bar">Rain Radar 480 km</div></div>
+  </div>
 </div>
 </body></html>

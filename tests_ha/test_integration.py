@@ -109,8 +109,9 @@ async def test_setup_creates_entities_and_unloads(
     assert hass.states.get("camera.weather_rain_radar_240_km").state == "idle"
     assert hass.states.get("camera.weather_rain_radar_480_km").state == "unavailable"
     radar_image = await async_get_image(hass, "camera.weather_rain_radar_70_km")
-    assert radar_image.content == b"png-70km"
-    assert radar_image.content_type == "image/png"
+    # Drawn on NEA's 853 x 479 Singapore base map.
+    assert radar_image.content_type == "image/jpeg"
+    assert radar_image.content[:3] == b"\xff\xd8\xff"
 
     dengue = hass.states.get("sensor.nea_dengue_clusters")
     assert dengue is not None

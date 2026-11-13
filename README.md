@@ -234,31 +234,34 @@ also carries `latitude`/`longitude`, so you can put them on a Map card instead (
   <sub>Real LTA stills from data.gov.sg, Friday 13 November 2026, 16:50.</sub>
 </p>
 
-**Rain radar:** a picture-entity card per radar range shows where it's raining right now.
+**Rain radar:** a picture-entity card per radar range shows where it's raining right now,
+drawn on the same maps NEA uses on its [rain areas page](https://www.nea.gov.sg/weather/rain-areas).
 
 ```yaml
-type: grid
-columns: 3
-square: false
+type: vertical-stack
 cards:
   - type: picture-entity
     entity: camera.weather_rain_radar_70_km
     name: Rain Radar 70 km
     show_state: false
-  - type: picture-entity
-    entity: camera.weather_rain_radar_240_km
-    name: Rain Radar 240 km
-    show_state: false
-  - type: picture-entity
-    entity: camera.weather_rain_radar_480_km
-    name: Rain Radar 480 km
-    show_state: false
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: picture-entity
+        entity: camera.weather_rain_radar_240_km
+        name: Rain Radar 240 km
+        show_state: false
+      - type: picture-entity
+        entity: camera.weather_rain_radar_480_km
+        name: Rain Radar 480 km
+        show_state: false
 ```
 
 <p align="center">
-  <img src="images/rain-radar.jpg" alt="Three picture-entity cards showing NEA rain radar images at 70 km, 240 km and 480 km range, with showers scattered north-east and east of Singapore" width="720">
+  <img src="images/rain-radar.jpg" alt="Picture-entity cards of NEA rain radar: the 70 km view over a map of Singapore with light scattered echoes, the 240 km view over Johor, the Riau Islands and Sumatra with showers east of Johor, and the 480 km view without a map" width="640">
   <br>
-  <sub>Real NEA radar images from data.gov.sg, Friday 13 November 2026, 22:30. NEA's images are transparent rain overlays with no map underneath.</sub>
+  <sub>Real NEA radar from data.gov.sg, Friday 13 November 2026, 22:45. NEA has no map for the 480 km range.</sub>
 </p>
 
 ## Entity reference
@@ -478,23 +481,27 @@ A camera shows as unavailable while LTA leaves it out of the feed.
 
 Updated every **5 minutes** from [NEA's weather radar images via data.gov.sg](https://data.gov.sg/datasets/d_418e9ac3414fd927b7405631e0a7bc82/view)
 (a beta dataset). Three `camera` entities on the *Weather* device show the latest radar image,
-centred on Singapore, at each range NEA publishes.
+centred on Singapore, at each range NEA publishes. The 70 km and 240 km images are drawn on
+NEA's own base maps from its [rain areas page](https://www.nea.gov.sg/weather/rain-areas),
+cropped and scaled exactly as that page shows them.
 
 <details>
 <summary>Entities and attributes</summary>
 
-| Entity ID | Range | Coverage (lat / lon) |
-|-----------|-------|----------------------|
-| `camera.weather_rain_radar_70_km` | 70 km | 0.72–1.98 N, 103.34–104.60 E |
-| `camera.weather_rain_radar_240_km` | 240 km | 0.81 S–3.51 N, 101.81–106.13 E |
-| `camera.weather_rain_radar_480_km` | 480 km | 2.97 S–5.66 N, 99.64–108.29 E |
+| Entity ID | Range | Image |
+|-----------|-------|-------|
+| `camera.weather_rain_radar_70_km` | 70 km | Singapore on NEA's map (853 × 479 JPEG) |
+| `camera.weather_rain_radar_240_km` | 240 km | Johor, Riau Islands and Sumatra on NEA's map (853 × 853 JPEG) |
+| `camera.weather_rain_radar_480_km` | 480 km | Bare radar overlay, no map (480 × 480 transparent PNG) |
 
-Each image is a 480 × 480 transparent PNG: coloured pixels are rain (cyan/green light, yellow
-moderate, orange/red/magenta heavy) and everything else is see-through, with no map underneath.
-Attributes: `range`, `image_timestamp` (the radar capture time), the image's bounding box as
-`north` / `south` / `east` / `west`, and the radar station's `center_latitude` /
-`center_longitude`. A radar camera shows as unavailable until its first image loads, and keeps
-its last image if a later fetch fails.
+Rain colours run cyan/green (light), yellow (moderate) and orange/red/magenta (heavy).
+Attributes: `range`, `basemap` (whether this range has an NEA map), `image_timestamp` (the
+radar capture time), the full radar image's bounding box as `north` / `south` / `east` /
+`west`, and the radar station's `center_latitude` / `center_longitude`.
+
+A radar camera shows as unavailable until its first image loads, and keeps its last image if a
+later fetch fails. The base map is downloaded once from nea.gov.sg; if that fails, the camera
+shows the bare overlay and tries the map again after 30 minutes.
 
 </details>
 

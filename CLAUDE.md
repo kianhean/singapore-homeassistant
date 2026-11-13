@@ -21,6 +21,7 @@ custom_components/singapore/
 ├── lightning_coordinator.py # LightningCoordinator: NEA lightning strikes, 30-min rolling window
 ├── uv_coordinator.py       # UvCoordinator: NEA hourly UV index + exposure bands
 ├── radar_coordinator.py    # RadarCoordinator: NEA rain radar PNGs (70/240/480 km)
+├── radar_image.py          # Pure-Pillow compositing of radar onto NEA base maps (BASEMAPS)
 ├── camera.py               # Camera entities (checkpoint traffic cameras + rain radar)
 ├── calendar.py             # Calendar entity (Singapore public holidays)
 ├── weather.py              # Weather entities (one per Singapore forecast area)
@@ -66,7 +67,7 @@ tests_ha/test_blueprints.py      # Runs every blueprint in real HA (one test per
 examples/dashboard.yaml          # Built-in-cards dashboard shown in images/hero.jpg
 docs/mockups/                    # HTML sources for the README images (node build.mjs → images/*.png)
 ├── fetch_cameras.py             # uv run: pulls real checkpoint stills into docs/mockups/cameras/
-└── fetch_radar.py               # uv run: pulls real radar PNGs into docs/mockups/radar/
+└── fetch_radar.py               # uv run: renders real radar (via radar_image.py) into docs/mockups/radar/
 ```
 
 README images must only show what Home Assistant really renders from this integration's
@@ -476,10 +477,22 @@ plus `data.boundaryBox` (EPSG:4326 upper-left / lower-right) and `data.projectio
 A range whose fetch fails (HTTP error/429, network) keeps its previous `RadarImage`; only when
 every range fails with nothing cached does the update fail. A payload with no record/image URL
 raises `UpdateFailed` (parse errors propagate). `SingaporeRainRadarCamera` (`camera.py`, on the
-*Weather* device, `content_type = "image/png"`) caches the PNG keyed by capture `timestamp`,
-not URL, because the URL is re-signed on every poll. Images are transparent overlays (no
-basemap); the rainfall colour legend is in the spec. data.gov.sg returns 403 to urllib's
-default User-Agent (aiohttp's is fine), which is why `fetch_radar.py` sets one.
+*Weather* device) caches its image keyed by capture `timestamp` (+ whether the base map was
+used), not URL, because the URL is re-signed on every poll.
+
+The radar PNGs are transparent overlays with no map. `radar_image.py` (Pillow only, no HA
+imports, so `docs/mockups/fetch_radar.py` loads it by path) draws 70 km and 240 km on the base
+maps from https://www.nea.gov.sg/weather/rain-areas (`/assets/images/map/base-853.png`,
+853 × 479; `240km-v2.jpg`, 853 × 853), replicating that page: both images at the same width,
+top-left aligned. The crop boxes in `BASEMAPS` were found by matching NEA's own overlays to
+data.gov.sg's image of the same capture (pixel-exact): NEA's 240 km overlay *is* the full
+480 × 480 image; its 70 km overlay is the crop `(83, 193, 300, 313)`. NEA has no 480 km map, so
+that camera serves the bare PNG. Base maps are fetched at runtime (once, retried after
+`BASEMAP_RETRY_SECONDS` on failure) rather than bundled, because they are NEA website assets,
+not open data. Composited output is JPEG (`content_type` is set per image). Pillow is a Home
+Assistant core dependency, so it isn't in `manifest.json`; it is in `requirements_test.txt`.
+data.gov.sg returns 403 to urllib's default User-Agent (aiohttp's is fine), which is why
+`fetch_radar.py` sets one.
 
 ### Camera platform test dependency
 

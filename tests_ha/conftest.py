@@ -8,8 +8,11 @@ HTTP is still mocked so the suite stays offline and deterministic.
 
 from __future__ import annotations
 
+import io
+
 import pytest
 from homeassistant.util import dt as dt_util
+from PIL import Image
 from pytest_homeassistant_custom_component.test_util.aiohttp import (
     AiohttpClientMocker,
 )
@@ -22,6 +25,7 @@ from custom_components.singapore.holiday_coordinator import PUBLIC_HOLIDAYS_URL
 from custom_components.singapore.lightning_coordinator import LIGHTNING_URL
 from custom_components.singapore.psi_coordinator import PSI_URL
 from custom_components.singapore.radar_coordinator import RADAR_URL
+from custom_components.singapore.radar_image import BASEMAPS
 from custom_components.singapore.traffic_coordinator import TRAFFIC_IMAGES_URL
 from custom_components.singapore.train_coordinator import TRAIN_STATUS_URL
 from custom_components.singapore.uv_coordinator import UV_URL
@@ -309,6 +313,12 @@ def _holiday_html() -> str:
 """
 
 
+def _png(size: tuple[int, int]) -> bytes:
+    out = io.BytesIO()
+    Image.new("RGBA", size).save(out, format="PNG")
+    return out.getvalue()
+
+
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Allow Home Assistant to load custom_components/singapore."""
@@ -383,5 +393,6 @@ def mock_sources(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
         )
     # 480 km deliberately failing: its camera must go unavailable.
     aioclient_mock.get(RADAR_URL.format(range="480km"), status=429)
-    aioclient_mock.get("https://radar.example/70km.png", content=b"png-70km")
+    aioclient_mock.get("https://radar.example/70km.png", content=_png((480, 480)))
+    aioclient_mock.get(BASEMAPS["70km"].url, content=_png((853, 479)))
     return aioclient_mock

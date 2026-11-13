@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 import aiohttp
 from homeassistant.components.camera import Camera
@@ -15,11 +16,15 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import SingaporeConfigEntry
 from .const import DOMAIN
 from .radar_coordinator import RADAR_RANGES, RadarCoordinator, RadarImage
+from .radar_image import BASEMAPS, composite_radar
 from .traffic_coordinator import CHECKPOINT_CAMERAS, TrafficImagesCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 PARALLEL_UPDATES = 0
+
+# How long to serve the bare radar overlay before trying NEA's base map again.
+BASEMAP_RETRY_SECONDS = 30 * 60
 
 
 async def async_setup_entry(
@@ -142,11 +147,17 @@ class SingaporeCheckpointCamera(CoordinatorEntity[TrafficImagesCoordinator], Cam
 
 
 class SingaporeRainRadarCamera(CoordinatorEntity[RadarCoordinator], Camera):
-    """Latest NEA rain radar image (transparent PNG) for one radar range."""
+    """Latest NEA rain radar image for one radar range.
+
+    For the 70 km and 240 km ranges the transparent radar PNG is drawn on NEA's own
+    rain-areas base map (fetched once from nea.gov.sg and kept in memory). The 480 km
+    range has no NEA map, so it is the bare overlay; so is any range while the base
+    map can't be fetched.
+    """
 
     _attr_has_entity_name = True
     _attr_translation_key = "rain_radar"
-    _attr_attribution = "Data provided by NEA via data.gov.sg"
+    _attr_attribution = "Data provided by NEA via data.gov.sg; map by NEA"
 
     def __init__(
         self, coordinator: RadarCoordinator, entry_id: str, radar_range: str
@@ -158,6 +169,9 @@ class SingaporeRainRadarCamera(CoordinatorEntity[RadarCoordinator], Camera):
         self._range = radar_range
         self._attr_unique_id = f"{entry_id}_rain_radar_{radar_range}"
         self._attr_translation_placeholders = {"range": RADAR_RANGES[radar_range]}
+        self._basemap_spec = BASEMAPS.get(radar_range)
+        self._basemap: bytes | None = None
+        self._basemap_failed_at: float | None = None
         self._cached_key: object = None
         self._cached_image: bytes | None = None
 
@@ -172,7 +186,10 @@ class SingaporeRainRadarCamera(CoordinatorEntity[RadarCoordinator], Camera):
 
     @property
     def extra_state_attributes(self) -> dict:
-        attrs: dict = {"range": RADAR_RANGES[self._range]}
+        attrs: dict = {
+            "range": RADAR_RANGES[self._range],
+            "basemap": self._basemap_spec is not None,
+        }
         radar = self._radar
         if radar is not None:
             attrs["image_timestamp"] = (
@@ -186,27 +203,66 @@ class SingaporeRainRadarCamera(CoordinatorEntity[RadarCoordinator], Camera):
             attrs["center_longitude"] = radar.center_longitude
         return attrs
 
+    async def _async_get_basemap(self) -> bytes | None:
+        """Return NEA's base map for this range, fetching it at most once.
+
+        A failed fetch is retried after ``BASEMAP_RETRY_SECONDS``, not on every
+        image request.
+        """
+        if self._basemap_spec is None or self._basemap is not None:
+            return self._basemap
+        if (
+            self._basemap_failed_at is not None
+            and time.monotonic() - self._basemap_failed_at < BASEMAP_RETRY_SECONDS
+        ):
+            return None
+        self._basemap = await _download_image(
+            self.hass, self._basemap_spec.url, f"Rain radar {self._range} base map"
+        )
+        if self._basemap is None:
+            self._basemap_failed_at = time.monotonic()
+        return self._basemap
+
     async def async_camera_image(
         self, width: int | None = None, height: int | None = None
     ) -> bytes | None:
-        """Return the latest radar image.
+        """Return the latest radar image, on NEA's base map where there is one.
 
         The presigned URL changes on every poll, so the cache is keyed by the
-        capture timestamp (falling back to the URL if NEA omits it).
+        capture timestamp (falling back to the URL if NEA omits it), plus whether
+        the base map was available.
         """
         radar = self._radar
         if radar is None:
             return self._cached_image
-        key = radar.timestamp or radar.image_url
+        basemap = await self._async_get_basemap()
+        key = (radar.timestamp or radar.image_url, basemap is not None)
         if key == self._cached_key and self._cached_image is not None:
             return self._cached_image
 
-        image = await _download_image(
+        overlay = await _download_image(
             self.hass, radar.image_url, f"Rain radar {self._range}"
         )
-        if image is None:
+        if overlay is None:
             return self._cached_image
 
+        image, content_type = overlay, "image/png"
+        if basemap is not None and self._basemap_spec is not None:
+            try:
+                image = await self.hass.async_add_executor_job(
+                    composite_radar, basemap, overlay, self._basemap_spec
+                )
+                content_type = "image/jpeg"
+            except OSError as err:  # PIL.UnidentifiedImageError is an OSError
+                _LOGGER.warning(
+                    "Could not draw rain radar %s on its base map: %s", self._range, err
+                )
+                # A corrupt base map would fail every time: fetch it again later.
+                self._basemap = None
+                self._basemap_failed_at = time.monotonic()
+                key = (key[0], False)
+
+        self.content_type = content_type
         self._cached_key = key
         self._cached_image = image
         return image
