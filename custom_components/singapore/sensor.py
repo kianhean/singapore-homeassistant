@@ -1,4 +1,4 @@
-"""Sensor platform: tariffs, COE, weather, PSI, trains, floods, dengue, lightning."""
+"""Sensor platform: tariffs, COE, weather, PSI, trains, floods, dengue, lightning, UV."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from homeassistant.const import (
     CONCENTRATION_MILLIGRAMS_PER_CUBIC_METER,
     DEGREE,
     PERCENTAGE,
+    UV_INDEX,
     UnitOfLength,
     UnitOfPrecipitationDepth,
     UnitOfSpeed,
@@ -49,6 +50,7 @@ from .psi_coordinator import (
     psi_band,
 )
 from .train_coordinator import TRAIN_LINES, TrainStatusCoordinator
+from .uv_coordinator import UV_EXPOSURE_OPTIONS, UvCoordinator, uv_exposure
 from .weather_coordinator import SingaporeWeatherCoordinator
 
 PARALLEL_UPDATES = 0
@@ -166,6 +168,8 @@ async def async_setup_entry(
             SingaporeNearestDengueClusterSensor(data.dengue, entry.entry_id),
             SingaporeLightningStrikesSensor(data.lightning, entry.entry_id),
             SingaporeNearestLightningSensor(data.lightning, entry.entry_id),
+            SingaporeUvIndexSensor(data.uv, entry.entry_id),
+            SingaporeUvExposureSensor(data.uv, entry.entry_id),
         ]
     )
 
@@ -746,7 +750,7 @@ class SingaporeFloodAlertsSensor(
 
 
 def _nea_device_info(entry_id: str) -> DeviceInfo:
-    """Device shared by the NEA dengue and lightning sensors."""
+    """Device shared by the NEA dengue, lightning and UV sensors."""
     return DeviceInfo(
         identifiers={(DOMAIN, f"{entry_id}_nea")},
         name="NEA",
@@ -954,3 +958,71 @@ class SingaporeNearestLightningSensor(_BaseLightningSensor):
                 }
             )
         return attrs
+
+
+class _BaseUvSensor(CoordinatorEntity[UvCoordinator], SensorEntity):
+    """Shared device info for NEA UV index sensors."""
+
+    _attr_has_entity_name = True
+    _attr_attribution = "Data provided by NEA via data.gov.sg"
+
+    def __init__(self, coordinator: UvCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._entry_id = entry_id
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return _nea_device_info(self._entry_id)
+
+
+class SingaporeUvIndexSensor(_BaseUvSensor):
+    """Latest hourly UV index (NEA publishes 7 am to 7 pm)."""
+
+    _attr_translation_key = "uv_index"
+    _attr_native_unit_of_measurement = UV_INDEX
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator: UvCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_uv_index"
+
+    @property
+    def native_value(self) -> int | None:
+        data = self.coordinator.data
+        if data is None or data.latest is None:
+            return None
+        return data.latest.value
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        data = self.coordinator.data
+        if data is None or data.latest is None:
+            return {}
+        peak = data.peak
+        return {
+            "hour": data.latest.hour.isoformat(),
+            "exposure": uv_exposure(data.latest.value),
+            "peak": peak.value,
+            "peak_hour": peak.hour.isoformat(),
+            "readings": [r.as_dict() for r in data.readings],
+            "source": "NEA via data.gov.sg",
+        }
+
+
+class SingaporeUvExposureSensor(_BaseUvSensor):
+    """NEA exposure category for the latest UV index (low ... extreme)."""
+
+    _attr_translation_key = "uv_exposure"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = UV_EXPOSURE_OPTIONS
+
+    def __init__(self, coordinator: UvCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_uv_exposure"
+
+    @property
+    def native_value(self) -> str | None:
+        data = self.coordinator.data
+        if data is None or data.latest is None:
+            return None
+        return uv_exposure(data.latest.value)

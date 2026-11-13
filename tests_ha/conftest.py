@@ -23,6 +23,7 @@ from custom_components.singapore.lightning_coordinator import LIGHTNING_URL
 from custom_components.singapore.psi_coordinator import PSI_URL
 from custom_components.singapore.traffic_coordinator import TRAFFIC_IMAGES_URL
 from custom_components.singapore.train_coordinator import TRAIN_STATUS_URL
+from custom_components.singapore.uv_coordinator import UV_URL
 from custom_components.singapore.weather_coordinator import (
     _READINGS_ENDPOINTS,
     FOUR_DAY_URL,
@@ -321,6 +322,22 @@ def mock_sources(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
     aioclient_mock.get(WEATHER_URL, json=_TWO_HR_PAYLOAD)
     aioclient_mock.get(FOUR_DAY_URL, status=404)
     aioclient_mock.get(TWENTY_FOUR_HR_URL, json=_TWENTY_FOUR_HR_PAYLOAD)
+    aioclient_mock.get(
+        UV_URL,
+        json={
+            "code": 0,
+            "data": {
+                "records": [
+                    {
+                        "index": [
+                            {"hour": "2026-11-13T13:00:00+08:00", "value": 9},
+                            {"hour": "2026-11-13T12:00:00+08:00", "value": 7},
+                        ]
+                    }
+                ]
+            },
+        },
+    )
     for url in _READINGS_ENDPOINTS.values():
         aioclient_mock.get(
             url, json={"items": [{"readings": [{"value": 30}, {"value": 32}]}]}

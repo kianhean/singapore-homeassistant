@@ -88,6 +88,17 @@
       },
       "nearest_lightning": {
         "default": "mdi:map-marker-distance"
+      },
+      "uv_index": {
+        "default": "mdi:sun-wireless"
+      },
+      "uv_exposure": {
+        "default": "mdi:sun-wireless",
+        "state": {
+          "high": "mdi:weather-sunny-alert",
+          "very_high": "mdi:weather-sunny-alert",
+          "extreme": "mdi:weather-sunny-alert"
+        }
       }
     },
     "camera": {

@@ -123,6 +123,23 @@ async def test_setup_creates_entities_and_unloads(
     assert lightning.attributes["type"] == "cloud_to_ground"
     assert lightning.attributes["strikes_within_10_km"] == 1
 
+    uv = hass.states.get("sensor.nea_uv_index")
+    assert uv is not None
+    assert uv.state == "9"
+    assert uv.attributes["unit_of_measurement"] == "UV index"
+    assert uv.attributes["state_class"] == "measurement"
+    assert uv.attributes["peak_hour"] == "2026-11-13T13:00:00+08:00"
+    exposure = hass.states.get("sensor.nea_uv_exposure")
+    assert exposure is not None
+    assert exposure.state == "very_high"
+    assert exposure.attributes["options"] == [
+        "low",
+        "moderate",
+        "high",
+        "very_high",
+        "extreme",
+    ]
+
     # Every entity must use a stable, entry-scoped unique ID.
     registry = er.async_get(hass)
     entities = er.async_entries_for_config_entry(registry, entry.entry_id)

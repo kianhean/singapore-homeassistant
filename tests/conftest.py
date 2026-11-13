@@ -288,6 +288,7 @@ _HA_MODULES: dict[str, ModuleType] = {
         UnitOfPrecipitationDepth=UnitOfPrecipitationDepth,
         UnitOfLength=UnitOfLength,
         PERCENTAGE=PERCENTAGE,
+        UV_INDEX="UV index",
         DEGREE=DEGREE,
         ATTR_LATITUDE=ATTR_LATITUDE,
         ATTR_LONGITUDE=ATTR_LONGITUDE,

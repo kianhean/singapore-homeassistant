@@ -21,6 +21,7 @@ from .lightning_coordinator import LightningCoordinator
 from .psi_coordinator import PsiCoordinator
 from .traffic_coordinator import TrafficImagesCoordinator
 from .train_coordinator import TrainStatusCoordinator
+from .uv_coordinator import UvCoordinator
 from .weather_coordinator import SingaporeWeatherCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ class SingaporeData:
     traffic: TrafficImagesCoordinator
     dengue: DengueClusterCoordinator
     lightning: LightningCoordinator
+    uv: UvCoordinator
 
 
 type SingaporeConfigEntry = ConfigEntry[SingaporeData]
@@ -65,6 +67,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
     traffic_coordinator = TrafficImagesCoordinator(hass, entry)
     dengue_coordinator = DengueClusterCoordinator(hass, entry)
     lightning_coordinator = LightningCoordinator(hass, entry)
+    uv_coordinator = UvCoordinator(hass, entry)
 
     # Fetch independent data sources concurrently to speed up setup.
     # return_exceptions=True lets every coordinator finish its first refresh
@@ -113,7 +116,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
 
     # SP Group tariffs are scraped from a third-party site that can be unreachable
     # for long stretches (e.g. TLS handshake failures, issue #44); flood alerts,
-    # traffic cameras, dengue clusters and lightning are supplementary. None of
+    # traffic cameras, dengue clusters, lightning and UV are supplementary. None of
     # them may block setup: their entities show unavailable until data arrives.
     for coordinator, label in (
         (tariff_coordinator, "SP Group tariff"),
@@ -121,6 +124,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
         (traffic_coordinator, "traffic camera"),
         (dengue_coordinator, "dengue cluster"),
         (lightning_coordinator, "lightning"),
+        (uv_coordinator, "UV index"),
     ):
         entry.async_create_background_task(
             hass,
@@ -151,6 +155,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
         traffic=traffic_coordinator,
         dengue=dengue_coordinator,
         lightning=lightning_coordinator,
+        uv=uv_coordinator,
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

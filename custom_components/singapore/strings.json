@@ -109,6 +109,19 @@
       },
       "nearest_lightning": {
         "name": "Nearest Lightning"
+      },
+      "uv_index": {
+        "name": "UV Index"
+      },
+      "uv_exposure": {
+        "name": "UV Exposure",
+        "state": {
+          "low": "Low",
+          "moderate": "Moderate",
+          "high": "High",
+          "very_high": "Very high",
+          "extreme": "Extreme"
+        }
       }
     },
     "camera": {
