@@ -244,24 +244,16 @@ cards:
     entity: camera.weather_rain_radar_70_km
     name: Rain Radar 70 km
     show_state: false
-  - type: grid
-    columns: 2
-    square: false
-    cards:
-      - type: picture-entity
-        entity: camera.weather_rain_radar_240_km
-        name: Rain Radar 240 km
-        show_state: false
-      - type: picture-entity
-        entity: camera.weather_rain_radar_480_km
-        name: Rain Radar 480 km
-        show_state: false
+  - type: picture-entity
+    entity: camera.weather_rain_radar_240_km
+    name: Rain Radar 240 km
+    show_state: false
 ```
 
 <p align="center">
-  <img src="images/rain-radar.jpg" alt="Picture-entity cards of NEA rain radar: the 70 km view over a map of Singapore with light scattered echoes, the 240 km view over Johor, the Riau Islands and Sumatra with showers east of Johor, and the 480 km view without a map" width="640">
+  <img src="images/rain-radar.jpg" alt="Picture-entity cards of NEA rain radar: the 70 km view over a map of Singapore with light scattered echoes, and the 240 km view over Johor, the Riau Islands and Sumatra with showers east of Johor" width="480">
   <br>
-  <sub>Real NEA radar from data.gov.sg, Friday 13 November 2026, 22:45. NEA has no map for the 480 km range.</sub>
+  <sub>Real NEA radar from data.gov.sg, Friday 13 November 2026, 22:45.</sub>
 </p>
 
 ## Entity reference
@@ -492,7 +484,7 @@ cropped and scaled exactly as that page shows them.
 |-----------|-------|-------|
 | `camera.weather_rain_radar_70_km` | 70 km | Singapore on NEA's map (853 × 479 JPEG) |
 | `camera.weather_rain_radar_240_km` | 240 km | Johor, Riau Islands and Sumatra on NEA's map (853 × 853 JPEG) |
-| `camera.weather_rain_radar_480_km` | 480 km | Bare radar overlay, no map (480 × 480 transparent PNG) |
+| `camera.weather_rain_radar_480_km` | 480 km | Bare radar overlay, no map (480 × 480 transparent PNG); **disabled by default** |
 
 Rain colours run cyan/green (light), yellow (moderate) and orange/red/magenta (heavy).
 Attributes: `range`, `basemap` (whether this range has an NEA map), `image_timestamp` (the
@@ -502,6 +494,10 @@ radar capture time), the full radar image's bounding box as `north` / `south` / 
 A radar camera shows as unavailable until its first image loads, and keeps its last image if a
 later fetch fails. The base map is downloaded once from nea.gov.sg; if that fails, the camera
 shows the bare overlay and tries the map again after 30 minutes.
+
+NEA has no map for the 480 km range, so that camera is disabled by default. To use it anyway
+(for example on a Picture Elements card over your own map), enable it under **Settings →
+Devices & services → Entities**.
 
 </details>
 

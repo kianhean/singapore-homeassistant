@@ -391,7 +391,7 @@ def mock_sources(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
                 },
             },
         )
-    # 480 km deliberately failing: its camera must go unavailable.
+    # 480 km failing: its (disabled-by-default) camera has no image to show.
     aioclient_mock.get(RADAR_URL.format(range="480km"), status=429)
     aioclient_mock.get("https://radar.example/70km.png", content=_png((480, 480)))
     aioclient_mock.get(BASEMAPS["70km"].url, content=_png((853, 479)))

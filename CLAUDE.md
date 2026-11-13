@@ -487,7 +487,8 @@ maps from https://www.nea.gov.sg/weather/rain-areas (`/assets/images/map/base-85
 top-left aligned. The crop boxes in `BASEMAPS` were found by matching NEA's own overlays to
 data.gov.sg's image of the same capture (pixel-exact): NEA's 240 km overlay *is* the full
 480 × 480 image; its 70 km overlay is the crop `(83, 193, 300, 313)`. NEA has no 480 km map, so
-that camera serves the bare PNG. Base maps are fetched at runtime (once, retried after
+that camera serves the bare PNG and is disabled by default
+(`_attr_entity_registry_enabled_default` is False when a range has no `BASEMAPS` entry). Base maps are fetched at runtime (once, retried after
 `BASEMAP_RETRY_SECONDS` on failure) rather than bundled, because they are NEA website assets,
 not open data. Composited output is JPEG (`content_type` is set per image). Pillow is a Home
 Assistant core dependency, so it isn't in `manifest.json`; it is in `requirements_test.txt`.

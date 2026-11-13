@@ -151,8 +151,8 @@ class SingaporeRainRadarCamera(CoordinatorEntity[RadarCoordinator], Camera):
 
     For the 70 km and 240 km ranges the transparent radar PNG is drawn on NEA's own
     rain-areas base map (fetched once from nea.gov.sg and kept in memory). The 480 km
-    range has no NEA map, so it is the bare overlay; so is any range while the base
-    map can't be fetched.
+    range has no NEA map, so it is the bare overlay and disabled by default; any range
+    also falls back to the bare overlay while its base map can't be fetched.
     """
 
     _attr_has_entity_name = True
@@ -170,6 +170,9 @@ class SingaporeRainRadarCamera(CoordinatorEntity[RadarCoordinator], Camera):
         self._attr_unique_id = f"{entry_id}_rain_radar_{radar_range}"
         self._attr_translation_placeholders = {"range": RADAR_RANGES[radar_range]}
         self._basemap_spec = BASEMAPS.get(radar_range)
+        # Without an NEA map (480 km) the image is just coloured blobs: keep the
+        # entity, but disabled until the user turns it on.
+        self._attr_entity_registry_enabled_default = self._basemap_spec is not None
         self._basemap: bytes | None = None
         self._basemap_failed_at: float | None = None
         self._cached_key: object = None

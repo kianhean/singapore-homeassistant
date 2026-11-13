@@ -1,8 +1,8 @@
 <!doctype html>
 <!-- Real NEA rain radar from data.gov.sg, rendered by fetch_radar.py with the
-     integration's own radar_image.composite_radar (70 km / 240 km on NEA's base maps;
-     480 km has no NEA map, so it's the bare transparent overlay), in picture-entity cards
-     laid out as in the README YAML. -->
+     integration's own radar_image.composite_radar (on NEA's base maps), in picture-entity
+     cards laid out as in the README YAML. The 480 km camera (no map) is disabled by
+     default, so it isn't shown. -->
 <html><head><meta charset="utf-8"><link rel="stylesheet" href="ha.css">
 <style>
   body { padding: 20px; }
@@ -16,9 +16,6 @@
 <div class="heading" style="margin-bottom:8px"><i m="mdiRadar"></i>Rain radar</div>
 <div class="stack">
   <div class="card cam"><img src="radar/70km.jpg" alt=""><div class="bar">Rain Radar 70 km</div></div>
-  <div class="g">
-    <div class="card cam"><img src="radar/240km.jpg" alt=""><div class="bar">Rain Radar 240 km</div></div>
-    <div class="card cam"><img src="radar/480km.png" alt=""><div class="bar">Rain Radar 480 km</div></div>
-  </div>
+  <div class="card cam"><img src="radar/240km.jpg" alt=""><div class="bar">Rain Radar 240 km</div></div>
 </div>
 </body></html>

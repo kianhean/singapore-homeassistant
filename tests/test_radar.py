@@ -237,6 +237,9 @@ def test_radar_camera_ids_attrs_and_availability():
     assert attrs["east"] == pytest.approx(104.602315)
     assert missing.available is False
     assert missing.extra_state_attributes == {"range": "480 km", "basemap": False}
+    # Mapped ranges are enabled; the map-less 480 km camera is disabled by default.
+    assert present._attr_entity_registry_enabled_default is True
+    assert missing._attr_entity_registry_enabled_default is False
     # Shares the Weather device with the area weather entities.
     assert present.device_info["identifiers"] == {("singapore", "entry1_weather")}
 
