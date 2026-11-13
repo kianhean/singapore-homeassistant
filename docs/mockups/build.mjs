@@ -1,6 +1,8 @@
 // Renders the README mock-ups in this folder to images in /images (JPEG where photos make PNG heavy).
 //
-//   cd docs/mockups && npm install && node build.mjs
+//   cd docs/mockups && npm install && node build.mjs [page.html ...]
+//
+// With page names, only those pages are rendered.
 //
 // Pages use <i m="mdiName"></i> placeholders, which are swapped for Material Design
 // Icons (the icon set Home Assistant uses) before rendering.
@@ -18,6 +20,7 @@ const pages = [
   { src: "alerts.html", out: "alerts.png", width: 1200 },
   { src: "cameras.html", out: "checkpoint-cameras.jpg", width: 900 },
   { src: "sp_account.html", out: "sp-account-dashboard.png", width: 1280 },
+  { src: "radar.html", out: "rain-radar.jpg", width: 600 },
   { src: "social.html", out: "social-preview.png", width: 1280, height: 640, scale: 1 },
 ];
 
@@ -27,8 +30,9 @@ const icon = (name) => {
   return `<svg class="mdi" viewBox="0 0 24 24"><path d="${path}"/></svg>`;
 };
 
+const only = process.argv.slice(2);
 const browser = await chromium.launch();
-for (const p of pages) {
+for (const p of pages.filter((p) => !only.length || only.includes(p.src))) {
   const html = readFileSync(join(here, p.src), "utf8").replace(
     /<i m="(\w+)"><\/i>/g,
     (_, name) => icon(name),

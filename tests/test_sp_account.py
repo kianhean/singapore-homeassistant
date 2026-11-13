@@ -334,7 +334,7 @@ def _runtime(accounts: dict) -> SingaporeData:
     others = {
         name: MagicMock()
         for name in (
-            "tariff coe weather holiday train psi flood traffic dengue lightning uv"
+            "tariff coe weather holiday train psi flood traffic dengue lightning uv radar"
         ).split()
     }
     return SingaporeData(**others, sp_accounts=accounts)

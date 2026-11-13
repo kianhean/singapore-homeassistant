@@ -216,6 +216,9 @@
     "camera": {
       "checkpoint_camera": {
         "name": "{location}"
+      },
+      "rain_radar": {
+        "name": "Rain Radar {range}"
       }
     }
   },

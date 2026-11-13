@@ -19,6 +19,7 @@ from .flood_coordinator import FloodAlertCoordinator
 from .holiday_coordinator import PublicHolidayCoordinator
 from .lightning_coordinator import LightningCoordinator
 from .psi_coordinator import PsiCoordinator
+from .radar_coordinator import RadarCoordinator
 from .sp_account_coordinator import SUBENTRY_TYPE_SP_ACCOUNT, SpAccountCoordinator
 from .traffic_coordinator import TrafficImagesCoordinator
 from .train_coordinator import TrainStatusCoordinator
@@ -51,6 +52,7 @@ class SingaporeData:
     dengue: DengueClusterCoordinator
     lightning: LightningCoordinator
     uv: UvCoordinator
+    radar: RadarCoordinator
     # One per SP Group e-account subentry, keyed by subentry id.
     sp_accounts: dict[str, SpAccountCoordinator] = field(default_factory=dict)
 
@@ -71,6 +73,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
     dengue_coordinator = DengueClusterCoordinator(hass, entry)
     lightning_coordinator = LightningCoordinator(hass, entry)
     uv_coordinator = UvCoordinator(hass, entry)
+    radar_coordinator = RadarCoordinator(hass, entry)
 
     # Fetch independent data sources concurrently to speed up setup.
     # return_exceptions=True lets every coordinator finish its first refresh
@@ -119,7 +122,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
 
     # SP Group tariffs are scraped from a third-party site that can be unreachable
     # for long stretches (e.g. TLS handshake failures, issue #44); flood alerts,
-    # traffic cameras, dengue clusters, lightning and UV are supplementary. None of
+    # traffic cameras, dengue clusters, lightning, UV and rain radar are supplementary. None of
     # them may block setup: their entities show unavailable until data arrives.
     for coordinator, label in (
         (tariff_coordinator, "SP Group tariff"),
@@ -128,6 +131,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
         (dengue_coordinator, "dengue cluster"),
         (lightning_coordinator, "lightning"),
         (uv_coordinator, "UV index"),
+        (radar_coordinator, "rain radar"),
     ):
         entry.async_create_background_task(
             hass,
@@ -187,6 +191,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
         lightning=lightning_coordinator,
         uv=uv_coordinator,
         sp_accounts=sp_accounts,
+        radar=radar_coordinator,
     )
     entry.async_on_unload(entry.add_update_listener(_async_entry_updated))
 

@@ -4,4 +4,6 @@ pytest-cov>=4.1
 beautifulsoup4==4.12.3
 voluptuous>=0.13
 aiohttp>=3.9
+# HA core ships Pillow; the rain radar camera composites with it.
+Pillow>=11
 ruff==0.14.11

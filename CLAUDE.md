@@ -20,13 +20,15 @@ custom_components/singapore/
 ├── dengue_coordinator.py   # DengueClusterCoordinator: NEA dengue cluster GeoJSON + distance helpers
 ├── lightning_coordinator.py # LightningCoordinator: NEA lightning strikes, 30-min rolling window
 ├── uv_coordinator.py       # UvCoordinator: NEA hourly UV index + exposure bands
+├── radar_coordinator.py    # RadarCoordinator: NEA rain radar PNGs (70/240/480 km)
+├── radar_image.py          # Pure-Pillow compositing of radar onto NEA base maps (BASEMAPS)
 ├── sp_account_coordinator.py # SpAccountCoordinator: one per SP e-account subentry (usage, bills, stats)
 ├── sp_account_sensor.py    # SP e-account sensors built from mapper SensorSpecs (added dynamically)
 ├── sp_account/             # Vendored from maci0/home-assistant-sp (MIT, see its LICENSE); no HA imports
 │   ├── client.py           # Sync urllib Auth0/Jarvis/Njord client (runs in the executor), MFA, cooldown
 │   ├── const.py / models.py / mapper.py / history.py  # constants, dataclasses, specs, statistics
 │   └── LICENSE             # Upstream MIT licence: must ship with the vendored code
-├── camera.py               # Camera entities (Woodlands/Tuas checkpoint traffic cameras)
+├── camera.py               # Camera entities (checkpoint traffic cameras + rain radar)
 ├── calendar.py             # Calendar entity (Singapore public holidays)
 ├── weather.py              # Weather entities (one per Singapore forecast area)
 ├── config_flow.py          # UI config flow (name; single instance) + SP account subentry flow
@@ -55,6 +57,7 @@ tests/
 ├── test_uv_coordinator.py       # UV parser (v1/v2), exposure bands, coordinator, sensors
 ├── test_sp_account.py           # SP account coordinator, sensors, flow helpers, reload listener
 ├── sp_account/                  # Vendored upstream client/mapper/history tests + recorded fixtures
+├── test_radar.py                # Radar parser, per-range fallback, radar camera entity + cache
 ├── test_calendar.py             # Calendar event and range query tests
 ├── test_sensor.py               # Sensor value, unit, attributes, unique_id, None-safety
 ├── test_weather.py              # Weather entity condition mapping + forecast tests
@@ -76,7 +79,8 @@ examples/sp_account_dashboard.yaml # SP account dashboard (built-in cards); test
                                  # entity/statistic in it exists (test_sp_account_statistics.py)
                                  # docs/mockups/sp_account.html mirrors it → images/sp-account-dashboard.png
 docs/mockups/                    # HTML sources for the README images (node build.mjs → images/*.png)
-└── fetch_cameras.py             # uv run: pulls real checkpoint stills into docs/mockups/cameras/
+├── fetch_cameras.py             # uv run: pulls real checkpoint stills into docs/mockups/cameras/
+└── fetch_radar.py               # uv run: renders real radar (via radar_image.py) into docs/mockups/radar/
 ```
 
 README images must only show what Home Assistant really renders from this integration's
@@ -100,6 +104,7 @@ class SingaporeData:
     dengue: DengueClusterCoordinator
     lightning: LightningCoordinator
     uv: UvCoordinator
+    radar: RadarCoordinator
     sp_accounts: dict[str, SpAccountCoordinator]  # keyed by subentry id
 
 type SingaporeConfigEntry = ConfigEntry[SingaporeData]
@@ -518,6 +523,36 @@ headers) when touching this code.
   unique ids are `{entry_id}_sp_{premise_id}_{key}`; entities are added with
   `config_subentry_id`. Diagnostics report SP accounts as flags/counts only (no address,
   account number, premise id, username or tokens).
+
+## How the Rain Radar Coordinator Works
+
+`radar_coordinator.py` GETs `https://api-open.data.gov.sg/v2/real-time/api/weather-radar-images/{range}`
+for each range in `RADAR_RANGES` (`70km`, `240km`, `480km`) every **5 minutes**, sequentially
+(data.gov.sg rate-limits bursts). Dataset `d_418e9ac3414fd927b7405631e0a7bc82` (beta); its
+OpenAPI spec is the dataset download. Payload: `data.records[0]` with `timestamp` and
+`image.url` (presigned S3 PNG, **expires ~20 min** after the call, so the URL changes every poll)
+plus `data.boundaryBox` (EPSG:4326 upper-left / lower-right) and `data.projection.center`.
+
+A range whose fetch fails (HTTP error/429, network) keeps its previous `RadarImage`; only when
+every range fails with nothing cached does the update fail. A payload with no record/image URL
+raises `UpdateFailed` (parse errors propagate). `SingaporeRainRadarCamera` (`camera.py`, on the
+*Weather* device) caches its image keyed by capture `timestamp` (+ whether the base map was
+used), not URL, because the URL is re-signed on every poll.
+
+The radar PNGs are transparent overlays with no map. `radar_image.py` (Pillow only, no HA
+imports, so `docs/mockups/fetch_radar.py` loads it by path) draws 70 km and 240 km on the base
+maps from https://www.nea.gov.sg/weather/rain-areas (`/assets/images/map/base-853.png`,
+853 × 479; `240km-v2.jpg`, 853 × 853), replicating that page: both images at the same width,
+top-left aligned. The crop boxes in `BASEMAPS` were found by matching NEA's own overlays to
+data.gov.sg's image of the same capture (pixel-exact): NEA's 240 km overlay *is* the full
+480 × 480 image; its 70 km overlay is the crop `(83, 193, 300, 313)`. NEA has no 480 km map, so
+that camera serves the bare PNG and is disabled by default
+(`_attr_entity_registry_enabled_default` is False when a range has no `BASEMAPS` entry). Base maps are fetched at runtime (once, retried after
+`BASEMAP_RETRY_SECONDS` on failure) rather than bundled, because they are NEA website assets,
+not open data. Composited output is JPEG (`content_type` is set per image). Pillow is a Home
+Assistant core dependency, so it isn't in `manifest.json`; it is in `requirements_test.txt`.
+data.gov.sg returns 403 to urllib's default User-Agent (aiohttp's is fine), which is why
+`fetch_radar.py` sets one.
 
 ### Camera platform test dependency
 

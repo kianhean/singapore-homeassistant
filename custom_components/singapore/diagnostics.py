@@ -38,6 +38,7 @@ async def async_get_config_entry_diagnostics(
             "dengue": _coordinator_diagnostics(data.dengue),
             "lightning": _coordinator_diagnostics(data.lightning),
             "uv": _coordinator_diagnostics(data.uv),
+            "radar": _coordinator_diagnostics(data.radar),
         },
         "sp_accounts": [
             _sp_account_diagnostics(coordinator)
