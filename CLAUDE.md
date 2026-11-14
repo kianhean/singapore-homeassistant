@@ -527,14 +527,20 @@ COE sensors are generated automatically for every category in `COE_CATEGORIES` i
 
 ## Brand Assets — Do Not Remove
 
-`custom_components/singapore/brand/icon.png` and `logo.png` look like unused duplicates of
-`custom_components/singapore/images/icon.png` (they're byte-for-byte identical and oversized
-for actual `home-assistant/brands` size limits), but **do not delete them**. The `hacs/action`
-CI check (`.github/workflows/hacs.yaml`) validates brand assets by checking for these files
-locally as a fallback whenever the repository isn't registered in the `home-assistant/brands`
-repo — this repo isn't, so removing `brand/` fails the `<Validation brands>` check and breaks
-CI. If this integration is ever submitted to `home-assistant/brands` with correctly-sized
-assets there, the local fallback files can be removed at that point, not before.
+`custom_components/singapore/brand/` holds the integration's brand images, which Home Assistant
+2026.3 and newer loads for a custom integration: `icon.png` (256×256) and `icon@2x.png` (512×512),
+`logo.png` (128 high) and `logo@2x.png` (256 high), and `dark_logo.png` / `dark_logo@2x.png` with
+white lettering for the dark theme. All are trimmed PNGs on a transparent background, the sizes
+`home-assistant/brands` asks for. The `hacs/action` CI check (`.github/workflows/hacs.yaml`) also
+validates them locally, as this repo isn't in `home-assistant/brands`, so **do not delete them**:
+removing `brand/` fails the `<Validation brands>` check.
+
+The mark is a red disc (Singapore red, `#EF3340`, the little red dot) holding a white house with a
+red dot inside; the logo sets it beside "Singapore" and "for Home Assistant" in Inter. It keeps
+clear of the flag, the crescent and stars, and the Merlion, whose use is restricted. The sources are
+`images/brand/*.svg`: to change them, edit the SVGs, render each at 4× (Chromium, with Inter
+installed), trim the transparent edges and scale down to the sizes above.
+`custom_components/singapore/images/icon.png` is a copy of `icon@2x.png`.
 
 ## Linting and Formatting
 
