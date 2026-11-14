@@ -1,0 +1,75 @@
+{
+  "server_time": "2026-08-01T00:00:00+08:00",
+  "premise_type": "residential",
+  "elec": {
+    "average_consumption": 180.0,
+    "comparison_type": "peer",
+    "comparison_message_type": "info",
+    "comparison_message": "Your usage is typical.",
+    "data": [
+      {
+        "period": "2026-06-01T00:00:00+08:00",
+        "status": "Actual",
+        "unit": "kWh",
+        "consumption": {
+          "previous": 198.0,
+          "current": 210.5
+        },
+        "peer_comparison": {
+          "average": 200.0,
+          "efficient": 150.0
+        }
+      },
+      {
+        "period": "2026-07-01T00:00:00+08:00",
+        "status": "Actual",
+        "unit": "kWh",
+        "consumption": {
+          "previous": 210.5,
+          "current": 141.956
+        },
+        "peer_comparison": {
+          "average": 200.0,
+          "efficient": 150.0
+        }
+      }
+    ]
+  },
+  "gas": {
+    "data": []
+  },
+  "water": {
+    "average_consumption": 15.0,
+    "comparison_type": "peer",
+    "comparison_message_type": "info",
+    "comparison_message": "Your usage is typical.",
+    "data": [
+      {
+        "period": "2026-06-01T00:00:00+08:00",
+        "status": "Actual",
+        "unit": "m3",
+        "consumption": {
+          "previous": 11.0,
+          "current": 12.3
+        },
+        "peer_comparison": {
+          "average": 14.0,
+          "efficient": 10.0
+        }
+      },
+      {
+        "period": "2026-07-01T00:00:00+08:00",
+        "status": "Actual",
+        "unit": "m3",
+        "consumption": {
+          "previous": 12.3,
+          "current": 6.59
+        },
+        "peer_comparison": {
+          "average": 14.0,
+          "efficient": 10.0
+        }
+      }
+    ]
+  }
+}

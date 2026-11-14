@@ -7,7 +7,8 @@
 
 <p align="center">
   Weather, PSI, MRT status, COE prices, utility tariffs, flash floods, dengue and lightning,<br>
-  straight from official Singapore government sources. No API keys, no accounts.
+  straight from official Singapore government sources. No API keys, no accounts.<br>
+  Optionally, link your SP Group e-account for your own electricity, water and bill readings.
 </p>
 
 <p align="center">
@@ -37,8 +38,12 @@
 | 🚇 **MRT/LRT**<br>Network and per-line status (normal, planned works, disruption) with LTA's message | 🛂 **Checkpoints**<br>Woodlands and Tuas traffic camera stills as camera entities | 🚗 **COE**<br>Category A–E premiums, refreshed after each bidding exercise |
 | ⚡ **Lightning**<br>Live strikes and the distance to the nearest one from your home | 🦟 **Dengue**<br>Active NEA clusters and how far the nearest is from your home | 🌊 **Flash floods**<br>PUB flood alerts as they're issued and cancelled |
 | 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🎉 **Public holidays**<br>MOM's holiday list as a calendar | 🧩 **Blueprints**<br>[One-click automations](#one-click-blueprints) for lightning, MRT disruptions, floods, haze and COE |
+| 🏠 **Your SP account** *(optional)*<br>Sign in once to get your own electricity, water and gas usage, down to the half hour on a smart meter | 📊 **Energy dashboard**<br>Hourly electricity with cost at the current SP tariff, plus monthly water, ready for [Home Assistant's Energy dashboard](#energy-dashboard-electricity-and-water) | 🧾 **Bills**<br>Last bill, amount due, meter readings and SP Green Goals, for [reminders and dashboards](#your-sp-account) |
 
-All public data: no API keys, one config entry, and a diagnostics download when something looks off.
+The public data needs no API keys and no account: one config entry, and a diagnostics download when
+something looks off. Linking your SP Group e-account is optional ([how](#optional-link-your-sp-group-e-account));
+that part is built on [maci0/home-assistant-sp](https://github.com/maci0/home-assistant-sp) by
+[@maci0](https://github.com/maci0) ([Credits](#credits)).
 
 ## Installation
 
@@ -61,6 +66,19 @@ Weather, MRT/LRT, Air Quality, PUB, NEA, Traffic Cameras, Public Holidays).
 
 The lightning and dengue distances are measured from the home location in
 **Settings → System → General**, so make sure it's set.
+
+### Optional: link your SP Group e-account
+
+1. Open **Settings → Devices & Services → Singapore**.
+2. Click **Add SP account** and sign in with the email and password you use in the SP app.
+   If your account has MFA, you'll be asked for the code from SMS, email or your authenticator app.
+
+There's no price to enter: the electricity cost for the Energy dashboard uses the SP Group
+tariff this integration already reads (`sensor.energy_electricity_tariff`).
+
+The password is never stored: only the session tokens SP returns are kept, and they renew
+themselves. You can add more than one account. Each one gets its own device, named after the
+premise address.
 
 > **Entity IDs on older installs:** since v0.3.0, entity names come from their device
 > (for example *Energy Electricity Tariff*). New installs get IDs like
@@ -223,6 +241,102 @@ actions:
 ```
 </details>
 
+#### With a linked SP account
+
+Replace `1_example_road_singapore` with your SP account device's slug (it's named after your
+premise address; the device page shows the entity IDs).
+
+<details>
+<summary><b>🧾 Tell me when a new SP bill arrives</b></summary>
+
+```yaml
+alias: New SP bill
+triggers:
+  - trigger: state
+    entity_id: sensor.1_example_road_singapore_last_bill
+    attribute: bill_date
+conditions:
+  # Skip restarts: only a real change from one bill to the next.
+  - condition: template
+    value_template: >-
+      {{ trigger.from_state is not none
+         and trigger.from_state.attributes.get('bill_date') is not none }}
+actions:
+  - action: notify.notify
+    data:
+      title: New SP bill
+      message: >-
+        {% set due = state_attr('sensor.1_example_road_singapore_last_bill', 'due_date') %}
+        {{ states('sensor.1_example_road_singapore_last_bill') }} SGD{% if due %},
+        due {{ (as_datetime(due) | as_local).strftime('%-d %b') }}{% endif %}.
+```
+</details>
+
+<details>
+<summary><b>💸 Remind me to pay before the due date (skips GIRO)</b></summary>
+
+```yaml
+alias: SP bill due soon
+triggers:
+  - trigger: time
+    at: "09:00:00"
+conditions:
+  - condition: numeric_state
+    entity_id: sensor.1_example_road_singapore_amount_due
+    above: 0
+  - condition: template
+    value_template: >-
+      {% set due = state_attr('sensor.1_example_road_singapore_last_bill', 'due_date') %}
+      {{ due is not none
+         and not state_attr('sensor.1_example_road_singapore_amount_due', 'giro_enabled')
+         and (as_datetime(due) - now()).days < 3 }}
+actions:
+  - action: notify.notify
+    data:
+      title: SP bill due soon
+      message: "{{ states('sensor.1_example_road_singapore_amount_due') }} SGD outstanding."
+```
+</details>
+
+<details>
+<summary><b>🎯 Warn me when I pass my Green Goals target</b></summary>
+
+```yaml
+alias: Over the Green Goals target
+triggers:
+  - trigger: template
+    value_template: >-
+      {{ states('sensor.1_example_road_singapore_electricity_this_month') | float(0)
+         > state_attr('sensor.1_example_road_singapore_electricity_this_month', 'goal_target') | float(1e9) }}
+actions:
+  - action: notify.notify
+    data:
+      title: Over this month's electricity target
+      message: >-
+        {{ states('sensor.1_example_road_singapore_electricity_this_month') }} kWh used,
+        target {{ state_attr('sensor.1_example_road_singapore_electricity_this_month', 'goal_target') }} kWh.
+```
+</details>
+
+<details>
+<summary><b>🪫 Prepaid credit running low</b></summary>
+
+For prepaid (PPMS) accounts only; the sensor exists when SP reports a prepaid balance.
+
+```yaml
+alias: SP prepaid credit low
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.1_example_road_singapore_prepaid_credit
+    below: 20
+actions:
+  - action: notify.notify
+    data:
+      title: SP prepaid credit low
+      message: "{{ states('sensor.1_example_road_singapore_prepaid_credit') }} SGD left. Top up in the SP app."
+```
+</details>
+
 ## Dashboard ideas
 
 **Copy the whole dashboard:** [`examples/dashboard.yaml`](examples/dashboard.yaml) builds the dashboard
@@ -261,6 +375,90 @@ cards:
   <sub>Real NEA radar from data.gov.sg, Friday 13 November 2026, 22:45.</sub>
 </p>
 
+### Your SP account
+
+<p align="center">
+  <img src="images/sp-account-dashboard.png" alt="SP account dashboard: this month's electricity use (153.1 kWh) and estimated cost (45.50 SGD), last month's 371.4 kWh, the 29.72 cents/kWh tariff, today's usage, daily and hourly electricity bar charts, amount due and last bill of 116.38 SGD, a bar chart of monthly bills, and Green Goals usage against a 350 kWh target" width="100%">
+  <br>
+  <sub>The dashboard from <a href="examples/sp_account_dashboard.yaml">examples/sp_account_dashboard.yaml</a>, built only from Home Assistant's built-in cards. Example account data.</sub>
+</p>
+
+With an SP account linked, **[`examples/sp_account_dashboard.yaml`](examples/sp_account_dashboard.yaml)**
+adds an *SP account* dashboard built only from built-in cards. Find-and-replace its two
+placeholders (your device slug and premise ID, explained at the top of the file), then paste it in.
+It shows:
+
+- **This month:** kWh used and the estimated cost so far (Statistic cards on the imported
+  statistics), last month's kWh for comparison, the current SP tariff, and today's usage.
+- **Usage:** daily bars for the last 30 days, and hourly bars for the last 3 days from the
+  smart meter. That's where the evening air-con hours show up.
+- **Bills:** amount due, the last bill, a bar chart of every bill in the
+  past year, your Green Goals usage against its target, and the meter reading.
+
+A test runs the example against a real Home Assistant, so every entity and statistic in it exists
+on a new install.
+
+**The Energy dashboard** is the other half: see the
+[step-by-step setup below](#energy-dashboard-electricity-and-water).
+
+**Today's estimated cost.** Combine the account's usage with the tariff the integration
+scrapes, using a template sensor in `configuration.yaml`:
+
+```yaml
+template:
+  - sensor:
+      - name: Electricity cost today
+        unique_id: sp_electricity_cost_today
+        unit_of_measurement: SGD
+        device_class: monetary
+        state: >-
+          {{ (states('sensor.1_example_road_singapore_electricity_today') | float(0)
+              * states('sensor.energy_electricity_tariff') | float(0) / 100) | round(2) }}
+        availability: >-
+          {{ has_value('sensor.1_example_road_singapore_electricity_today')
+             and has_value('sensor.energy_electricity_tariff') }}
+```
+
+**Weather and usage together.** A History graph card with **Electricity last 30 min** and
+`sensor.weather_temperature` shows how much a hot afternoon costs you in air-con. Put both
+on one card.
+
+### Energy dashboard: electricity and water
+
+With an SP account linked, Home Assistant's built-in **Energy dashboard** can track your flat or
+house's electricity (with cost) and water. Wait for the account's first poll (a minute or so after
+adding it), then go to **Settings → Dashboards → Energy**:
+
+1. **Electricity grid → Add consumption.** Pick **SP Group electricity**, a statistic, not a
+   sensor. Under cost, choose **Use an entity tracking the total costs** and pick
+   **SP Group electricity cost**.
+2. **Water consumption → Add water source.** Pick **SP Group water**.
+3. **Gas consumption** (only if you have piped gas on the account): pick **SP Group gas**.
+4. Save, and open the **Energy** dashboard from the sidebar.
+
+If you have more than one SP account, each has its own set (the ID contains the premise ID,
+e.g. `singapore:2001590888_electricity`). **Developer tools → Statistics**, search "SP Group",
+lists them.
+
+**What to expect**
+
+- **History right away.** About 13 months of past usage is imported on the first poll, so the
+  month and year views fill in immediately. You don't have to wait for Home Assistant to collect it.
+- **Electricity is hourly on a smart meter,** but SP publishes it a few hours late. Today's bars
+  fill in through the day, so the *today* view looks low until the evening. Check yesterday for
+  a complete day. Without a smart meter, SP only has billed months, so you'll see one block per
+  month.
+- **Water is monthly.** SP bills water monthly, so each month's usage lands as one bar at the
+  start of the billing period. Use the month or year view; the day view will look empty.
+- **Cost is an estimate.** It uses the SP Group regulated tariff (incl. GST) this integration
+  reads, and the whole series is re-priced when the tariff changes each quarter. If you buy
+  electricity from an Open Electricity Market retailer, your real rate differs. The **Last bill**
+  sensor has the exact amount. Water cost isn't calculated (your bill includes charges beyond
+  the per-m³ tariff).
+- **Don't pick the sensors** (*Electricity cumulative*, *Electricity today*, *Electricity meter*,
+  *Water meter* and so on) as Energy sources. They measure other things, and Home Assistant would
+  compute its own sum from them that disagrees with the imported history.
+
 ## Entity reference
 
 Everything the integration creates, by data source. Expand a section for its entities and attributes.
@@ -286,6 +484,54 @@ The solar export price sensor also includes `network_cost` and `total_tariff`.
 <p align="center">
   <img src="images/energy-sensors.jpeg" alt="Singapore Energy device page showing electricity, gas, solar export, and water tariff sensors" width="320">
 </p>
+
+</details>
+
+### SP Group e-account (optional)
+
+Your own SP account data, read from the same APIs the SP Group app uses (Auth0 sign-in, then
+the Jarvis and Njord services) every 30 minutes. Added per account with **Add SP account**
+(see [Setup](#optional-link-your-sp-group-e-account)). The device is named after the premise
+address, so entity IDs look like `sensor.<your_address>_electricity_today`.
+
+<details>
+<summary>Entities, attributes and the Energy dashboard</summary>
+
+Sensors are only created for what your account has (for example, gas and the EV sensors
+appear only when SP returns data for them). New ones are added without a reload.
+
+| Name | What it is |
+|------|------------|
+| Electricity cumulative | Smart-meter (AMI) or billed total for the loaded window (~13 months) |
+| Electricity last billed / Water last billed / Gas last billed | Latest billed month |
+| Electricity today | AMI kWh for today (SGT) |
+| Electricity last 30 min | Last published AMI half-hour slot (lags a few hours) |
+| Water / Gas | Sum of billed months |
+| Last bill | Latest bill in SGD |
+| Amount due | Outstanding amount; negative is a credit |
+| Prepaid credit | PPMS balance, when the account is prepaid |
+| Electricity meter / Water meter | Last actual meter register reading |
+| Electricity this month / Water this month | Green Goals usage, with `goal_target` and `percent_difference` attributes |
+| GreenUP points, EV wallet, EV session, EV last charge, EV unpaid | When you use those SP services |
+| Unread notifications, Bill delivery, FCU (Tengah cooling), SP tariff | When SP returns them |
+| Account | Account status; carries the address, account number and retailer as attributes |
+
+**Energy dashboard.** After the first poll, long-term statistics are imported (setup steps:
+[Energy dashboard: electricity and water](#energy-dashboard-electricity-and-water)):
+
+- Grid consumption: pick the statistic **SP Group electricity**
+  (`singapore:<premise_id>_electricity`), not a sensor. It is built from the AMI half-hours
+  (folded to hours) where available, else billed months.
+- Cost: pick **SP Group electricity cost** (`singapore:<premise_id>_electricity_cost`) as the
+  grid source's cost. It's priced at the SP Group regulated tariff (incl. GST) this integration
+  scrapes, and the whole series is re-priced when the tariff changes each quarter, so past
+  quarters show at the current rate. If you buy from an Open Electricity Market retailer, your
+  real rate differs; use your bills (**Last bill**) for exact amounts.
+- Water: **SP Group water** (`singapore:<premise_id>_water`), billed months in m³.
+- Gas: **SP Group gas** (`singapore:<premise_id>_gas`) when SP returns gas data.
+- **SP Group bill** (`singapore:<premise_id>_last_bill`) has one point per billed month.
+- Don't use *Electricity cumulative*, *Electricity last billed*, *Electricity meter* or
+  *Electricity this month* as a grid source. They measure different things.
 
 </details>
 
@@ -664,6 +910,12 @@ sensor.air_quality_psi_east:
 - **Unavailable sensors:** flood alerts, traffic cameras, rain radar, dengue clusters, lightning, UV, PSI, COE and SP Group tariffs
   load in the background, so the rest of the integration still starts if one of those
   sources is down. Their sensors show as unavailable until a fetch succeeds.
+- **SP account sensors unavailable:** if SP rejects the stored session, a repair appears under
+  **Settings → Repairs**. Open the account under the Singapore integration and choose
+  **Reconfigure** and sign in again. If SP says the sign-in looks suspicious, sign in once in the
+  SP app, wait a few minutes, then try again. After a wrong password the next attempt waits
+  60 seconds, so Auth0 doesn't lock the account. The rest of the integration keeps working
+  either way.
 - **HTTP 429 in the log:** data.gov.sg rate-limits bursts of requests, which can happen
   when Home Assistant starts. Weather and dengue requests retry right away; other
   sources try again on their next scheduled update.
@@ -685,6 +937,7 @@ sensor.air_quality_psi_east:
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_418e9ac3414fd927b7405631e0a7bc82/view) | Rain radar images (70 / 240 / 480 km) | Every 5 min |
 | [MOM](https://www.mom.gov.sg/employment-practices/public-holidays) | Public holidays | Every 24 h |
 | [mytransport.sg](https://www.mytransport.sg/trainstatus) | MRT/LRT train status | Every 5 min |
+| SP Group app APIs (optional, your e-account) | Your usage, bills, meters, Green Goals | Every 30 min |
 
 ## Development
 
@@ -711,9 +964,24 @@ Bug reports, data source ideas and pull requests are welcome. When something loo
 the **Download diagnostics** file to your [issue](https://github.com/kianhean/singapore-homeassistant/issues).
 If the integration is useful to you, a ⭐ on GitHub helps other Singapore Home Assistant users find it.
 
+## Credits
+
+The SP Group e-account support is built on
+**[maci0/home-assistant-sp](https://github.com/maci0/home-assistant-sp)** by
+**Marcel W. Wysocki ([@maci0](https://github.com/maci0))**. The SP API client, sign-in and
+MFA handling, sensor mapping, Energy statistics logic and their tests are vendored from its
+v1.8.0 release under the MIT License, in
+[`custom_components/singapore/sp_account/`](custom_components/singapore/sp_account) with
+the original [LICENSE](custom_components/singapore/sp_account/LICENSE). This port fixes its
+"Config flow could not be loaded: 500" error
+([maci0/home-assistant-sp#21](https://github.com/maci0/home-assistant-sp/issues/21)) by
+keeping every form field serializable. If you only want SP account data, use the original
+integration. Thank you, Marcel!
+
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENSE). The vendored SP Group client in
+`custom_components/singapore/sp_account/` is MIT licensed, Copyright (c) 2026 Marcel W. Wysocki.
 
 Data and the checkpoint camera stills in the README come from data.gov.sg, LTA, NEA, PUB, MOM and
 SP Group, and remain theirs (data.gov.sg data is under the

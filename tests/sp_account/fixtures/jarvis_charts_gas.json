@@ -1,0 +1,35 @@
+{
+  "server_time": "2026-08-01T00:00:00+08:00",
+  "premise_type": "residential",
+  "elec": {
+    "data": []
+  },
+  "gas": {
+    "average_consumption": 8.0,
+    "comparison_type": "peer",
+    "comparison_message": "Your usage is typical.",
+    "data": [
+      {
+        "period": "2026-06-01T00:00:00+08:00",
+        "status": "Actual",
+        "unit": "kWh",
+        "consumption": {
+          "previous": 9.0,
+          "current": 10.5
+        }
+      },
+      {
+        "period": "2026-07-01T00:00:00+08:00",
+        "status": "Actual",
+        "unit": "kWh",
+        "consumption": {
+          "previous": 10.5,
+          "current": 7.2
+        }
+      }
+    ]
+  },
+  "water": {
+    "data": []
+  }
+}
