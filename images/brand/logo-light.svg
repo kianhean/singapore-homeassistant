@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 256" width="1000" height="256">
+  <g>  <circle cx="128" cy="128" r="124" fill="#EF3340"/>
+  <path d="M128 52 L210 124 Q214 128 208 132 L190 132 L190 192 Q190 202 180 202 L76 202 Q66 202 66 192 L66 132 L48 132 Q42 128 46 124 Z"
+        fill="#FFFFFF" stroke="#FFFFFF" stroke-width="10" stroke-linejoin="round"/>
+  <circle cx="128" cy="156" r="24" fill="#EF3340"/></g>
+  <text x="290" y="150" font-family="Inter" font-weight="700" font-size="112" letter-spacing="-3" fill="#1D1D1F">Singapore</text>
+  <text x="294" y="208" font-family="Inter" font-weight="500" font-size="40" fill="#6E6E73">for Home Assistant</text>
+</svg>
