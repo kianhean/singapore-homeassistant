@@ -1,4 +1,9 @@
-<h1 align="center">Singapore for Home Assistant</h1>
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="custom_components/singapore/brand/dark_logo@2x.png">
+    <img src="custom_components/singapore/brand/logo@2x.png" alt="Singapore for Home Assistant" height="96">
+  </picture>
+</h1>
 
 <p align="center">
   Weather, PSI, MRT status, COE prices, utility tariffs, flash floods, dengue and lightning,<br>
@@ -695,7 +700,9 @@ hits the live data sources. See CLAUDE.md for both.
 
 The README images are rendered from HTML in [`docs/mockups/`](docs/mockups): run
 `uv run docs/mockups/fetch_cameras.py` for fresh camera stills (`fetch_radar.py` for radar images), then
-`cd docs/mockups && npm install && node build.mjs`. Keep `hero.html` in sync with
+`cd docs/mockups && npm install && node build.mjs`. The same script renders the icon and logo from
+[`images/brand/`](images/brand) into `custom_components/singapore/brand/` (`node build.mjs brand`
+for those alone). Keep `hero.html` in sync with
 [`examples/dashboard.yaml`](examples/dashboard.yaml).
 
 ## Contributing
