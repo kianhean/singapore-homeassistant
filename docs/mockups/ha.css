@@ -14,7 +14,7 @@
   --purple: #9c27b0;
   --teal: #009688;
   --yellow: #ffc107;
-  --sg-red: #d71f35;
+  --sg-red: #EF3340;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { background: var(--bg); }
