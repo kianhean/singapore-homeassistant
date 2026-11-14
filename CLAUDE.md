@@ -538,8 +538,10 @@ removing `brand/` fails the `<Validation brands>` check.
 The mark is a red disc (Singapore red, `#EF3340`, the little red dot) holding a white house with a
 red dot inside; the logo sets it beside "Singapore" and "for Home Assistant" in Inter. It keeps
 clear of the flag, the crescent and stars, and the Merlion, whose use is restricted. The sources are
-`images/brand/*.svg`: to change them, edit the SVGs, render each at 4× (Chromium, with Inter
-installed), trim the transparent edges and scale down to the sizes above.
+`images/brand/*.svg`: edit them, then run `cd docs/mockups && node build.mjs brand social.html`
+(Inter must be installed), which trims each to its drawing at the sizes above, and redraws the
+social preview, whose kicker carries the mark. The README's header is `logo@2x.png`, with
+`dark_logo@2x.png` on GitHub's dark theme. The red is `--sg-red` in `docs/mockups/ha.css` too.
 `custom_components/singapore/images/icon.png` is a copy of `icon@2x.png`.
 
 ## Linting and Formatting
