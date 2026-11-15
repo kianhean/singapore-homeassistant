@@ -219,6 +219,9 @@
       },
       "rain_radar": {
         "name": "Rain Radar {range}"
+      },
+      "rain_radar_animation": {
+        "name": "Rain Radar {range} Animation"
       }
     },
     "event": {

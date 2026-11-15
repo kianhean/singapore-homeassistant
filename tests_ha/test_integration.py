@@ -117,6 +117,23 @@ async def test_setup_creates_entities_and_unloads(
     assert radar_image.content_type == "image/jpeg"
     assert radar_image.content[:3] == b"\xff\xd8\xff"
 
+    # Animated loops for the two mapped ranges only (frames from the same API call).
+    animation = hass.states.get("camera.weather_rain_radar_70_km_animation")
+    assert animation is not None
+    assert animation.state == "idle"
+    assert animation.attributes["frame_count"] == 1
+    assert animation.attributes["first_frame_timestamp"] == "2026-11-13T22:25:00+08:00"
+    assert hass.states.get("camera.weather_rain_radar_240_km_animation").state == "idle"
+    assert (
+        er.async_get(hass).async_get_entity_id(
+            "camera", "singapore", f"{entry.entry_id}_rain_radar_animation_480km"
+        )
+        is None
+    )
+    gif = await async_get_image(hass, "camera.weather_rain_radar_70_km_animation")
+    assert gif.content_type == "image/gif"
+    assert gif.content[:4] == b"GIF8"
+
     dengue = hass.states.get("sensor.nea_dengue_clusters")
     assert dengue is not None
     assert dengue.state == "2"
