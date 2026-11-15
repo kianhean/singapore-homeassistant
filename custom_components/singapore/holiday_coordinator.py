@@ -15,6 +15,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from .const import scaled_interval
+
 _LOGGER = logging.getLogger(__name__)
 
 PUBLIC_HOLIDAYS_URL = "https://www.mom.gov.sg/employment-practices/public-holidays"
@@ -52,7 +54,7 @@ class PublicHolidayCoordinator(DataUpdateCoordinator[list[PublicHoliday]]):
             _LOGGER,
             config_entry=config_entry,
             name="Singapore Public Holidays",
-            update_interval=UPDATE_INTERVAL,
+            update_interval=scaled_interval(config_entry, UPDATE_INTERVAL),
             # Parsed data is a dataclass, so unchanged polls skip state writes.
             always_update=False,
         )

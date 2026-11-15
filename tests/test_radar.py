@@ -98,6 +98,7 @@ def test_radar_ranges():
 
 def _response(status: int = 200, json_payload=None, body: bytes = b"png"):
     response = AsyncMock()
+    response.headers = {}  # real mapping: the data.gov.sg limiter reads it on 429
     response.status = status
     response.json = AsyncMock(return_value=json_payload)
     response.read = AsyncMock(return_value=body)

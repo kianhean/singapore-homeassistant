@@ -69,6 +69,11 @@ def test_every_blueprint_is_tested() -> None:
         "flood_alert.yaml",
         "haze_purifier.yaml",
         "coe_results.yaml",
+        "rain_forecast.yaml",
+        "uv_high.yaml",
+        "dengue_nearby.yaml",
+        "holiday_tomorrow.yaml",
+        "sp_bill.yaml",
     }
     assert {p.name for p in BLUEPRINTS.glob("*.yaml")} == tested
 
@@ -220,4 +225,184 @@ async def test_coe_results(hass: HomeAssistant, notify_calls) -> None:
         "Category C: 66,101 SGD\n"
         "Category D: 9,001 SGD\n"
         "Category E: 115,000 SGD"
+    )
+
+
+async def test_rain_forecast(hass: HomeAssistant, notify_calls) -> None:
+    entity = "weather.weather_bedok"
+    await _set(hass, entity, "unavailable", friendly_name="Weather Bedok")
+    await _automation(hass, "rain_forecast.yaml", {"weather_entity": entity})
+
+    # Coming back from unavailable straight into rain is not a forecast change.
+    await _set(hass, entity, "rainy", friendly_name="Weather Bedok")
+    assert notify_calls == []
+
+    await _set(hass, entity, "partlycloudy", friendly_name="Weather Bedok")
+    await _set(hass, entity, "lightning-rainy", friendly_name="Weather Bedok")
+    assert [c.data["message"] for c in notify_calls] == [
+        "Weather Bedok: thundery showers in the next 2 hours"
+    ]
+
+    # Heavier rain while already wet is not news.
+    await _set(hass, entity, "pouring", friendly_name="Weather Bedok")
+    assert len(notify_calls) == 1
+
+
+async def test_uv_high(hass: HomeAssistant, notify_calls) -> None:
+    sensor = "sensor.nea_uv_index"
+    await _set(hass, sensor, "5")
+    await _automation(hass, "uv_high.yaml", {"threshold": 8})
+
+    await _set(hass, sensor, "7")
+    assert notify_calls == []
+    await _set(hass, sensor, "8")  # reaching the threshold counts
+    assert [c.data["message"] for c in notify_calls] == [
+        "UV index is 8. Use sunscreen, a hat and shade."
+    ]
+    # Staying above it does not repeat; dropping and rising again does.
+    await _set(hass, sensor, "10")
+    assert len(notify_calls) == 1
+    await _set(hass, sensor, "6")
+    await _set(hass, sensor, "9")
+    assert len(notify_calls) == 2
+
+
+async def test_dengue_nearby(hass: HomeAssistant, notify_calls) -> None:
+    sensor = "sensor.nea_nearest_dengue_cluster"
+    await _set(hass, sensor, "3.2", locality="Bedok North Ave 1")
+    await _automation(hass, "dengue_nearby.yaml", {"distance": 1})
+    assert notify_calls == []
+
+    await _set(hass, sensor, "0.43", locality="Bedok North Ave 3")
+    assert notify_calls[0].data["message"] == (
+        "There is an active dengue cluster 0.4 km away (Bedok North Ave 3). "
+        "Check for stagnant water and use repellent."
+    )
+
+    await _set(hass, sensor, "5")
+    await _set(hass, sensor, "0.0", locality="Bedok North Ave 3")
+    assert (
+        notify_calls[1]
+        .data["message"]
+        .startswith("Your home is inside an active dengue cluster (Bedok North Ave 3).")
+    )
+
+
+async def test_holiday_tomorrow(hass: HomeAssistant, notify_calls) -> None:
+    from homeassistant.components.calendar import CalendarEntity, CalendarEvent
+
+    tomorrow = (dt_util.now() + timedelta(days=1)).date()
+
+    class _Holidays(CalendarEntity):
+        _attr_name = "Public Holidays"
+
+        def __init__(self, days):
+            self._events = [
+                CalendarEvent(start=day, end=day + timedelta(days=1), summary=summary)
+                for day, summary in days
+            ]
+
+        @property
+        def event(self):
+            return self._events[0] if self._events else None
+
+        async def async_get_events(self, hass, start_date, end_date):
+            return [
+                e
+                for e in self._events
+                if e.start_datetime_local < end_date
+                and e.end_datetime_local > start_date
+            ]
+
+    await async_setup_component(hass, "calendar", {})
+    calendar = _Holidays([(tomorrow, "Deepavali")])
+    component = hass.data["entity_components"]["calendar"]
+    await component.async_add_entities([calendar])
+    await hass.async_block_till_done()
+
+    alarm = async_mock_service(hass, "input_boolean", "turn_off")
+    await _automation(
+        hass,
+        "holiday_tomorrow.yaml",
+        {
+            "calendar": calendar.entity_id,
+            "check_time": "20:00:00",
+            "holiday_actions": [
+                {
+                    "action": "input_boolean.turn_off",
+                    "target": {"entity_id": "input_boolean.weekday_alarm"},
+                }
+            ],
+        },
+    )
+    await hass.services.async_call(
+        "automation", "trigger", {"entity_id": "automation.test"}, blocking=True
+    )
+    await hass.async_block_till_done()
+    assert [c.data["message"] for c in notify_calls] == ["Tomorrow is Deepavali."]
+    assert len(alarm) == 1
+
+    # No holiday tomorrow: nothing happens.
+    calendar._events = []
+    await hass.services.async_call(
+        "automation", "trigger", {"entity_id": "automation.test"}, blocking=True
+    )
+    await hass.async_block_till_done()
+    assert len(notify_calls) == 1
+
+    # Cancel the daily time trigger and the calendar's state timer so no
+    # timer outlives the test.
+    await hass.services.async_call(
+        "automation", "turn_off", {"entity_id": "automation.test"}, blocking=True
+    )
+    await calendar.async_remove()
+
+
+async def test_sp_bill(hass: HomeAssistant, notify_calls, freezer) -> None:
+    bill = "sensor.1_example_road_singapore_last_bill"
+    due = "sensor.1_example_road_singapore_amount_due"
+    await hass.config.async_set_time_zone("Asia/Singapore")
+    freezer.move_to("2026-08-14T08:00:00+08:00")
+    # SP gives due dates as midnight Singapore time in UTC.
+    await _set(
+        hass, bill, "88.4", bill_date="2026-07-20", due_date="2026-07-16T16:00:00Z"
+    )
+    await _set(hass, due, "0", giro_enabled=False)
+    await _automation(
+        hass,
+        "sp_bill.yaml",
+        {
+            "last_bill_sensor": bill,
+            "amount_due_sensor": due,
+            "remind_days": 3,
+            "remind_time": "09:00:00",
+        },
+    )
+
+    await _set(
+        hass, bill, "102.35", bill_date="2026-08-03", due_date="2026-08-16T16:00:00Z"
+    )
+    await _set(hass, due, "102.35", giro_enabled=False)
+    assert [c.data for c in notify_calls] == [
+        {"title": "New SP bill", "message": "102.35 SGD, due 17 Aug."}
+    ]
+
+    # 09:00 on 14 Aug: three days before 17 Aug → reminder.
+    freezer.move_to("2026-08-14T09:00:00+08:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert notify_calls[1].data == {
+        "title": "SP bill due soon",
+        "message": "102.35 SGD outstanding, due in 3 days (17 Aug).",
+    }
+
+    # Paid, or paying by GIRO: no reminder.
+    await _set(hass, due, "102.35", giro_enabled=True)
+    freezer.move_to("2026-08-15T09:00:00+08:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert len(notify_calls) == 2
+
+    await hass.services.async_call(
+        "automation", "turn_off", {"entity_id": "automation.test"}, blocking=True
     )

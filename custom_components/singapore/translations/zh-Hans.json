@@ -1,0 +1,361 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "新加坡",
+        "description": "设置新加坡集成。",
+        "data": {
+          "name": "集成名称"
+        }
+      }
+    },
+    "error": {
+      "empty_name": "名称不能为空。",
+      "name_too_long": "名称不能超过 64 个字符。"
+    },
+    "abort": {
+      "already_configured": "此集成已配置。",
+      "single_instance_allowed": "新加坡集成已配置，只能添加一个。"
+    }
+  },
+  "entity": {
+    "calendar": {
+      "public_holidays": {
+        "name": "公共假期"
+      }
+    },
+    "sensor": {
+      "electricity_tariff": {
+        "name": "电费"
+      },
+      "solar_export_price": {
+        "name": "太阳能上网电价"
+      },
+      "gas_tariff": {
+        "name": "煤气费"
+      },
+      "water_tariff": {
+        "name": "水费"
+      },
+      "coe_category": {
+        "name": "{category} 类"
+      },
+      "temperature": {
+        "name": "气温"
+      },
+      "humidity": {
+        "name": "湿度"
+      },
+      "wind_speed": {
+        "name": "风速"
+      },
+      "wind_bearing": {
+        "name": "风向"
+      },
+      "rainfall": {
+        "name": "降雨量"
+      },
+      "train_status": {
+        "name": "状态",
+        "state": {
+          "normal": "正常",
+          "planned": "计划施工",
+          "disruption": "服务中断"
+        }
+      },
+      "train_line_status": {
+        "name": "{line} 状态",
+        "state": {
+          "normal": "正常",
+          "planned": "计划施工",
+          "disruption": "服务中断"
+        }
+      },
+      "psi": {
+        "name": "PSI"
+      },
+      "psi_region": {
+        "name": "PSI {region}"
+      },
+      "pm25": {
+        "name": "PM2.5"
+      },
+      "pm10": {
+        "name": "PM10"
+      },
+      "ozone": {
+        "name": "臭氧"
+      },
+      "nitrogen_dioxide": {
+        "name": "二氧化氮"
+      },
+      "sulphur_dioxide": {
+        "name": "二氧化硫"
+      },
+      "carbon_monoxide": {
+        "name": "一氧化碳"
+      },
+      "flood_alerts": {
+        "name": "淹水警报"
+      },
+      "dengue_clusters": {
+        "name": "骨痛热症病例群"
+      },
+      "nearest_dengue_cluster": {
+        "name": "最近的骨痛热症病例群"
+      },
+      "lightning_strikes": {
+        "name": "雷击次数"
+      },
+      "nearest_lightning": {
+        "name": "最近的雷击"
+      },
+      "uv_index": {
+        "name": "紫外线指数"
+      },
+      "uv_exposure": {
+        "name": "紫外线照射级别",
+        "state": {
+          "low": "低",
+          "moderate": "中等",
+          "high": "高",
+          "very_high": "很高",
+          "extreme": "极高"
+        }
+      },
+      "sp_electricity": {
+        "name": "累计用电量"
+      },
+      "sp_water": {
+        "name": "用水量"
+      },
+      "sp_gas": {
+        "name": "煤气用量"
+      },
+      "sp_electricity_last_period": {
+        "name": "上期账单用电量"
+      },
+      "sp_electricity_today": {
+        "name": "今日用电量"
+      },
+      "sp_electricity_last_hour": {
+        "name": "最近 30 分钟用电量"
+      },
+      "sp_water_last_period": {
+        "name": "上期账单用水量"
+      },
+      "sp_gas_last_period": {
+        "name": "上期账单煤气用量"
+      },
+      "sp_account": {
+        "name": "账户",
+        "state": {
+          "unknown": "未知"
+        }
+      },
+      "sp_ppms_credit": {
+        "name": "预付余额"
+      },
+      "sp_last_bill": {
+        "name": "上期账单"
+      },
+      "sp_amount_due": {
+        "name": "应付金额"
+      },
+      "sp_electricity_meter": {
+        "name": "电表"
+      },
+      "sp_water_meter": {
+        "name": "水表"
+      },
+      "sp_electricity_goal": {
+        "name": "本月用电量"
+      },
+      "sp_water_goal": {
+        "name": "本月用水量"
+      },
+      "sp_greenup_points": {
+        "name": "GreenUP 积分"
+      },
+      "sp_ev_wallet": {
+        "name": "电动车钱包"
+      },
+      "sp_ev_session": {
+        "name": "电动车充电会话",
+        "state": {
+          "unknown": "未知"
+        }
+      },
+      "sp_ev_last_charge": {
+        "name": "电动车上次充电"
+      },
+      "sp_ev_unpaid": {
+        "name": "电动车未付款"
+      },
+      "sp_unread_notifications": {
+        "name": "未读通知"
+      },
+      "sp_bill_delivery": {
+        "name": "账单寄送方式",
+        "state": {
+          "ebill": "电子账单",
+          "paper": "纸质账单"
+        }
+      },
+      "sp_fcu": {
+        "name": "FCU",
+        "state": {
+          "on": "开",
+          "off": "关"
+        }
+      },
+      "sp_tariff": {
+        "name": "SP 电价"
+      }
+    },
+    "camera": {
+      "checkpoint_camera": {
+        "name": "{location}"
+      },
+      "rain_radar": {
+        "name": "降雨雷达 {range}"
+      }
+    },
+    "event": {
+      "coe_results": {
+        "name": "新结果",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "new_results": "新结果"
+            }
+          }
+        }
+      },
+      "train_service_alert": {
+        "name": "服务警报",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "disruption": "服务中断",
+              "planned": "计划通知",
+              "resolved": "已恢复"
+            }
+          }
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "sp_account": {
+      "initiate_flow": {
+        "user": "添加 SP 账户"
+      },
+      "entry_type": "SP 账户",
+      "step": {
+        "user": {
+          "title": "添加 SP Group 电子账户",
+          "description": "使用您在 SP 应用中登录的电子账户邮箱和密码登录。密码不会被保存：只保留 SP 返回的会话令牌。能源仪表板中的电费会自动使用本集成获取的 SP Group 电价。",
+          "data": {
+            "username": "邮箱",
+            "password": "密码"
+          }
+        },
+        "mfa": {
+          "title": "SP Group 验证",
+          "description": "请输入一次性验证码。",
+          "data": {
+            "mfa_code": "验证码"
+          }
+        },
+        "reconfigure": {
+          "title": "重新登录 SP Group",
+          "description": "会话过期或密码更改后使用此项。",
+          "data": {
+            "username": "邮箱",
+            "password": "密码"
+          }
+        }
+      },
+      "error": {
+        "invalid_auth": "电子账户邮箱或密码无效。",
+        "cannot_connect": "无法连接 SP Group。",
+        "requires_verification": "SP 将此次登录标记为可疑。请先在 SP 应用中登录一次，等待几分钟后再试。",
+        "too_many_attempts": "登录尝试次数过多。请等待一分钟后再试。",
+        "invalid_username": "请输入有效的电子账户邮箱（不超过 254 字节）。",
+        "invalid_password": "请输入密码（不超过 1024 个字符）。"
+      },
+      "abort": {
+        "already_configured": "此 SP 电子账户已添加。",
+        "reconfigure_successful": "已重新登录。",
+        "unique_id_mismatch": "该邮箱与此 SP 电子账户不符。请改为添加新账户。"
+      }
+    }
+  },
+  "exceptions": {
+    "auth_failed": {
+      "message": "SP Group 拒绝了已保存的电子账户凭据：{error}"
+    },
+    "requires_verification": {
+      "message": "SP 将此次登录标记为可疑。请先在 SP 应用中登录一次，等待几分钟后重试：{error}"
+    },
+    "usage_failed": {
+      "message": "无法从 SP Group 获取用量：{error}"
+    }
+  },
+  "issues": {
+    "sp_account_auth_failed": {
+      "title": "SP 账户 {title} 需要重新登录",
+      "description": "SP Group 拒绝了 {title} 的已保存会话。请前往 设置 → 设备与服务 → 新加坡，打开 {title} SP 账户条目，选择“重新配置”并重新登录。在此之前其传感器将不可用；集成的其他部分照常运行。"
+    },
+    "source_failing": {
+      "title": "{source} 已连续一天更新失败",
+      "description": "过去 24 小时内新加坡集成无法更新 {source}。该数据源的网站或 API 可能已更改。最近的错误：`{error}`\n\n请查看[问题跟踪器]({issue_tracker})并报告此问题（附上集成的诊断信息）。如果您不需要这些数据，可在 设置 → 设备与服务 → 新加坡 → 配置 中关闭该数据源。更新成功后此通知会自动消失。"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "新加坡选项",
+        "description": "选择要运行的数据源。关闭的数据源会停止轮询，其实体将不再提供（如不需要，可从实体列表中删除）。保存后集成会重新加载。",
+        "data": {
+          "sources": "数据源",
+          "api_key": "data.gov.sg API 密钥",
+          "polling": "轮询频率"
+        },
+        "data_description": {
+          "sources": "关闭 SP Group 电价后，SP 账户的费用统计也将不再计价。",
+          "api_key": "可选。data.gov.sg 的免费密钥可提供更高的速率限制（减少 HTTP 429 错误）。留空则使用公共限制。",
+          "polling": "“降低”会将快速数据源（淹水警报、雷击、交通摄像头、雷达、列车、天气、PSI、紫外线）的轮询频率降低为三分之一。"
+        }
+      }
+    },
+    "error": {
+      "no_sources": "请至少开启一个数据源，或先添加一个 SP 账户。"
+    }
+  },
+  "selector": {
+    "sources": {
+      "options": {
+        "tariff": "SP Group 水电煤气费率",
+        "coe": "拥车证投标结果",
+        "weather": "NEA 天气与预报",
+        "holiday": "公共假期日历",
+        "train": "地铁/轻轨列车状态",
+        "psi": "空气质量（PSI）",
+        "flood": "PUB 淹水警报",
+        "traffic": "关卡交通摄像头",
+        "dengue": "NEA 骨痛热症病例群",
+        "lightning": "NEA 雷击",
+        "uv": "NEA 紫外线指数",
+        "radar": "NEA 降雨雷达"
+      }
+    },
+    "polling": {
+      "options": {
+        "normal": "正常",
+        "reduced": "降低（频率为三分之一）"
+      }
+    }
+  }
+}

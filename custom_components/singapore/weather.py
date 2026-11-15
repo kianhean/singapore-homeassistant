@@ -48,7 +48,8 @@ async def async_setup_entry(
     """Set up weather entities for each forecast area."""
     coordinator = entry.runtime_data.weather
 
-    if coordinator.data is None:
+    if coordinator is None or coordinator.data is None:
+        # Weather turned off in the options, or no forecast areas loaded.
         async_add_entities([])
         return
 

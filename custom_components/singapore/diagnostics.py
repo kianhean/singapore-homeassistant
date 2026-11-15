@@ -9,6 +9,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from . import SingaporeConfigEntry
+from .const import (
+    CONF_API_KEY,
+    CONF_POLLING,
+    POLLING_NORMAL,
+    SOURCES,
+    enabled_sources,
+)
 from .sp_account.const import CONF_REFRESH_TOKEN
 from .sp_account_coordinator import SpAccountCoordinator
 
@@ -26,19 +33,17 @@ async def async_get_config_entry_diagnostics(
     data = entry.runtime_data
     return {
         "entry": {"title": entry.title, "version": entry.version},
+        "options": {
+            "disabled_sources": sorted(
+                source for source in SOURCES if source not in enabled_sources(entry)
+            ),
+            "polling": entry.options.get(CONF_POLLING, POLLING_NORMAL),
+            # Never the key itself: diagnostics get pasted into public issues.
+            "has_api_key": bool(entry.options.get(CONF_API_KEY)),
+        },
         "coordinators": {
-            "tariff": _coordinator_diagnostics(data.tariff),
-            "coe": _coordinator_diagnostics(data.coe),
-            "weather": _coordinator_diagnostics(data.weather),
-            "holiday": _coordinator_diagnostics(data.holiday),
-            "train": _coordinator_diagnostics(data.train),
-            "psi": _coordinator_diagnostics(data.psi),
-            "flood": _coordinator_diagnostics(data.flood),
-            "traffic": _coordinator_diagnostics(data.traffic),
-            "dengue": _coordinator_diagnostics(data.dengue),
-            "lightning": _coordinator_diagnostics(data.lightning),
-            "uv": _coordinator_diagnostics(data.uv),
-            "radar": _coordinator_diagnostics(data.radar),
+            source: _coordinator_diagnostics(coordinator)
+            for source, coordinator in data.coordinators().items()
         },
         "sp_accounts": [
             _sp_account_diagnostics(coordinator)

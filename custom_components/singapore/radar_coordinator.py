@@ -13,6 +13,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .const import data_gov_headers, scaled_interval
+from .datagov import data_gov_get
+
 _LOGGER = logging.getLogger(__name__)
 
 RADAR_URL = "https://api-open.data.gov.sg/v2/real-time/api/weather-radar-images/{range}"
@@ -123,14 +126,17 @@ class RadarCoordinator(DataUpdateCoordinator[RadarData]):
             _LOGGER,
             config_entry=config_entry,
             name="Singapore Rain Radar",
-            update_interval=UPDATE_INTERVAL,
+            update_interval=scaled_interval(config_entry, UPDATE_INTERVAL),
         )
 
     async def _fetch_range(
         self, session: aiohttp.ClientSession, radar_range: str
     ) -> dict:
-        async with session.get(
+        async with data_gov_get(
+            self.hass,
+            session,
             RADAR_URL.format(range=radar_range),
+            headers=data_gov_headers(self.config_entry),
             timeout=aiohttp.ClientTimeout(total=30),
         ) as response:
             if response.status != 200:

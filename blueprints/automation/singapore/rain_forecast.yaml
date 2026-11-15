@@ -1,0 +1,68 @@
+blueprint:
+  name: Singapore – rain expected
+  description: >-
+    Get a notification when NEA's 2-hour forecast for your area turns to rain,
+    showers or thundery showers, for example to bring in the laundry. Uses a
+    **weather** entity from the Singapore integration (one per forecast area,
+    such as weather.weather_bedok).
+  domain: automation
+  author: Singapore for Home Assistant
+  source_url: https://github.com/kianhean/singapore-homeassistant/blob/main/blueprints/automation/singapore/rain_forecast.yaml
+  homeassistant:
+    min_version: 2025.4.0
+  input:
+    weather_entity:
+      name: Forecast area
+      description: The weather entity for the area you want to watch.
+      selector:
+        entity:
+          filter:
+            - integration: singapore
+              domain: weather
+    notify_action:
+      name: Notify action
+      description: >-
+        The action that sends the notification, for example
+        notify.mobile_app_your_phone. Leave as notify.notify to use the default.
+      default: notify.notify
+      selector:
+        text: {}
+    extra_actions:
+      name: Extra actions (optional)
+      description: Anything else to do, for example close the windows.
+      default: []
+      selector:
+        action: {}
+
+mode: single
+max_exceeded: silent
+
+variables:
+  weather_entity: !input weather_entity
+  wet: [rainy, pouring, lightning-rainy, lightning]
+
+triggers:
+  - trigger: state
+    entity_id: !input weather_entity
+    to: [rainy, pouring, lightning-rainy, lightning]
+
+conditions:
+  # Only a change from dry weather; rain → heavier rain is not news, and nor
+  # is the entity coming back from unavailable.
+  - condition: template
+    value_template: >-
+      {{ trigger.from_state is not none
+         and trigger.from_state.state not in wet
+         and trigger.from_state.state not in ['unavailable', 'unknown'] }}
+
+actions:
+  - action: !input notify_action
+    data:
+      title: Rain expected
+      message: >-
+        {{ state_attr(weather_entity, 'friendly_name') or weather_entity }}:
+        {{ states(weather_entity) | replace('lightning-rainy', 'thundery showers')
+           | replace('lightning', 'thunderstorms') | replace('pouring', 'heavy rain')
+           | replace('rainy', 'rain') }} in the next 2 hours
+  - choose: []
+    default: !input extra_actions

@@ -13,6 +13,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .const import data_gov_headers, scaled_interval
+from .datagov import data_gov_get
+
 _LOGGER = logging.getLogger(__name__)
 
 PSI_URL = "https://api-open.data.gov.sg/v2/real-time/api/psi"
@@ -82,7 +85,7 @@ class PsiCoordinator(DataUpdateCoordinator[PsiData]):
             _LOGGER,
             config_entry=config_entry,
             name="Singapore NEA PSI",
-            update_interval=UPDATE_INTERVAL,
+            update_interval=scaled_interval(config_entry, UPDATE_INTERVAL),
             # Parsed data is a dataclass, so unchanged polls skip state writes.
             always_update=False,
         )
@@ -90,8 +93,12 @@ class PsiCoordinator(DataUpdateCoordinator[PsiData]):
     async def _async_update_data(self) -> PsiData:
         session = async_get_clientsession(self.hass)
         try:
-            async with session.get(
-                PSI_URL, timeout=aiohttp.ClientTimeout(total=30)
+            async with data_gov_get(
+                self.hass,
+                session,
+                PSI_URL,
+                headers=data_gov_headers(self.config_entry),
+                timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status != 200:
                     raise UpdateFailed(

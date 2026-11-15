@@ -220,6 +220,30 @@
       "rain_radar": {
         "name": "Rain Radar {range}"
       }
+    },
+    "event": {
+      "coe_results": {
+        "name": "New results",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "new_results": "New results"
+            }
+          }
+        }
+      },
+      "train_service_alert": {
+        "name": "Service alert",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "disruption": "Disruption",
+              "planned": "Planned notice",
+              "resolved": "Resolved"
+            }
+          }
+        }
+      }
     }
   },
   "config_subentries": {
@@ -283,6 +307,55 @@
     "sp_account_auth_failed": {
       "title": "SP account {title} needs you to sign in again",
       "description": "SP Group rejected the stored session for {title}. Go to Settings → Devices & services → Singapore, open the {title} SP account entry, choose Reconfigure and sign in again. Its sensors stay unavailable until then; the rest of the integration keeps working."
+    },
+    "source_failing": {
+      "title": "{source} has been failing for a day",
+      "description": "Singapore could not update {source} for the past 24 hours. The source may have changed its website or API. Last error: `{error}`\n\nCheck [the issue tracker]({issue_tracker}) and report it (attach the integration's diagnostics). If you don't need this data, turn the source off under Settings → Devices & services → Singapore → Configure. This notice clears itself once an update succeeds."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Singapore options",
+        "description": "Choose which data sources run. A source you turn off stops polling and its entities are no longer provided (remove them from the entity list if you don't want them back). Saving reloads the integration.",
+        "data": {
+          "sources": "Data sources",
+          "api_key": "data.gov.sg API key",
+          "polling": "Polling"
+        },
+        "data_description": {
+          "sources": "Turning off SP Group tariffs also leaves SP account cost statistics unpriced.",
+          "api_key": "Optional. A free key from data.gov.sg gives higher rate limits (fewer HTTP 429 errors). Leave empty to use the public limits.",
+          "polling": "Reduced polls the fast sources (flood alerts, lightning, traffic cameras, radar, trains, weather, PSI, UV) three times less often."
+        }
+      }
+    },
+    "error": {
+      "no_sources": "Turn on at least one data source, or add an SP account first."
+    }
+  },
+  "selector": {
+    "sources": {
+      "options": {
+        "tariff": "SP Group utility tariffs",
+        "coe": "COE bidding results",
+        "weather": "NEA weather and forecasts",
+        "holiday": "Public holidays calendar",
+        "train": "MRT/LRT train status",
+        "psi": "Air quality (PSI)",
+        "flood": "PUB flood alerts",
+        "traffic": "Checkpoint traffic cameras",
+        "dengue": "NEA dengue clusters",
+        "lightning": "NEA lightning",
+        "uv": "NEA UV index",
+        "radar": "NEA rain radar"
+      }
+    },
+    "polling": {
+      "options": {
+        "normal": "Normal",
+        "reduced": "Reduced (3× less often)"
+      }
     }
   }
 }

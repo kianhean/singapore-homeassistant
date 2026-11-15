@@ -115,64 +115,62 @@ async def async_setup_entry(
 ) -> None:
     """Set up SP Group tariff and COE sensors."""
     data = entry.runtime_data
-    tariff_coordinator = data.tariff
-    coe_coordinator = data.coe
-    weather_coordinator = data.weather
-    train_coordinator = data.train
-    psi_coordinator = data.psi
+    eid = entry.entry_id
+    entities: list[SensorEntity] = []
 
-    entities: list[SensorEntity] = [
-        SingaporeElectricityTariffSensor(tariff_coordinator, entry.entry_id),
-        SingaporeSolarExportPriceSensor(tariff_coordinator, entry.entry_id),
-        SingaporeGasTariffSensor(tariff_coordinator, entry.entry_id),
-        SingaporeWaterTariffSensor(tariff_coordinator, entry.entry_id),
-    ]
-    for cat in COE_CATEGORIES:
-        entities.append(SingaporeCoeResultSensor(coe_coordinator, entry.entry_id, cat))
-
-    entities.extend(
-        [
-            SingaporeTemperatureSensor(weather_coordinator, entry.entry_id),
-            SingaporeHumiditySensor(weather_coordinator, entry.entry_id),
-            SingaporeWindSpeedSensor(weather_coordinator, entry.entry_id),
-            SingaporeWindBearingSensor(weather_coordinator, entry.entry_id),
-            SingaporeRainfallSensor(weather_coordinator, entry.entry_id),
-            SingaporeTrainStatusSensor(train_coordinator, entry.entry_id),
+    # A source turned off in the options has no coordinator and no entities.
+    if (tariff := data.tariff) is not None:
+        entities += [
+            SingaporeElectricityTariffSensor(tariff, eid),
+            SingaporeSolarExportPriceSensor(tariff, eid),
+            SingaporeGasTariffSensor(tariff, eid),
+            SingaporeWaterTariffSensor(tariff, eid),
         ]
-    )
-    for line in TRAIN_LINES:
-        entities.append(
-            SingaporeTrainLineStatusSensor(train_coordinator, entry.entry_id, line)
-        )
-
-    entities.append(SingaporePsiSensor(psi_coordinator, entry.entry_id))
-    for region in PSI_REGIONS:
-        entities.append(
-            SingaporeRegionalPsiSensor(psi_coordinator, entry.entry_id, region)
-        )
-    for reading_key, translation_key, device_class, unit in PSI_POLLUTANT_SENSORS:
-        entities.append(
+    if (coe := data.coe) is not None:
+        entities += [SingaporeCoeResultSensor(coe, eid, cat) for cat in COE_CATEGORIES]
+    if (weather := data.weather) is not None:
+        entities += [
+            SingaporeTemperatureSensor(weather, eid),
+            SingaporeHumiditySensor(weather, eid),
+            SingaporeWindSpeedSensor(weather, eid),
+            SingaporeWindBearingSensor(weather, eid),
+            SingaporeRainfallSensor(weather, eid),
+        ]
+    if (train := data.train) is not None:
+        entities.append(SingaporeTrainStatusSensor(train, eid))
+        entities += [
+            SingaporeTrainLineStatusSensor(train, eid, line) for line in TRAIN_LINES
+        ]
+    if (psi := data.psi) is not None:
+        entities.append(SingaporePsiSensor(psi, eid))
+        entities += [
+            SingaporeRegionalPsiSensor(psi, eid, region) for region in PSI_REGIONS
+        ]
+        entities += [
             SingaporePollutantSensor(
-                psi_coordinator,
-                entry.entry_id,
-                reading_key,
-                translation_key,
-                device_class,
-                unit,
+                psi, eid, reading_key, translation_key, device_class, unit
             )
-        )
-
-    entities.extend(
-        [
-            SingaporeFloodAlertsSensor(data.flood, entry.entry_id),
-            SingaporeDengueClustersSensor(data.dengue, entry.entry_id),
-            SingaporeNearestDengueClusterSensor(data.dengue, entry.entry_id),
-            SingaporeLightningStrikesSensor(data.lightning, entry.entry_id),
-            SingaporeNearestLightningSensor(data.lightning, entry.entry_id),
-            SingaporeUvIndexSensor(data.uv, entry.entry_id),
-            SingaporeUvExposureSensor(data.uv, entry.entry_id),
+            for reading_key, translation_key, device_class, unit in (
+                PSI_POLLUTANT_SENSORS
+            )
         ]
-    )
+    if data.flood is not None:
+        entities.append(SingaporeFloodAlertsSensor(data.flood, eid))
+    if (dengue := data.dengue) is not None:
+        entities += [
+            SingaporeDengueClustersSensor(dengue, eid),
+            SingaporeNearestDengueClusterSensor(dengue, eid),
+        ]
+    if (lightning := data.lightning) is not None:
+        entities += [
+            SingaporeLightningStrikesSensor(lightning, eid),
+            SingaporeNearestLightningSensor(lightning, eid),
+        ]
+    if (uv := data.uv) is not None:
+        entities += [
+            SingaporeUvIndexSensor(uv, eid),
+            SingaporeUvExposureSensor(uv, eid),
+        ]
 
     async_add_entities(entities)
 

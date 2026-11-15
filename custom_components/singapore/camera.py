@@ -33,20 +33,19 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the checkpoint traffic cameras and the rain radar cameras."""
-    coordinator = entry.runtime_data.traffic
-    radar = entry.runtime_data.radar
-    async_add_entities(
-        [
-            *(
-                SingaporeCheckpointCamera(coordinator, entry.entry_id, camera_id)
-                for camera_id in CHECKPOINT_CAMERAS
-            ),
-            *(
-                SingaporeRainRadarCamera(radar, entry.entry_id, radar_range)
-                for radar_range in RADAR_RANGES
-            ),
+    data = entry.runtime_data
+    entities: list[Camera] = []
+    if (traffic := data.traffic) is not None:
+        entities += [
+            SingaporeCheckpointCamera(traffic, entry.entry_id, camera_id)
+            for camera_id in CHECKPOINT_CAMERAS
         ]
-    )
+    if (radar := data.radar) is not None:
+        entities += [
+            SingaporeRainRadarCamera(radar, entry.entry_id, radar_range)
+            for radar_range in RADAR_RANGES
+        ]
+    async_add_entities(entities)
 
 
 async def _download_image(hass: HomeAssistant, url: str, label: str) -> bytes | None:

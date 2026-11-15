@@ -12,6 +12,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .const import data_gov_headers, scaled_interval
+from .datagov import data_gov_get
+
 _LOGGER = logging.getLogger(__name__)
 
 FLOOD_ALERTS_URL = "https://api-open.data.gov.sg/v2/real-time/api/weather/flood-alerts"
@@ -203,7 +206,7 @@ class FloodAlertCoordinator(DataUpdateCoordinator[FloodAlertData]):
             _LOGGER,
             config_entry=config_entry,
             name="Singapore PUB Flood Alerts",
-            update_interval=UPDATE_INTERVAL,
+            update_interval=scaled_interval(config_entry, UPDATE_INTERVAL),
             # Parsed data is a dataclass, so unchanged polls skip state writes.
             always_update=False,
         )
@@ -212,8 +215,12 @@ class FloodAlertCoordinator(DataUpdateCoordinator[FloodAlertData]):
     async def _async_update_data(self) -> FloodAlertData:
         session = async_get_clientsession(self.hass)
         try:
-            async with session.get(
-                FLOOD_ALERTS_URL, timeout=aiohttp.ClientTimeout(total=30)
+            async with data_gov_get(
+                self.hass,
+                session,
+                FLOOD_ALERTS_URL,
+                headers=data_gov_headers(self.config_entry),
+                timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status != 200:
                     raise UpdateFailed(

@@ -137,6 +137,7 @@ def test_uv_exposure_bands(value, band):
 
 def _response(status=200, payload=None):
     response = AsyncMock()
+    response.headers = {}  # real mapping: the data.gov.sg limiter reads it on 429
     response.status = status
     response.json = AsyncMock(return_value=payload)
     response.__aenter__ = AsyncMock(return_value=response)

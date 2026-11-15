@@ -366,7 +366,7 @@ async def test_weather_coordinator_fetches_four_day():
     two_hr_resp = _MockResponse(200, two_hr_payload)
     four_day_resp = _MockResponse(200, four_day_payload)
 
-    async def _mock_get(url, timeout=None):
+    async def _mock_get(url, timeout=None, headers=None):
         if "four-day" in url:
             return four_day_resp
         if "two-hr" in url:
@@ -416,7 +416,7 @@ async def test_weather_coordinator_releases_both_responses_on_two_hr_error():
     four_day_resp = _MockResponse(200, {})
     day_resp = _MockResponse(200, {})
 
-    async def _mock_get(url, timeout=None):
+    async def _mock_get(url, timeout=None, headers=None):
         if "four-day" in url:
             return four_day_resp
         if "twenty-four" in url:
@@ -475,7 +475,7 @@ async def test_weather_coordinator_four_day_http_error_is_soft():
     two_hr_resp = _MockResponse(200, two_hr_payload)
     four_day_resp = _MockResponse(503)
 
-    async def _mock_get(url, timeout=None):
+    async def _mock_get(url, timeout=None, headers=None):
         if "four-day" in url:
             return four_day_resp
         if "two-hr" in url:
@@ -673,7 +673,7 @@ async def test_weather_coordinator_twenty_four_hour(day_status):
         def release(self):
             pass
 
-    async def _mock_get(url, timeout=None):
+    async def _mock_get(url, timeout=None, headers=None):
         if "twenty-four" in url:
             return _MockResponse(day_status, day_payload)
         if "two-hr" in url:

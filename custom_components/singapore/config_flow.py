@@ -13,17 +13,31 @@ from homeassistant.config_entries import (
     ConfigFlow,
     ConfigFlowResult,
     ConfigSubentryFlow,
+    OptionsFlow,
     SubentryFlowResult,
 )
 from homeassistant.const import CONF_NAME, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.helpers.selector import (
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
 )
 
-from .const import DOMAIN
+from .const import (
+    CONF_API_KEY,
+    CONF_DISABLED_SOURCES,
+    CONF_POLLING,
+    CONF_SOURCES,
+    DOMAIN,
+    POLLING_NORMAL,
+    POLLING_OPTIONS,
+    SOURCES,
+    enabled_sources,
+)
 from .sp_account.client import (
     AuthError,
     SpGroupClient,
@@ -61,6 +75,10 @@ _USERNAME_SELECTOR = TextSelector(
 )
 _PASSWORD_SELECTOR = TextSelector(
     TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="current-password")
+)
+# The data.gov.sg API key: masked, but not a login password for the browser.
+_PASSWORD_SELECTOR_PLAIN = TextSelector(
+    TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="off")
 )
 
 
@@ -117,6 +135,12 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
         """SP e-accounts are added as subentries of the single entry."""
         return {SUBENTRY_TYPE_SP_ACCOUNT: SpAccountSubentryFlow}
 
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> SingaporeOptionsFlow:
+        """Data sources, data.gov.sg API key and polling speed."""
+        return SingaporeOptionsFlow()
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -139,6 +163,74 @@ class SingaporeElectricityConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=STEP_USER_DATA_SCHEMA,
             errors=errors,
         )
+
+
+def options_schema(options: dict[str, Any]) -> vol.Schema:
+    """The options form, pre-filled from the entry's current options."""
+    enabled = enabled_sources(options)
+    api_key = options.get(CONF_API_KEY) or ""
+    return vol.Schema(
+        {
+            vol.Optional(
+                CONF_SOURCES, default=[s for s in SOURCES if s in enabled]
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=list(SOURCES),
+                    multiple=True,
+                    mode=SelectSelectorMode.LIST,
+                    translation_key=CONF_SOURCES,
+                )
+            ),
+            vol.Optional(
+                CONF_API_KEY, description={"suggested_value": api_key}
+            ): _PASSWORD_SELECTOR_PLAIN,
+            vol.Required(
+                CONF_POLLING, default=options.get(CONF_POLLING, POLLING_NORMAL)
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=POLLING_OPTIONS,
+                    mode=SelectSelectorMode.DROPDOWN,
+                    translation_key=CONF_POLLING,
+                )
+            ),
+        }
+    )
+
+
+def options_from_input(user_input: dict[str, Any]) -> dict[str, Any]:
+    """Stored options for a submitted form.
+
+    The form lists the enabled sources; the entry stores the disabled ones, so
+    a source added in a later release starts out enabled.
+    """
+    enabled = set(user_input.get(CONF_SOURCES) or ())
+    options: dict[str, Any] = {
+        CONF_DISABLED_SOURCES: [s for s in SOURCES if s not in enabled],
+        CONF_POLLING: user_input.get(CONF_POLLING, POLLING_NORMAL),
+    }
+    if api_key := (user_input.get(CONF_API_KEY) or "").strip():
+        options[CONF_API_KEY] = api_key
+    return options
+
+
+class SingaporeOptionsFlow(OptionsFlow):
+    """Choose which data sources run, and how they poll."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            if not user_input.get(CONF_SOURCES) and not self.config_entry.subentries:
+                errors[CONF_SOURCES] = "no_sources"
+            else:
+                # Saving the options reloads the entry (see _async_entry_updated).
+                return self.async_create_entry(data=options_from_input(user_input))
+        schema = options_schema(dict(self.config_entry.options))
+        if user_input is not None:
+            # Re-show what was submitted, not the stored options.
+            schema = self.add_suggested_values_to_schema(schema, user_input)
+        return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
 
 
 class SpAccountSubentryFlow(ConfigSubentryFlow):
