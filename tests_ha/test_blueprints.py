@@ -73,6 +73,7 @@ def test_every_blueprint_is_tested() -> None:
         "uv_high.yaml",
         "dengue_nearby.yaml",
         "holiday_tomorrow.yaml",
+        "sp_bill.yaml",
     }
     assert {p.name for p in BLUEPRINTS.glob("*.yaml")} == tested
 
@@ -355,3 +356,53 @@ async def test_holiday_tomorrow(hass: HomeAssistant, notify_calls) -> None:
         "automation", "turn_off", {"entity_id": "automation.test"}, blocking=True
     )
     await calendar.async_remove()
+
+
+async def test_sp_bill(hass: HomeAssistant, notify_calls, freezer) -> None:
+    bill = "sensor.1_example_road_singapore_last_bill"
+    due = "sensor.1_example_road_singapore_amount_due"
+    await hass.config.async_set_time_zone("Asia/Singapore")
+    freezer.move_to("2026-08-14T08:00:00+08:00")
+    # SP gives due dates as midnight Singapore time in UTC.
+    await _set(
+        hass, bill, "88.4", bill_date="2026-07-20", due_date="2026-07-16T16:00:00Z"
+    )
+    await _set(hass, due, "0", giro_enabled=False)
+    await _automation(
+        hass,
+        "sp_bill.yaml",
+        {
+            "last_bill_sensor": bill,
+            "amount_due_sensor": due,
+            "remind_days": 3,
+            "remind_time": "09:00:00",
+        },
+    )
+
+    await _set(
+        hass, bill, "102.35", bill_date="2026-08-03", due_date="2026-08-16T16:00:00Z"
+    )
+    await _set(hass, due, "102.35", giro_enabled=False)
+    assert [c.data for c in notify_calls] == [
+        {"title": "New SP bill", "message": "102.35 SGD, due 17 Aug."}
+    ]
+
+    # 09:00 on 14 Aug: three days before 17 Aug → reminder.
+    freezer.move_to("2026-08-14T09:00:00+08:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert notify_calls[1].data == {
+        "title": "SP bill due soon",
+        "message": "102.35 SGD outstanding, due in 3 days (17 Aug).",
+    }
+
+    # Paid, or paying by GIRO: no reminder.
+    await _set(hass, due, "102.35", giro_enabled=True)
+    freezer.move_to("2026-08-15T09:00:00+08:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert len(notify_calls) == 2
+
+    await hass.services.async_call(
+        "automation", "turn_off", {"entity_id": "automation.test"}, blocking=True
+    )

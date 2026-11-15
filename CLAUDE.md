@@ -399,7 +399,8 @@ as a text input (default `notify.notify`). Template triggers must read inputs th
 `trigger_variables` (plain `variables` are evaluated after the trigger). Blueprints:
 lightning_nearby, mrt_line_disruption, flood_alert, haze_purifier, coe_results,
 rain_forecast (weather entity turns wet), uv_high, dengue_nearby, holiday_tomorrow
-(`calendar.get_events` for tomorrow at a set time). `tests_ha/test_blueprints.py` loads each one
+(`calendar.get_events` for tomorrow at a set time), sp_bill (new bill + due-date reminder;
+blueprint variables are stored as plain values, so a date must be re-parsed in each template). `tests_ha/test_blueprints.py` loads each one
 with `use_blueprint` and drives sensor states, so it runs on every HA version in the CI
 matrix; `test_every_blueprint_is_tested` fails if a blueprint has no test.
 

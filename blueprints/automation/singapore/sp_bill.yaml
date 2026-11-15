@@ -1,0 +1,117 @@
+blueprint:
+  name: Singapore – SP bill
+  description: >-
+    Get a notification when a new SP Group bill arrives, and an optional
+    reminder before its due date while an amount is outstanding (skipped when
+    the account pays by GIRO). Needs an SP account linked in the Singapore
+    integration: pick that account's **Last bill** and **Amount due** sensors.
+  domain: automation
+  author: Singapore for Home Assistant
+  source_url: https://github.com/kianhean/singapore-homeassistant/blob/main/blueprints/automation/singapore/sp_bill.yaml
+  homeassistant:
+    min_version: 2025.4.0
+  input:
+    last_bill_sensor:
+      name: Last bill sensor
+      description: The SP account's "Last bill" sensor.
+      selector:
+        entity:
+          filter:
+            - integration: singapore
+              domain: sensor
+              device_class: monetary
+    amount_due_sensor:
+      name: Amount due sensor
+      description: The SP account's "Amount due" sensor.
+      selector:
+        entity:
+          filter:
+            - integration: singapore
+              domain: sensor
+              device_class: monetary
+    remind_days:
+      name: Remind before due date
+      description: >-
+        Send a reminder this many days before the due date while something is
+        still outstanding. 0 turns the reminder off.
+      default: 3
+      selector:
+        number:
+          min: 0
+          max: 14
+          step: 1
+          unit_of_measurement: days
+    remind_time:
+      name: Reminder time
+      default: "09:00:00"
+      selector:
+        time: {}
+    notify_action:
+      name: Notify action
+      description: >-
+        The action that sends the notification, for example
+        notify.mobile_app_your_phone. Leave as notify.notify to use the default.
+      default: notify.notify
+      selector:
+        text: {}
+
+mode: queued
+
+variables:
+  last_bill_sensor: !input last_bill_sensor
+  amount_due_sensor: !input amount_due_sensor
+  remind_days: !input remind_days
+  due_raw: "{{ state_attr(last_bill_sensor, 'due_date') }}"
+  # Variables are stored as plain values (a date becomes a string), so each
+  # one parses due_raw itself. SP gives midnight Singapore time in UTC.
+  due_label: >-
+    {{ (as_datetime(due_raw) | as_local).strftime('%-d %b') if due_raw else '' }}
+  days_left: >-
+    {{ ((as_datetime(due_raw) | as_local).date() - now().date()).days
+       if due_raw else none }}
+
+triggers:
+  - trigger: state
+    entity_id: !input last_bill_sensor
+    attribute: bill_date
+    id: new_bill
+  - trigger: time
+    at: !input remind_time
+    id: reminder
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: new_bill
+          # Skip restarts and the first poll: only one bill replacing another.
+          - condition: template
+            value_template: >-
+              {{ trigger.from_state is not none
+                 and trigger.from_state.attributes.get('bill_date') is not none
+                 and trigger.to_state.attributes.get('bill_date') is not none }}
+        sequence:
+          - action: !input notify_action
+            data:
+              title: New SP bill
+              message: >-
+                {{ states(last_bill_sensor) | float(0) | round(2) }} SGD{% if due_label %},
+                due {{ due_label }}{% endif %}.
+      - conditions:
+          - condition: trigger
+            id: reminder
+          - condition: template
+            value_template: >-
+              {{ remind_days | int > 0
+                 and days_left is not none
+                 and 0 <= days_left <= remind_days | int
+                 and states(amount_due_sensor) | float(0) > 0
+                 and not state_attr(amount_due_sensor, 'giro_enabled') }}
+        sequence:
+          - action: !input notify_action
+            data:
+              title: SP bill due soon
+              message: >-
+                {{ states(amount_due_sensor) | float(0) | round(2) }} SGD outstanding,
+                due {{ 'today' if days_left == 0 else ('tomorrow' if days_left == 1
+                else 'in ' ~ days_left ~ ' days') }} ({{ due_label }}).
