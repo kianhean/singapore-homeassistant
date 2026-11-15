@@ -6,10 +6,20 @@ on:
       - main
     paths:
       - custom_components/singapore/manifest.json
+  # A release created by hand (or a draft published later) gets its singapore.zip from
+  # the backfill step below, so HACS can install it and its downloads are counted.
+  # Releases this workflow creates use GITHUB_TOKEN, which doesn't fire this trigger.
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
   contents: write
+
+# One run at a time, so two runs never upload the same release's zip together.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
