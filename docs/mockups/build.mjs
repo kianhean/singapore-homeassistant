@@ -33,6 +33,7 @@ const pages = [
   { src: "hero.html", out: "hero.jpg", width: 1280 },
   { src: "alerts.html", out: "alerts.png", width: 1200 },
   { src: "cameras.html", out: "checkpoint-cameras.jpg", width: 900 },
+  { src: "sp_account.html", out: "sp-account-dashboard.png", width: 1280 },
   { src: "radar.html", out: "rain-radar.jpg", width: 600 },
   { src: "social.html", out: "social-preview.png", width: 1280, height: 640, scale: 1 },
 ];

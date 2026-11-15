@@ -1,0 +1,33 @@
+{
+  "message": "Your meter reading is not due for submission yet.",
+  "latest_submission_period": {
+    "title": "Sep 2026",
+    "period_type": "Actual",
+    "start_date": "2026-08-30T06:00:00+08:00",
+    "end_date": "2026-09-03T17:00:00+08:00"
+  },
+  "meters": [
+    {
+      "account_number": "1234567890",
+      "meter_id": "PA0000001",
+      "utility_type": "electric",
+      "last_actual_at": "2026-08-03T00:00:00+08:00",
+      "last_actual_value": "14256",
+      "pre_dec_place": 7,
+      "dec_place": 0,
+      "min": 14256,
+      "max": 16084
+    },
+    {
+      "account_number": "1234567890",
+      "meter_id": "VP0000001",
+      "utility_type": "water",
+      "last_actual_at": "2026-07-02T00:00:00+08:00",
+      "last_actual_value": "931.4",
+      "pre_dec_place": 4,
+      "dec_place": 1,
+      "min": 931.4,
+      "max": 951.8
+    }
+  ]
+}

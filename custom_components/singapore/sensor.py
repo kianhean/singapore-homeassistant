@@ -49,6 +49,7 @@ from .psi_coordinator import (
     PsiCoordinator,
     psi_band,
 )
+from .sp_account_sensor import async_setup_sp_account_sensors
 from .train_coordinator import TRAIN_LINES, TrainStatusCoordinator
 from .uv_coordinator import UV_EXPOSURE_OPTIONS, UvCoordinator, uv_exposure
 from .weather_coordinator import SingaporeWeatherCoordinator
@@ -174,6 +175,11 @@ async def async_setup_entry(
     )
 
     async_add_entities(entities)
+
+    for unsub in async_setup_sp_account_sensors(
+        entry.entry_id, data.sp_accounts, async_add_entities
+    ):
+        entry.async_on_unload(unsub)
 
 
 class _BaseTariffSensor(CoordinatorEntity[SPGroupCoordinator], SensorEntity):

@@ -1,0 +1,14 @@
+{
+  "payables": [
+    {
+      "account_number": "1234567890",
+      "currency": "SGD",
+      "amount": 20369,
+      "premises_id": "premise-001",
+      "system": "EBS",
+      "recurring_enabled": false,
+      "giro_enabled": false,
+      "is_owner": true
+    }
+  ]
+}

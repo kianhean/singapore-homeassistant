@@ -1,0 +1,131 @@
+# An "SP account" dashboard view for a linked SP Group e-account, built only
+# from Home Assistant's built-in cards. Pair it with examples/dashboard.yaml.
+#
+# To use it: Settings → Dashboards → Add dashboard → New dashboard from scratch,
+# open it, ⋮ → Edit dashboard → ⋮ → Raw configuration editor, and paste this in.
+#
+# Two things to replace (find-and-replace the whole file):
+#   1_example_road_singapore  → your SP account device's slug. The device is named
+#                               after your premise address, so "1 Example Road,
+#                               Singapore" becomes sensor.1_example_road_singapore_*.
+#                               Open the device page to see your entity IDs.
+#   2001590888                → your premise ID, used in the imported statistics
+#                               (singapore:<premise_id>_electricity). It is the
+#                               premise_id attribute of the Account sensor, or search
+#                               "SP Group" in Developer tools → Statistics.
+#
+# Cards that read imported statistics (statistic, statistics-graph) fill in after
+# the first poll. Smart-meter (AMI) data lags SP by a few hours.
+title: SP account
+views:
+  - title: SP account
+    path: sp-account
+    icon: mdi:home-lightning-bolt
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: This month
+            icon: mdi:calendar-month
+          - type: statistic
+            entity: singapore:2001590888_electricity
+            name: Electricity used
+            stat_type: change
+            period:
+              calendar:
+                period: month
+            grid_options: { columns: 6 }
+          - type: statistic
+            entity: singapore:2001590888_electricity_cost
+            name: Estimated cost
+            stat_type: change
+            period:
+              calendar:
+                period: month
+            grid_options: { columns: 6 }
+          - type: statistic
+            entity: singapore:2001590888_electricity
+            name: Last month
+            stat_type: change
+            period:
+              calendar:
+                period: month
+                offset: -1
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.energy_electricity_tariff
+            name: Tariff
+            color: amber
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.1_example_road_singapore_electricity_today
+            name: Today so far
+            color: amber
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.1_example_road_singapore_electricity_last_30_min
+            name: Last 30 min
+            color: amber
+            grid_options: { columns: 6 }
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Usage
+            icon: mdi:chart-bar
+          - type: statistics-graph
+            title: Daily electricity
+            entities:
+              - entity: singapore:2001590888_electricity
+                name: Electricity
+            chart_type: bar
+            period: day
+            days_to_show: 30
+            stat_types: [change]
+          - type: statistics-graph
+            title: Hourly, last 3 days
+            entities:
+              - entity: singapore:2001590888_electricity
+                name: Electricity
+            chart_type: bar
+            period: hour
+            days_to_show: 3
+            stat_types: [change]
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Bills
+            icon: mdi:receipt-text-outline
+          - type: tile
+            entity: sensor.1_example_road_singapore_amount_due
+            name: Amount due
+            color: red
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.1_example_road_singapore_last_bill
+            name: Last bill
+            grid_options: { columns: 6 }
+          - type: statistics-graph
+            title: Monthly bills
+            entities:
+              - entity: singapore:2001590888_last_bill
+                name: Bill
+            chart_type: bar
+            period: month
+            days_to_show: 365
+            stat_types: [state]
+          - type: entities
+            title: Green Goals
+            entities:
+              - entity: sensor.1_example_road_singapore_electricity_this_month
+                name: Used this month
+              - type: attribute
+                entity: sensor.1_example_road_singapore_electricity_this_month
+                attribute: goal_target
+                name: Target
+                suffix: kWh
+              - entity: sensor.1_example_road_singapore_electricity_meter
+                name: Meter reading

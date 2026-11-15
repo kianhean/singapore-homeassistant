@@ -1,0 +1,42 @@
+{
+  "history": [
+    {
+      "type": "transaction",
+      "created_at": "2026-08-20T16:00:00Z",
+      "transaction": {
+        "channel": "EXTERNAL",
+        "amount": 50000,
+        "txn_id": "",
+        "txn_time": "2026-08-20T16:00:00Z",
+        "status": "",
+        "account_numbers": ["1234567890"],
+        "payment_method": "AGENT BANK INTERNET",
+        "is_recurring": false
+      }
+    },
+    {
+      "type": "bill",
+      "created_at": "2026-08-03T16:00:00Z",
+      "bill": {
+        "amount": 20369,
+        "account_number": "1234567890",
+        "pdf_url": "https://b2c.api.spdigital.sg/njord/v1/bills/download?sig=fixture",
+        "date": "2026-08-03T16:00:00Z",
+        "period": "2026-07-31T16:00:00Z",
+        "due_date": "2026-08-17T16:00:00Z"
+      }
+    },
+    {
+      "type": "bill",
+      "created_at": "2026-07-02T16:00:00Z",
+      "bill": {
+        "amount": 32326,
+        "account_number": "1234567890",
+        "pdf_url": "https://b2c.api.spdigital.sg/njord/v1/bills/download?sig=fixture-old",
+        "date": "2026-07-02T16:00:00Z",
+        "period": "2026-06-30T16:00:00Z",
+        "due_date": "2026-07-16T16:00:00Z"
+      }
+    }
+  ]
+}

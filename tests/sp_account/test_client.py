@@ -1,0 +1,934 @@
+# Vendored from maci0/home-assistant-sp v1.8.0 (25833b6), MIT licensed,
+# Copyright (c) 2026 Marcel W. Wysocki. See
+# custom_components/singapore/sp_account/LICENSE.
+"""Drive the shipped SpGroupClient against APK-shaped HTTP fixtures."""
+
+from __future__ import annotations
+
+import codecs
+import json
+from datetime import UTC, datetime
+from urllib.parse import urlparse
+
+import pytest
+
+from custom_components.singapore.sp_account.client import (
+    AuthError,
+    HttpResponse,
+    Session,
+    SpGroupClient,
+    UsageError,
+    _drop_future,
+    _mfa_channel_from_challenge,
+    _oob_factor_authenticator_id,
+    _parse_bills,
+    _parse_green_goals,
+    _pick_mfa_factor,
+    _ssl_context,
+)
+from custom_components.singapore.sp_account.const import (
+    AUTH0_AUDIENCE,
+    AUTH0_CLIENT_ID,
+    AUTH0_GRANT_TYPE,
+    AUTH0_MFA_AUTHENTICATORS_PATH,
+    AUTH0_MFA_CHALLENGE_PATH,
+    AUTH0_MFA_OAUTH_HOST,
+    AUTH0_MFA_OOB_GRANT,
+    AUTH0_MFA_OTP_GRANT,
+    AUTH0_REALM,
+    AUTH0_REFRESH_GRANT,
+    AUTH0_SCOPE,
+    B2C_HOST,
+    CONTENT_TYPE_JSON,
+    HEADER_ID_TOKEN,
+    IDENTITY_HOST,
+    JARVIS_AMI_PATH,
+    JARVIS_CHARTS_PATH,
+    JARVIS_GREEN_GOALS_PATH,
+    JARVIS_ME_PATH,
+    JARVIS_PPMS_PATH,
+    NJORD_HISTORY_PATH,
+    NJORD_PAYABLES_PATH,
+    OAUTH_TOKEN_PATH,
+    UNIT_KWH,
+    USER_AGENT,
+)
+from custom_components.singapore.sp_account.models import (
+    SG_TZ,
+    MfaChallenge,
+    PeriodReading,
+    PremiseInfo,
+    UsageReadings,
+)
+
+from .conftest import (
+    FixedClock,
+    FixtureTransport,
+    billed_totals_from_charts_payload,
+    fixture_client,
+    load_fixture,
+)
+
+
+def test_login_returns_access_token_from_fixture() -> None:
+    token_payload = json.loads(load_fixture("oauth_token_success.json"))
+    transport = FixtureTransport()
+    client = SpGroupClient(transport=transport, clock=FixedClock())
+    session = client.login("user@example.com", "secret")
+    assert session.access_token == token_payload["access_token"]
+    assert session.id_token == token_payload["id_token"]
+    assert session.refresh_token == token_payload["refresh_token"]
+
+
+def test_login_sends_auth0_password_realm_body() -> None:
+    transport = FixtureTransport()
+    client = SpGroupClient(transport=transport, clock=FixedClock())
+    client.login("user@example.com", "secret")
+    recorded = transport.requests[0]
+    assert recorded.method == "POST"
+    assert recorded.url == f"{IDENTITY_HOST}{OAUTH_TOKEN_PATH}"
+    assert recorded.headers["Content-Type"] == CONTENT_TYPE_JSON
+    assert recorded.headers["Accept-Language"] == "en_US"
+    assert recorded.headers["User-Agent"] == USER_AGENT
+    assert recorded.body is not None
+    body = json.loads(recorded.body.decode("utf-8"))
+    assert body == {
+        "client_id": AUTH0_CLIENT_ID,
+        "audience": AUTH0_AUDIENCE,
+        "username": "user@example.com",
+        "password": "secret",
+        "scope": AUTH0_SCOPE,
+        "grant_type": AUTH0_GRANT_TYPE,
+        "realm": AUTH0_REALM,
+    }
+    # The scope the request carried is the one the APK sends: reading it here
+    # checks the wire, not just the constant.
+    assert "me:rbac" in body["scope"]
+    assert "me:uportal" in body["scope"]
+
+
+def test_mfa_challenge_exposes_token_and_submit_sends_otp() -> None:
+    transport = FixtureTransport(require_mfa=True, mfa_success=True)
+    client = SpGroupClient(transport=transport, clock=FixedClock())
+
+    with pytest.raises(AuthError) as raised:
+        client.login("user@example.com", "secret")
+
+    assert raised.value.error == "mfa_required"
+    assert raised.value.mfa_token == "mfa-token"
+
+    session = client.submit_mfa(raised.value.mfa_token, "123456")
+    assert session.access_token == "mfa-access-token"
+    assert session.id_token == "mfa-id-token"
+    assert session.refresh_token == "mfa-refresh-token"
+    recorded = transport.requests[1]
+    assert recorded.body is not None
+    body = json.loads(recorded.body.decode("utf-8"))
+    assert body == {
+        "grant_type": AUTH0_MFA_OTP_GRANT,
+        "client_id": AUTH0_CLIENT_ID,
+        "mfa_token": "mfa-token",
+        "otp": "123456",
+    }
+
+
+def test_mfa_oob_lists_challenges_and_submits_binding_code() -> None:
+    transport = FixtureTransport(mfa_oob=True, mfa_success=True)
+    client = SpGroupClient(transport=transport, clock=FixedClock())
+
+    with pytest.raises(AuthError) as raised:
+        client.login("user@example.com", "secret")
+
+    assert raised.value.error == "mfa_required"
+    assert raised.value.mfa_token == "mfa-token"
+
+    authenticators = client.list_mfa_authenticators("mfa-token")
+    assert authenticators
+    sms = next(
+        factor
+        for factor in authenticators
+        if factor["authenticator_type"] == "oob" and factor["oob_channel"] == "sms"
+    )
+    assert sms["id"] == "sms|dev_abc123"
+
+    listed = transport.requests[1]
+    assert listed.method == "GET"
+    assert listed.url == f"{AUTH0_MFA_OAUTH_HOST}{AUTH0_MFA_AUTHENTICATORS_PATH}"
+    assert listed.headers["Authorization"] == "Bearer mfa-token"
+
+    challenge = client.challenge_mfa("mfa-token", "sms|dev_abc123")
+    assert challenge.oob_code == "oob-code"
+
+    challenged = transport.requests[2]
+    assert challenged.method == "POST"
+    assert challenged.url == f"{AUTH0_MFA_OAUTH_HOST}{AUTH0_MFA_CHALLENGE_PATH}"
+    assert challenged.headers["Authorization"] == "Bearer mfa-token"
+    assert challenged.body is not None
+    challenge_body = json.loads(challenged.body.decode("utf-8"))
+    assert challenge_body == {
+        "client_id": AUTH0_CLIENT_ID,
+        "mfa_token": "mfa-token",
+        "challenge_type": "oob",
+        "authenticator_id": "sms|dev_abc123",
+    }
+
+    session = client.submit_mfa_oob("mfa-token", "oob-code", "654321")
+    assert session.access_token == "mfa-access-token"
+    assert session.id_token == "mfa-id-token"
+    assert session.refresh_token == "mfa-refresh-token"
+
+    submitted = transport.requests[3]
+    assert submitted.url == f"{IDENTITY_HOST}{OAUTH_TOKEN_PATH}"
+    assert submitted.body is not None
+    submit_body = json.loads(submitted.body.decode("utf-8"))
+    assert submit_body == {
+        "grant_type": AUTH0_MFA_OOB_GRANT,
+        "client_id": AUTH0_CLIENT_ID,
+        "mfa_token": "mfa-token",
+        "oob_code": "oob-code",
+        "binding_code": "654321",
+    }
+
+
+def test_list_mfa_authenticators_parses_bare_array_response() -> None:
+    # Regression: Auth0 /mfa/authenticators returns a BARE JSON array, not
+    # {"authenticators": [...]}. The old parser coerced it to {} and listed
+    # zero factors, so no OOB challenge (SMS) was ever fired.
+    transport = FixtureTransport(authenticators_bare=True)
+    client = SpGroupClient(transport=transport, clock=FixedClock())
+
+    authenticators = client.list_mfa_authenticators("mfa-token")
+
+    assert {factor["id"] for factor in authenticators} == {
+        "recovery-code|dev_abc123",
+        "sms|dev_abc123",
+        "email|dev_abc123",
+    }
+    sms = next(
+        factor
+        for factor in authenticators
+        if factor["authenticator_type"] == "oob" and factor["oob_channel"] == "sms"
+    )
+    assert sms["id"] == "sms|dev_abc123"
+    assert sms["type"] == "phone"
+
+
+def _oob_sms_factor() -> dict[str, object]:
+    return {
+        "id": "sms|dev_abc123",
+        "authenticator_type": "oob",
+        "oob_channel": "sms",
+        "active": True,
+        "type": "phone",
+    }
+
+
+def _oob_email_factor() -> dict[str, object]:
+    return {
+        "id": "email|dev_abc123",
+        "authenticator_type": "oob",
+        "oob_channel": "email",
+        "active": True,
+        "type": "email",
+    }
+
+
+def _totp_factor() -> dict[str, object]:
+    return {
+        "id": "totp|dev_abc123",
+        "authenticator_type": "otp",
+        "active": True,
+        "type": "totp",
+    }
+
+
+def _totp_literal_factor() -> dict[str, object]:
+    return {
+        "id": "totp|dev_abc123",
+        "authenticator_type": "totp",
+        "active": True,
+        "type": "totp",
+    }
+
+
+def _blank_id_totp_factor() -> dict[str, object]:
+    return {
+        "id": "",
+        "authenticator_type": "otp",
+        "active": True,
+        "type": "totp",
+    }
+
+
+def _inactive_sms_factor() -> dict[str, object]:
+    return {
+        "id": "sms|dev_inactive",
+        "authenticator_type": "oob",
+        "oob_channel": "sms",
+        "active": False,
+        "type": "phone",
+    }
+
+
+def _recovery_factor() -> dict[str, object]:
+    return {
+        "id": "recovery-code|dev_abc123",
+        "authenticator_type": "recovery-code",
+        "active": True,
+        "type": "recovery-code",
+    }
+
+
+@pytest.mark.parametrize(
+    ("factors", "expected"),
+    [
+        pytest.param(
+            (_oob_sms_factor(), _recovery_factor()),
+            {"oob_channel": "sms", "authenticator_type": "oob"},
+            id="sms-only",
+        ),
+        pytest.param(
+            (_oob_email_factor(),),
+            {"oob_channel": "email"},
+            id="email-only",
+        ),
+        pytest.param(
+            (_oob_email_factor(), _oob_sms_factor()),
+            {"oob_channel": "sms"},
+            id="prefers-sms-over-email",
+        ),
+        pytest.param(
+            (_oob_sms_factor(), _totp_factor()),
+            {"authenticator_type": "otp", "id": "totp|dev_abc123"},
+            id="prefers-totp-over-sms",
+        ),
+        pytest.param(
+            (_blank_id_totp_factor(), _oob_sms_factor()),
+            {"authenticator_type": "oob", "oob_channel": "sms"},
+            id="blank-id-totp-falls-through-to-sms",
+        ),
+        pytest.param(
+            (_oob_sms_factor(), _totp_literal_factor()),
+            {"authenticator_type": "totp", "id": "totp|dev_abc123"},
+            id="prefers-totp-literal-over-sms",
+        ),
+        pytest.param(
+            (_totp_factor(), _recovery_factor()),
+            {"authenticator_type": "otp", "id": "totp|dev_abc123"},
+            id="otp-only",
+        ),
+        pytest.param((_recovery_factor(),), None, id="recovery-code-only"),
+        pytest.param(
+            (_inactive_sms_factor(), _oob_email_factor()),
+            {"oob_channel": "email"},
+            id="skips-inactive-sms",
+        ),
+    ],
+)
+def test_pick_mfa_factor(
+    factors: tuple[dict[str, object], ...],
+    expected: dict[str, object] | None,
+) -> None:
+    factor = _pick_mfa_factor(factors)
+    if expected is None:
+        assert factor is None
+        return
+    assert factor is not None
+    for key, value in expected.items():
+        assert factor[key] == value
+
+
+def test_oob_factor_authenticator_id_extracts_oob_id() -> None:
+    assert _oob_factor_authenticator_id(_oob_sms_factor()) == "sms|dev_abc123"
+
+
+def test_oob_factor_authenticator_id_returns_none_for_totp_and_recovery() -> None:
+    assert _oob_factor_authenticator_id(_totp_factor()) is None
+    assert _oob_factor_authenticator_id(_recovery_factor()) is None
+    assert _oob_factor_authenticator_id(None) is None
+
+
+def test_oob_factor_authenticator_id_requires_string_id() -> None:
+    factor: dict[str, object] = {
+        "id": "",
+        "authenticator_type": "oob",
+        "oob_channel": "sms",
+    }
+    assert _oob_factor_authenticator_id(factor) is None
+    factor["id"] = 123
+    assert _oob_factor_authenticator_id(factor) is None
+
+
+def test_mfa_channel_oob_with_valid_challenge() -> None:
+    channel, oob_code = _mfa_channel_from_challenge(
+        _oob_sms_factor(), MfaChallenge(oob_code="oob-code")
+    )
+    assert channel == "oob"
+    assert oob_code == "oob-code"
+
+
+def test_mfa_channel_falls_back_when_challenge_is_none() -> None:
+    channel, oob_code = _mfa_channel_from_challenge(_oob_sms_factor(), None)
+    assert channel == "totp"
+    assert oob_code is None
+
+
+def test_mfa_channel_never_oob_without_a_code() -> None:
+    no_code = MfaChallenge(oob_code="")
+    channel, oob_code = _mfa_channel_from_challenge(_oob_sms_factor(), no_code)
+    assert channel == "totp"
+    assert oob_code is None
+    blank = MfaChallenge(oob_code="   ")
+    channel, oob_code = _mfa_channel_from_challenge(_oob_sms_factor(), blank)
+    assert channel == "totp"
+    assert oob_code is None
+
+
+def test_mfa_channel_totp_for_non_oob_factor() -> None:
+    channel, oob_code = _mfa_channel_from_challenge(
+        _totp_factor(), MfaChallenge(oob_code="oob-code")
+    )
+    assert channel == "totp"
+    assert oob_code is None
+    channel, _ = _mfa_channel_from_challenge(_recovery_factor(), None)
+    assert channel == "totp"
+
+
+def test_challenge_mfa_rejects_non_prompt_binding_method() -> None:
+    transport = FixtureTransport(mfa_oob=True, mfa_challenge_binding="enter_code")
+    client = SpGroupClient(transport=transport, clock=FixedClock())
+
+    with pytest.raises(AuthError) as raised:
+        client.login("user@example.com", "secret")
+    mfa_token = raised.value.mfa_token
+    assert mfa_token is not None
+
+    with pytest.raises(AuthError) as exc_info:
+        client.challenge_mfa(mfa_token, "sms|dev_abc123")
+    assert exc_info.value.error == "challenge_failed"
+    # The failure came from the challenge exchange, not from the factor list.
+    assert transport.requests[-1].url == (
+        f"{AUTH0_MFA_OAUTH_HOST}{AUTH0_MFA_CHALLENGE_PATH}"
+    )
+
+
+def test_challenge_mfa_accepts_the_prompt_binding_method_folded() -> None:
+    """The binding method is server text: its case and width are not its identity."""
+    transport = FixtureTransport(mfa_oob=True, mfa_challenge_binding="PROMPT")
+    client = SpGroupClient(transport=transport, clock=FixedClock())
+
+    with pytest.raises(AuthError) as raised:
+        client.login("user@example.com", "secret")
+    mfa_token = raised.value.mfa_token
+    assert mfa_token is not None
+
+    challenge = client.challenge_mfa(mfa_token, "sms|dev_abc123")
+    assert challenge.oob_code == "oob-code"
+
+
+def test_prepare_mfa_challenges_sms_and_returns_oob() -> None:
+    transport = FixtureTransport(mfa_oob=True)
+    client = SpGroupClient(transport=transport, clock=FixedClock())
+
+    channel, oob_code = client.prepare_mfa("mfa-token")
+
+    assert channel == "oob"
+    assert oob_code == "oob-code"
+    assert transport.requests[0].method == "GET"
+    assert transport.requests[1].method == "POST"
+    challenged = transport.requests[1]
+    assert challenged.url == f"{AUTH0_MFA_OAUTH_HOST}{AUTH0_MFA_CHALLENGE_PATH}"
+
+
+def test_prepare_mfa_falls_back_when_binding_is_not_prompt() -> None:
+    transport = FixtureTransport(mfa_oob=True, mfa_challenge_binding="enter_code")
+    client = SpGroupClient(transport=transport, clock=FixedClock())
+
+    channel, oob_code = client.prepare_mfa("mfa-token")
+
+    assert channel == "totp"
+    assert oob_code is None
+
+
+def test_stored_session_skips_password_login() -> None:
+    token_payload = json.loads(load_fixture("oauth_token_success.json"))
+    session = Session(
+        access_token=token_payload["access_token"],
+        id_token=token_payload["id_token"],
+        refresh_token=token_payload["refresh_token"],
+        expires_at=FixedClock().timestamp() + 3600,
+    )
+    transport = FixtureTransport()
+    client = SpGroupClient(transport=transport, session=session, clock=FixedClock())
+    client.fetch_usage()
+    assert all(not req.url.endswith(OAUTH_TOKEN_PATH) for req in transport.requests)
+
+
+def test_expired_stored_session_refreshes_instead_of_sending_the_password() -> None:
+    token_payload = json.loads(load_fixture("oauth_token_success.json"))
+    transport = FixtureTransport()
+    client = SpGroupClient(
+        transport=transport,
+        session=Session(
+            access_token="stale-access",
+            id_token="stale-id",
+            refresh_token=token_payload["refresh_token"],
+            expires_at=FixedClock().timestamp() - 1,
+        ),
+    )
+
+    session = client.ensure_session()
+
+    assert session.access_token == token_payload["access_token"]
+    assert session.refresh_token == token_payload["refresh_token"]
+    assert len(transport.requests) == 1
+    recorded = transport.requests[0]
+    assert recorded.url == f"{IDENTITY_HOST}{OAUTH_TOKEN_PATH}"
+    assert recorded.body is not None
+    body = json.loads(recorded.body.decode("utf-8"))
+    assert body["grant_type"] == AUTH0_REFRESH_GRANT
+    assert "password" not in body
+
+
+def test_session_without_a_refresh_token_demands_a_login() -> None:
+    transport = FixtureTransport()
+    client = SpGroupClient(
+        transport=transport,
+        session=Session(
+            access_token="",
+            id_token="stale",
+            refresh_token=None,
+            expires_at=0,
+        ),
+    )
+
+    with pytest.raises(AuthError) as raised:
+        client.ensure_session()
+
+    assert raised.value.error == "invalid_grant"
+    assert transport.requests == []
+
+
+def test_refresh_sends_refresh_token_grant() -> None:
+    token_payload = json.loads(load_fixture("oauth_token_success.json"))
+    transport = FixtureTransport()
+    client = SpGroupClient(
+        clock=FixedClock(),
+        transport=transport,
+        session=Session(
+            access_token=token_payload["access_token"],
+            id_token=token_payload["id_token"],
+            refresh_token=token_payload["refresh_token"],
+        ),
+    )
+    client.refresh()
+    recorded = transport.requests[0]
+    assert recorded.body is not None
+    body = json.loads(recorded.body.decode("utf-8"))
+    assert body["grant_type"] == AUTH0_REFRESH_GRANT
+    assert body["refresh_token"] == token_payload["refresh_token"]
+    assert body["client_id"] == AUTH0_CLIENT_ID
+
+
+def test_fetch_usage_returns_kwh_and_water_from_charts_fixture() -> None:
+    charts = json.loads(load_fixture("jarvis_charts.json"))
+    expected_kwh, expected_m3 = billed_totals_from_charts_payload(charts)
+    token_payload = json.loads(load_fixture("oauth_token_success.json"))
+    me_payload = json.loads(load_fixture("jarvis_me.json"))
+    premise_id = me_payload["premises"][0]["id"]
+
+    transport = FixtureTransport()
+    client = fixture_client(transport)
+    usage = client.fetch_usage()
+
+    assert usage.electricity_kwh == expected_kwh
+    assert usage.water_m3 == expected_m3
+    assert usage.electricity is not None and usage.electricity.unit == "kWh"
+    assert usage.water is not None and usage.water.unit == "m³"
+    assert usage.premise_id == premise_id
+
+    by_path = {urlparse_path(req.url): req for req in transport.requests}
+    me_req = by_path[JARVIS_ME_PATH]
+    charts_req = by_path[f"{JARVIS_CHARTS_PATH}/{premise_id}"]
+    bearer = f"Bearer {token_payload['access_token']}"
+    assert me_req.method == "GET"
+    assert me_req.url == f"{B2C_HOST}{JARVIS_ME_PATH}"
+    assert me_req.headers["Authorization"] == bearer
+    assert me_req.headers[HEADER_ID_TOKEN] == token_payload["id_token"]
+    assert charts_req.method == "GET"
+    assert charts_req.url == f"{B2C_HOST}{JARVIS_CHARTS_PATH}/{premise_id}"
+    assert charts_req.headers["Authorization"] == bearer
+    assert charts_req.headers[HEADER_ID_TOKEN] == token_payload["id_token"]
+    assert usage.premise.account_number == "1234567890"
+    assert usage.premise.address == "1 Example Road, Singapore"
+    assert usage.premise.ami_elec is True
+    assert usage.premise.ppms_exists is False
+    assert usage.meter_reading is not None
+    assert usage.meter_reading.title == "Sep 2026"
+    assert usage.ppms_credit is None
+    assert usage.gas is None
+    smrd_paths = [
+        urlparse_path(req.url)
+        for req in transport.requests
+        if urlparse_path(req.url).startswith("/jarvis/v3/smrd-uportal/")
+    ]
+    assert smrd_paths == [f"/jarvis/v3/smrd-uportal/{premise_id}"]
+    assert all(
+        not urlparse_path(req.url).startswith("/jarvis/v3/ppms/balance/")
+        for req in transport.requests
+    )
+    ami_reqs = [
+        req for req in transport.requests if urlparse_path(req.url) == JARVIS_AMI_PATH
+    ]
+    assert len(ami_reqs) == 2
+    groups = []
+    for req in ami_reqs:
+        assert req.method == "POST"
+        assert req.body is not None
+        payload = json.loads(req.body.decode("utf-8"))
+        groups.append(payload["grouped_by"])
+        assert payload["utility_type"] == "electric"
+        assert payload["premise_id"] == premise_id
+        assert payload["start"].isdigit()
+        assert len(payload["start"]) == 14
+    assert sorted(groups) == ["day", "month"]
+    assert len(usage.ami_hourly) == 4
+    assert len(usage.ami_daily) == 2
+    assert usage.ami_hourly[0].amount == pytest.approx(0.4)
+    assert usage.last_bill is not None
+    assert usage.last_bill.amount_sgd == pytest.approx(203.69)
+    assert usage.last_bill.period == "2026-07-31T16:00:00Z"
+    assert len(usage.bills) == 2
+    assert usage.bills[0].amount_sgd == pytest.approx(323.26)
+    assert usage.bills[-1].amount_sgd == pytest.approx(203.69)
+    assert usage.amount_due is not None
+    assert usage.amount_due.amount_sgd == pytest.approx(203.69)
+    assert any(
+        urlparse_path(req.url) == NJORD_PAYABLES_PATH for req in transport.requests
+    )
+    history_reqs = [
+        req
+        for req in transport.requests
+        if urlparse_path(req.url) == NJORD_HISTORY_PATH
+    ]
+    assert len(history_reqs) == 1
+    assert "account_numbers=1234567890" in history_reqs[0].url
+    elec_meter = usage.meter("electric")
+    water_meter = usage.meter("water")
+    assert elec_meter is not None
+    assert elec_meter.value == pytest.approx(14256)
+    assert elec_meter.meter_id == "PA0000001"
+    assert water_meter is not None
+    assert water_meter.value == pytest.approx(931.4)
+    elec_goal = usage.goal("elec")
+    assert elec_goal is not None
+    assert elec_goal.used == pytest.approx(1160.77)
+    assert elec_goal.target == pytest.approx(672.47)
+    assert elec_goal.cost_difference_sgd == pytest.approx(103.10)
+    assert usage.goal("water") is None
+    assert any(
+        urlparse_path(req.url) == JARVIS_GREEN_GOALS_PATH for req in transport.requests
+    )
+
+
+def test_a_goal_type_in_another_case_still_picks_its_own_unit() -> None:
+    """The goal type is server text, and the goal is looked up folded.
+
+    A type spelled "Elec" is the electricity goal, so it must not fall back to
+    the volume unit the way an unrecognized type does.
+    """
+    body = {
+        "goals": [
+            {
+                "type": "Elec",
+                "premises": [
+                    {
+                        "id": "premise-001",
+                        "data": {"used": 10.0, "target": 20.0},
+                    }
+                ],
+            }
+        ]
+    }
+    goals = _parse_green_goals(body, "premise-001")
+    assert len(goals) == 1
+    assert goals[0].kind == "Elec"
+    assert goals[0].unit == UNIT_KWH
+    assert (
+        UsageReadings(
+            premise=PremiseInfo(
+                id="premise-001",
+                address=None,
+                account_number=None,
+                account_status=None,
+                account_type=None,
+                premise_type=None,
+                utilities=(),
+                ami_elec=None,
+                retailer_name=None,
+                ppms_exists=False,
+            ),
+            electricity=None,
+            water=None,
+            gas=None,
+            green_goals=goals,
+        ).goal("elec")
+        is goals[0]
+    )
+
+
+def test_premise_selection_skips_inactive_premises() -> None:
+    """A multi-premise account reads the active premise, not the first listed."""
+    me = json.loads(load_fixture("jarvis_me.json"))
+    inactive = {**me["premises"][0], "id": "premise-000", "active": False}
+    me["premises"] = [inactive, me["premises"][0], {**inactive, "id": "premise-002"}]
+    transport = FixtureTransport(
+        responses={JARVIS_ME_PATH: HttpResponse(200, json.dumps(me).encode("utf-8"))}
+    )
+
+    usage = fixture_client(transport).fetch_usage()
+
+    assert usage.premise.id == "premise-001"
+    charts = [
+        req
+        for req in transport.requests
+        if urlparse_path(req.url).startswith(f"{JARVIS_CHARTS_PATH}/")
+    ]
+    assert charts, "the charts read must target the selected premise"
+    assert all(
+        urlparse_path(req.url) == f"{JARVIS_CHARTS_PATH}/premise-001" for req in charts
+    )
+
+
+def test_premise_selection_falls_back_when_none_is_active() -> None:
+    me = json.loads(load_fixture("jarvis_me.json"))
+    me["premises"][0]["active"] = False
+    me["premises"].insert(0, {"no_id": True})
+
+    client = fixture_client(
+        FixtureTransport(
+            responses={JARVIS_ME_PATH: HttpResponse(200, json.dumps(me).encode())}
+        )
+    )
+
+    assert client._select_premise(me).get("id") == "premise-001"
+
+
+@pytest.mark.parametrize(
+    ("premises", "message"),
+    [
+        pytest.param([], "no premises", id="empty-list"),
+        pytest.param("not-a-list", "no premises", id="not-a-list"),
+        pytest.param([{"no_id": True}, {"id": ""}], "premise id missing", id="no-ids"),
+    ],
+)
+def test_premise_selection_rejects_an_account_with_no_readable_premise(
+    premises: object, message: str
+) -> None:
+    client = fixture_client()
+    with pytest.raises(UsageError) as raised:
+        client._select_premise({"premises": premises})
+    assert message in str(raised.value)
+
+
+def test_ppms_credit_is_read_when_the_premise_enrols() -> None:
+    """PPMS enrolled premises read a balance; unenrolled ones never ask."""
+    me = json.loads(load_fixture("jarvis_me.json"))
+    me["premises"][0]["ppms_details"] = {"exists": True, "account_number": "PPMS-1"}
+    transport = FixtureTransport(
+        responses={
+            JARVIS_ME_PATH: HttpResponse(200, json.dumps(me).encode("utf-8")),
+            f"{JARVIS_PPMS_PATH}/premise-001": HttpResponse(
+                200,
+                b'{"amount": 42.5, "updated_at": "2026-09-01T00:00:00Z"}',
+            ),
+        }
+    )
+
+    usage = fixture_client(transport).fetch_usage()
+
+    assert usage.ppms_credit == pytest.approx(42.5)
+    ppms_paths = [
+        urlparse_path(req.url)
+        for req in transport.requests
+        if urlparse_path(req.url).startswith(JARVIS_PPMS_PATH)
+    ]
+    assert ppms_paths == [f"{JARVIS_PPMS_PATH}/premise-001"]
+
+
+def test_ppms_enrolment_without_a_balance_leaves_the_credit_unset() -> None:
+    me = json.loads(load_fixture("jarvis_me.json"))
+    me["premises"][0]["ppms_details"] = {"exists": True, "account_number": "PPMS-1"}
+    transport = FixtureTransport(
+        responses={
+            JARVIS_ME_PATH: HttpResponse(200, json.dumps(me).encode("utf-8")),
+            f"{JARVIS_PPMS_PATH}/premise-001": HttpResponse(200, b"null"),
+        }
+    )
+
+    usage = fixture_client(transport).fetch_usage()
+
+    assert usage.ppms_credit is None
+    assert usage.electricity is not None
+
+
+def test_me_forbidden_uses_server_error_description() -> None:
+    transport = FixtureTransport(
+        responses={
+            JARVIS_ME_PATH: HttpResponse(
+                403,
+                b'{"error":"invalid_claim","error_description":"claim error"}',
+            )
+        }
+    )
+    client = fixture_client(transport)
+    with pytest.raises(AuthError) as exc_info:
+        client.fetch_usage()
+    assert exc_info.value.error == "invalid_claim"
+    assert "claim error" in exc_info.value.error_description
+
+
+def test_invalid_credentials_raise_auth_error() -> None:
+    fail_payload = json.loads(load_fixture("oauth_token_invalid_grant.json"))
+    transport = FixtureTransport(fail_login=True)
+    client = SpGroupClient(transport=transport, clock=FixedClock())
+    with pytest.raises(AuthError) as exc_info:
+        client.login("user@example.com", "wrong")
+    assert exc_info.value.error == fail_payload["error"]
+    assert exc_info.value.error_description == fail_payload["error_description"]
+    with pytest.raises(AuthError) as unread:
+        client.fetch_usage()
+    # With no session to refresh, the poll names the missing credentials as the
+    # cause rather than failing with an error the caller has to interpret.
+    assert unread.value.error == "invalid_grant"
+    assert unread.value.error_description == "login credentials required"
+    assert all(urlparse_path(req.url) != JARVIS_ME_PATH for req in transport.requests)
+    assert all(
+        not urlparse_path(req.url).startswith(JARVIS_CHARTS_PATH)
+        for req in transport.requests
+    )
+
+
+def test_empty_gas_does_not_fail_fetch() -> None:
+    client = fixture_client()
+    usage = client.fetch_usage()
+    assert usage.gas is None
+    assert usage.electricity is not None
+    assert usage.water is not None
+
+
+def test_gas_only_charts_return_gas_series() -> None:
+    client = fixture_client(FixtureTransport(charts_fixture="jarvis_charts_gas.json"))
+    usage = client.fetch_usage()
+    assert usage.electricity is None
+    assert usage.water is None
+    assert usage.gas is not None
+    assert usage.gas.total == pytest.approx(17.7)
+    assert usage.gas.unit == "kWh"
+
+
+def test_amount_due_credit_is_negative_sgd() -> None:
+    transport = FixtureTransport(
+        responses={
+            NJORD_PAYABLES_PATH: HttpResponse(
+                200,
+                b'{"payables":[{"account_number":"1234567890","currency":"SGD",'
+                b'"amount":-29631,"premises_id":"premise-001","system":"EBS",'
+                b'"recurring_enabled":false,"giro_enabled":false,'
+                b'"is_owner":true}]}',
+            )
+        }
+    )
+    usage = fixture_client(transport).fetch_usage()
+    assert usage.amount_due is not None
+    assert usage.amount_due.amount_sgd == pytest.approx(-296.31)
+
+
+def urlparse_path(url: str) -> str:
+    return urlparse(url).path
+
+
+def test_new_account_without_bills_still_reads_ami() -> None:
+    """A premise activated days ago has no billed period yet, only AMI slots."""
+    transport = FixtureTransport(charts_fixture="jarvis_charts_new_account.json")
+    client = fixture_client(transport)
+
+    usage = client.fetch_usage()
+
+    assert usage.water is None
+    assert usage.gas is None
+    assert usage.electricity is not None
+    assert usage.electricity.periods == ()
+    assert usage.electricity_kwh == 0.0
+    assert usage.electricity.unit == "kWh"
+    assert usage.ami_hourly
+    assert usage.ami_daily
+    assert JARVIS_AMI_PATH in {urlparse_path(req.url) for req in transport.requests}
+
+
+def test_drop_future_removes_padded_days() -> None:
+    now = datetime(2026, 9, 21, 21, 50, tzinfo=SG_TZ)
+    periods = (
+        PeriodReading(start=datetime(2026, 9, 20, 0, 0, tzinfo=SG_TZ), amount=4.2),
+        PeriodReading(start=datetime(2026, 9, 21, 0, 0, tzinfo=SG_TZ), amount=2.1),
+        PeriodReading(start=datetime(2026, 9, 22, 0, 0, tzinfo=SG_TZ), amount=0.0),
+        PeriodReading(start=datetime(2026, 9, 30, 0, 0, tzinfo=SG_TZ), amount=0.0),
+    )
+
+    kept = _drop_future(periods, now)
+
+    assert [item.start.day for item in kept] == [20, 21]
+
+
+def test_tls_context_is_built_once_per_process() -> None:
+    assert _ssl_context() is _ssl_context()
+
+
+def test_charts_with_a_byte_order_mark_and_a_non_breaking_space_unit() -> None:
+    """A BOM must not fail the read, and a U+00A0 inside "kWh" must not either."""
+    payload = json.loads(load_fixture("jarvis_charts.json"))
+    elec = payload["elec"]
+    assert isinstance(elec, dict)
+    for row in elec["data"]:
+        row["unit"] = "k\u00a0Wh"
+    body = codecs.BOM_UTF8 + json.dumps(payload).encode("utf-8")
+    transport = FixtureTransport(
+        responses={f"{JARVIS_CHARTS_PATH}/premise-001": HttpResponse(200, body)}
+    )
+
+    usage = fixture_client(transport).fetch_usage()
+
+    assert usage.electricity is not None
+    assert usage.electricity.unit == "kWh"
+    assert usage.electricity_kwh == pytest.approx(352.456)
+
+
+def test_bills_order_by_instant_not_by_timestamp_text() -> None:
+    """Njord mixes ``Z`` and ``+08:00`` offsets; text order is not time order."""
+    body = {
+        "history": [
+            {
+                "type": "bill",
+                "created_at": "2026-08-09T01:00:00+08:00",
+                "bill": {
+                    "date": "2026-08-09T01:00:00+08:00",
+                    "amount": 32326,
+                },
+            },
+            {
+                "type": "bill",
+                "created_at": "2026-08-08T20:00:00Z",
+                "bill": {"date": "2026-08-08T20:00:00Z", "amount": 20369},
+            },
+        ]
+    }
+
+    bills = _parse_bills(body)
+
+    # 2026-08-08T20:00Z is 2026-08-09T04:00 SGT, so it is the later bill even
+    # though its text sorts first.
+    assert [bill.amount_sgd for bill in bills] == [
+        pytest.approx(323.26),
+        pytest.approx(203.69),
+    ]
+    assert bills[-1].issued_at == datetime(2026, 8, 8, 20, tzinfo=UTC)

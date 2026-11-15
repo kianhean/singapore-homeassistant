@@ -99,6 +99,72 @@
           "very_high": "mdi:weather-sunny-alert",
           "extreme": "mdi:weather-sunny-alert"
         }
+      },
+      "sp_electricity_last_period": {
+        "default": "mdi:flash-outline"
+      },
+      "sp_electricity_today": {
+        "default": "mdi:calendar-today"
+      },
+      "sp_electricity_last_hour": {
+        "default": "mdi:clock-outline"
+      },
+      "sp_water_last_period": {
+        "default": "mdi:water-outline"
+      },
+      "sp_gas_last_period": {
+        "default": "mdi:fire"
+      },
+      "sp_account": {
+        "default": "mdi:home-account"
+      },
+      "sp_ppms_credit": {
+        "default": "mdi:cash"
+      },
+      "sp_last_bill": {
+        "default": "mdi:receipt-text-outline"
+      },
+      "sp_amount_due": {
+        "default": "mdi:cash-clock"
+      },
+      "sp_electricity_meter": {
+        "default": "mdi:gauge"
+      },
+      "sp_water_meter": {
+        "default": "mdi:counter"
+      },
+      "sp_electricity_goal": {
+        "default": "mdi:target"
+      },
+      "sp_water_goal": {
+        "default": "mdi:target-account"
+      },
+      "sp_greenup_points": {
+        "default": "mdi:leaf"
+      },
+      "sp_ev_wallet": {
+        "default": "mdi:ev-station"
+      },
+      "sp_ev_session": {
+        "default": "mdi:ev-plug-type2"
+      },
+      "sp_ev_last_charge": {
+        "default": "mdi:battery-charging"
+      },
+      "sp_ev_unpaid": {
+        "default": "mdi:cash-remove"
+      },
+      "sp_unread_notifications": {
+        "default": "mdi:bell-badge-outline"
+      },
+      "sp_bill_delivery": {
+        "default": "mdi:email-outline"
+      },
+      "sp_fcu": {
+        "default": "mdi:air-conditioner"
+      },
+      "sp_tariff": {
+        "default": "mdi:tag-outline"
       }
     },
     "camera": {

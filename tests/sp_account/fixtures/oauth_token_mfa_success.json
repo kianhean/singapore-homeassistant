@@ -1,0 +1,8 @@
+{
+  "access_token": "mfa-access-token",
+  "refresh_token": "mfa-refresh-token",
+  "id_token": "mfa-id-token",
+  "scope": "openid email profile offline_access user_metadata enroll read:authenticators me:uportal me",
+  "expires_in": 3600,
+  "token_type": "Bearer"
+}

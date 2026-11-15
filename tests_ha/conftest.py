@@ -9,6 +9,8 @@ HTTP is still mocked so the suite stays offline and deterministic.
 from __future__ import annotations
 
 import io
+from collections.abc import Iterator
+from unittest.mock import patch
 
 import pytest
 from homeassistant.util import dt as dt_util
@@ -26,6 +28,8 @@ from custom_components.singapore.lightning_coordinator import LIGHTNING_URL
 from custom_components.singapore.psi_coordinator import PSI_URL
 from custom_components.singapore.radar_coordinator import RADAR_URL
 from custom_components.singapore.radar_image import BASEMAPS
+from custom_components.singapore.sp_account import client as client_module
+from custom_components.singapore.sp_account.client import SpGroupClient
 from custom_components.singapore.traffic_coordinator import TRAFFIC_IMAGES_URL
 from custom_components.singapore.train_coordinator import TRAIN_STATUS_URL
 from custom_components.singapore.uv_coordinator import UV_URL
@@ -35,6 +39,10 @@ from custom_components.singapore.weather_coordinator import (
     TWENTY_FOUR_HR_URL,
     WEATHER_URL,
 )
+
+# Recorded SP Group (Auth0/Jarvis/Njord) responses, vendored with the client
+# from maci0/home-assistant-sp.
+from tests.sp_account.conftest import FixedClock, FixtureTransport
 
 pytest_plugins = "pytest_homeassistant_custom_component"
 
@@ -396,3 +404,32 @@ def mock_sources(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
     aioclient_mock.get("https://radar.example/70km.png", content=_png((480, 480)))
     aioclient_mock.get(BASEMAPS["70km"].url, content=_png((853, 479)))
     return aioclient_mock
+
+
+@pytest.fixture(autouse=True)
+def clear_sp_login_cooldown() -> Iterator[None]:
+    """The client's per-account sign-in cooldown is process state."""
+    client_module._LOGIN_FAILURES.clear()
+    client_module._LOGIN_ATTEMPTS.clear()
+    yield
+    client_module._LOGIN_FAILURES.clear()
+    client_module._LOGIN_ATTEMPTS.clear()
+
+
+@pytest.fixture
+def sp_transport() -> Iterator[FixtureTransport]:
+    """Route every SpGroupClient the integration creates to recorded fixtures."""
+    transport = FixtureTransport()
+
+    class _FixtureClient(SpGroupClient):
+        def __init__(self, session=None, **_kwargs) -> None:
+            super().__init__(session=session, transport=transport, clock=FixedClock())
+
+    with (
+        patch("custom_components.singapore.config_flow.SpGroupClient", _FixtureClient),
+        patch(
+            "custom_components.singapore.sp_account_coordinator.SpGroupClient",
+            _FixtureClient,
+        ),
+    ):
+        yield transport
