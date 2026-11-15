@@ -14,6 +14,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .const import scaled_interval
+
 _LOGGER = logging.getLogger(__name__)
 
 TARIFF_URL = "https://www.spgroup.com.sg/our-services/utilities/tariff-information"
@@ -122,7 +124,7 @@ class SPGroupCoordinator(DataUpdateCoordinator[TariffData]):
             _LOGGER,
             config_entry=config_entry,
             name="SP Group Tariffs",
-            update_interval=UPDATE_INTERVAL,
+            update_interval=scaled_interval(config_entry, UPDATE_INTERVAL),
         )
         self.last_updated: datetime | None = None
 

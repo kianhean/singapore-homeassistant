@@ -8,7 +8,9 @@ The integration domain is `singapore`.
 ```
 custom_components/singapore/
 ├── __init__.py             # Entry setup/teardown; creates and stores coordinators
-├── const.py                # DOMAIN constant (imported by config_flow without pulling in coordinators)
+├── const.py                # DOMAIN, option keys, SOURCES + helpers (enabled_sources, data_gov_headers,
+│                           #   scaled_interval); imported by config_flow without pulling in coordinators
+├── health.py               # SourceHealthMonitor: hourly check, "source_failing_<source>" repair issues
 ├── coordinator.py          # SPGroupCoordinator: fetches + parses SP Group tariff page
 ├── coe_coordinator.py      # CoeCoordinator: fetches COE results from data.gov.sg API
 ├── holiday_coordinator.py  # PublicHolidayCoordinator: fetches + parses MOM holidays
@@ -30,15 +32,18 @@ custom_components/singapore/
 │   └── LICENSE             # Upstream MIT licence: must ship with the vendored code
 ├── camera.py               # Camera entities (checkpoint traffic cameras + rain radar)
 ├── calendar.py             # Calendar entity (Singapore public holidays)
+├── event.py                # Event entities: COE new results, MRT/LRT service alerts
 ├── weather.py              # Weather entities (one per Singapore forecast area)
-├── config_flow.py          # UI config flow (name; single instance) + SP account subentry flow
+├── config_flow.py          # UI config flow (name; single instance), options flow, SP account subentry flow
+├── quality_scale.yaml      # Self-assessed HA quality scale rules (hassfest skips it for custom integrations)
 ├── diagnostics.py          # "Download diagnostics": coordinator status + parsed data
 ├── sensor.py               # Sensor entities (tariff, COE, weather, PSI, trains, flood, dengue, lightning, UV)
 ├── manifest.json           # Integration metadata; declares beautifulsoup4 dep, single_config_entry
 ├── icons.json              # Icon translations (entity icons live here, not in _attr_icon)
 ├── strings.json            # Config flow UI strings + entity names + enum state names
 └── translations/
-    └── en.json             # English translations (mirrors strings.json)
+    ├── en.json             # English translations (mirrors strings.json)
+    └── zh-Hans.json        # Simplified Chinese: same keys + placeholders (tests/test_translations.py)
 
 tests/
 ├── conftest.py                  # Mocks HA modules so tests run without installing homeassistant
@@ -62,11 +67,14 @@ tests/
 ├── test_sensor.py               # Sensor value, unit, attributes, unique_id, None-safety
 ├── test_weather.py              # Weather entity condition mapping + forecast tests
 ├── test_diagnostics.py          # Diagnostics serialization
+├── test_options.py              # Option helpers, sources off, health monitor, event entities
+├── test_translations.py         # Every translations/*.json mirrors strings.json keys + placeholders
 └── test_e2e.py                  # Live scrape tests (run with -m e2e, skipped in CI by default)
 
 tests_ha/                        # Runs against a REAL Home Assistant (no module mocks)
 ├── conftest.py                  # pytest-homeassistant-custom-component + canned HTTP responses
 ├── test_integration.py          # Full entry setup/unload, config flow, diagnostics
+├── test_options.py              # Options form over HTTP, sources off + reload, API key header, repairs, events
 ├── test_sp_account.py           # SP subentry flow over HTTP (schema serialization), MFA, repairs
 └── test_sp_account_statistics.py # SP Energy statistics land in a real recorder
 
@@ -89,23 +97,27 @@ entities with built-in cards (no custom cards, invented attributes or reworded s
 not illustrations.
 
 Entry data is stored on `entry.runtime_data` as a `SingaporeData` dataclass (not
-`hass.data[DOMAIN]`, which is the legacy pattern):
+`hass.data[DOMAIN]`, which is the legacy pattern). Each field is named after its source key
+in `const.SOURCES` and is **None when that source is turned off in the options**, so every
+platform must check before creating entities:
 ```python
 @dataclass
 class SingaporeData:
-    tariff: SPGroupCoordinator
-    coe: CoeCoordinator
-    weather: SingaporeWeatherCoordinator
-    holiday: PublicHolidayCoordinator
-    train: TrainStatusCoordinator
-    psi: PsiCoordinator
-    flood: FloodAlertCoordinator
-    traffic: TrafficImagesCoordinator
-    dengue: DengueClusterCoordinator
-    lightning: LightningCoordinator
-    uv: UvCoordinator
-    radar: RadarCoordinator
+    tariff: SPGroupCoordinator | None
+    coe: CoeCoordinator | None
+    weather: SingaporeWeatherCoordinator | None
+    holiday: PublicHolidayCoordinator | None
+    train: TrainStatusCoordinator | None
+    psi: PsiCoordinator | None
+    flood: FloodAlertCoordinator | None
+    traffic: TrafficImagesCoordinator | None
+    dengue: DengueClusterCoordinator | None
+    lightning: LightningCoordinator | None
+    uv: UvCoordinator | None
+    radar: RadarCoordinator | None
     sp_accounts: dict[str, SpAccountCoordinator]  # keyed by subentry id
+    options: dict  # the options this setup used; a change reloads the entry
+    def coordinators(self) -> dict[str, DataUpdateCoordinator]: ...  # enabled ones
 
 type SingaporeConfigEntry = ConfigEntry[SingaporeData]
 ```
@@ -117,6 +129,48 @@ Platforms read it via `entry.runtime_data.<coordinator>` (see `sensor.py`, `weat
 `calendar.py`). The COE refresh-time unsubscribe callable is registered with
 `entry.async_on_unload(unsub_coe)` instead of being stored manually and unsubscribed in
 `async_unload_entry`.
+
+## Options flow
+
+`SingaporeOptionsFlow` (Configure button) has three fields; all serializable selectors:
+
+- `sources` — multi-select of `SOURCES` (labels under `selector.sources` in strings.json).
+  Stored inverted as `options["disabled_sources"]`, so a source added in a later release is
+  on for existing users. `enabled_sources(entry)` reads it. Empty with no SP subentries is
+  rejected (`no_sources`).
+- `api_key` — optional data.gov.sg key, sent as `x-api-key` by `data_gov_headers(entry)` on
+  every data.gov.sg request (COE, weather, PSI, flood, traffic, dengue, lightning, UV, radar);
+  **never** to SP Group, MOM or mytransport.sg. data.gov.sg answers 200 even for a bogus key,
+  so it is not validated. Diagnostics report `has_api_key` only.
+- `polling` — `normal` / `reduced`. Each coordinator passes
+  `update_interval=scaled_interval(config_entry, UPDATE_INTERVAL)`; reduced multiplies
+  sub-hourly intervals by 3 (daily/6-hourly ones are unchanged).
+
+Saving options fires the update listener; `_async_entry_updated` reloads when
+`entry.options != runtime_data.options` (before the SP-subentry check). A new data source
+must be added to `SOURCES`, `SOURCE_NAMES`, `_COORDINATORS` in `__init__.py`, a
+`SingaporeData` field, `selector.sources.options` in strings.json, and use both helpers.
+
+Weather, holidays and trains are the blocking first refreshes (`_BLOCKING_SOURCES`); every
+other source loads in the background.
+
+## Repairs for failing sources
+
+`health.py` checks the enabled coordinators hourly (`async_track_time_interval`). A source
+whose `last_update_success` has been False for `FAILING_THRESHOLD` (24 h) gets a
+`source_failing_<source>` issue (placeholders `source`, `error`, `issue_tracker`); the next
+success, turning the source off, or removing the entry deletes it. Transient network errors
+don't trigger it because coordinators serve last-known data through those (see Key
+Conventions); it catches parse failures and sources that never loaded.
+
+## Event entities
+
+`event.py`: `event.coe_new_results` fires `new_results` once per bidding exercise. It
+compares `"{month} #{bidding_no}"` with the `exercise` attribute EventEntity restored, so
+results published while HA was down still fire; a fresh install only records the baseline.
+`event.mrt_lrt_service_alert` fires `disruption` / `planned` / `resolved` per line from
+`train_transitions(previous, current)`; the first poll is only a baseline. Event entities are
+on the COE and MRT/LRT devices; names/states under `entity.event` in strings.json.
 
 ## Sensors
 
@@ -341,7 +395,11 @@ the four-day outlook.
 `blueprints/automation/singapore/*.yaml` are automation blueprints linked from the README
 with my.home-assistant.io import buttons (which point at `main`). Each sets
 `homeassistant.min_version` to the minimum supported HA version and takes the notify action
-as a text input (default `notify.notify`). `tests_ha/test_blueprints.py` loads each one
+as a text input (default `notify.notify`). Template triggers must read inputs through
+`trigger_variables` (plain `variables` are evaluated after the trigger). Blueprints:
+lightning_nearby, mrt_line_disruption, flood_alert, haze_purifier, coe_results,
+rain_forecast (weather entity turns wet), uv_high, dengue_nearby, holiday_tomorrow
+(`calendar.get_events` for tomorrow at a set time). `tests_ha/test_blueprints.py` loads each one
 with `use_blueprint` and drives sensor states, so it runs on every HA version in the CI
 matrix; `test_every_blueprint_is_tested` fails if a blueprint has no test.
 
@@ -644,5 +702,8 @@ Both commands must exit cleanly — CI will fail otherwise.
 - Always bump `custom_components/singapore/manifest.json` `version` for every PR that changes
   shipped integration behavior/code, so merge-to-main release automation can create the next
   GitHub release tag from that version.
-- Translations live in `translations/en.json` and must mirror `strings.json`
+- Translations live in `translations/en.json` and must mirror `strings.json`. Other languages
+  (`zh-Hans.json`) must have exactly the same keys and `{placeholders}`; when you add a string,
+  add its translation too (`tests/test_translations.py` fails otherwise). zh-Hans isn't in
+  HA's `NATIVE_ENTITY_IDS`, so entity IDs stay English-derived.
 - For quick one-off API/scraping investigations, use `uv run script.py` with inline `# /// script` dependency blocks — avoids venv setup entirely

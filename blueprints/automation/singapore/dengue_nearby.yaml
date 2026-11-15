@@ -1,0 +1,72 @@
+blueprint:
+  name: Singapore – dengue cluster nearby
+  description: >-
+    Get a notification when an NEA dengue cluster is active within a distance
+    of your home that you choose. Uses the **NEA Nearest Dengue Cluster**
+    sensor from the Singapore integration, which measures from the home
+    location in Settings → System → General to the edge of the nearest
+    cluster (0 km when home is inside one).
+  domain: automation
+  author: Singapore for Home Assistant
+  source_url: https://github.com/kianhean/singapore-homeassistant/blob/main/blueprints/automation/singapore/dengue_nearby.yaml
+  homeassistant:
+    min_version: 2025.4.0
+  input:
+    dengue_sensor:
+      name: Nearest dengue cluster sensor
+      default: sensor.nea_nearest_dengue_cluster
+      selector:
+        entity:
+          filter:
+            - integration: singapore
+              domain: sensor
+              device_class: distance
+    distance:
+      name: Distance
+      description: Notify when the nearest cluster is closer than this.
+      default: 1
+      selector:
+        number:
+          min: 0.1
+          max: 10
+          step: 0.1
+          unit_of_measurement: km
+    notify_action:
+      name: Notify action
+      description: >-
+        The action that sends the notification, for example
+        notify.mobile_app_your_phone. Leave as notify.notify to use the default.
+      default: notify.notify
+      selector:
+        text: {}
+    extra_actions:
+      name: Extra actions (optional)
+      description: Anything else to do, for example a reminder to check for stagnant water.
+      default: []
+      selector:
+        action: {}
+
+mode: single
+max_exceeded: silent
+
+variables:
+  dengue_sensor: !input dengue_sensor
+
+triggers:
+  - trigger: numeric_state
+    entity_id: !input dengue_sensor
+    below: !input distance
+
+actions:
+  - action: !input notify_action
+    data:
+      title: Dengue cluster nearby
+      message: >-
+        {% set km = states(dengue_sensor) | float(0) %}
+        {% set place = state_attr(dengue_sensor, 'locality') %}
+        {{ 'Your home is inside' if km == 0 else 'There is' }} an active dengue
+        cluster{{ '' if km == 0 else ' ' ~ (km | round(1)) ~ ' km away' }}{{
+        (' (' ~ place ~ ')') if place else '' }}. Check for stagnant water and
+        use repellent.
+  - choose: []
+    default: !input extra_actions

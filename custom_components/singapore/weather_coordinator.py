@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .const import data_gov_headers, scaled_interval
 from .psi_coordinator import DEFAULT_REGION_LOCATIONS
 
 _LOGGER = logging.getLogger(__name__)
@@ -138,7 +139,7 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
             _LOGGER,
             config_entry=config_entry,
             name="Singapore NEA Weather",
-            update_interval=UPDATE_INTERVAL,
+            update_interval=scaled_interval(config_entry, UPDATE_INTERVAL),
             # Parsed data is a dataclass, so unchanged polls skip state writes.
             always_update=False,
         )
@@ -147,14 +148,15 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
     async def _async_update_data(self) -> WeatherData:
         session = async_get_clientsession(self.hass)
         timeout = aiohttp.ClientTimeout(total=30)
+        headers = data_gov_headers(self.config_entry)
         two_hr_resp: aiohttp.ClientResponse | None = None
         four_day_resp: aiohttp.ClientResponse | None = None
         day_resp: aiohttp.ClientResponse | None = None
         try:
             two_hr_resp, four_day_resp, day_resp = await asyncio.gather(
-                session.get(WEATHER_URL, timeout=timeout),
-                session.get(FOUR_DAY_URL, timeout=timeout),
-                session.get(TWENTY_FOUR_HR_URL, timeout=timeout),
+                session.get(WEATHER_URL, headers=headers, timeout=timeout),
+                session.get(FOUR_DAY_URL, headers=headers, timeout=timeout),
+                session.get(TWENTY_FOUR_HR_URL, headers=headers, timeout=timeout),
             )
             if two_hr_resp.status != 200:
                 raise UpdateFailed(
@@ -180,7 +182,7 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
                     day_resp.status,
                 )
             parsed.readings = await _fetch_aggregated_readings(
-                session, self._readings_sem
+                session, self._readings_sem, headers
             )
             return parsed
         except (aiohttp.ClientError, TimeoutError) as err:
@@ -207,7 +209,10 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
 
 
 async def _fetch_with_retry(
-    session: aiohttp.ClientSession, url: str, timeout: int = 20
+    session: aiohttp.ClientSession,
+    url: str,
+    timeout: int = 20,
+    headers: dict[str, str] | None = None,
 ) -> aiohttp.ClientResponse:
     """GET url, retrying up to _MAX_RETRIES times on HTTP 429.
 
@@ -217,7 +222,7 @@ async def _fetch_with_retry(
     Callers must consume or release the returned response.
     """
     client_timeout = aiohttp.ClientTimeout(total=timeout)
-    response = await session.get(url, timeout=client_timeout)
+    response = await session.get(url, headers=headers, timeout=client_timeout)
     for attempt in range(_MAX_RETRIES):
         if response.status != 429:
             return response
@@ -233,17 +238,19 @@ async def _fetch_with_retry(
         )
         response.release()
         await asyncio.sleep(retry_after)
-        response = await session.get(url, timeout=client_timeout)
+        response = await session.get(url, headers=headers, timeout=client_timeout)
     return response  # last response (may still be 429 if all retries exhausted)
 
 
 async def _fetch_aggregated_readings(
-    session: aiohttp.ClientSession, sem: asyncio.Semaphore
+    session: aiohttp.ClientSession,
+    sem: asyncio.Semaphore,
+    headers: dict[str, str] | None = None,
 ) -> WeatherReadings:
     keys = list(_READINGS_ENDPOINTS.keys())
     results = await asyncio.gather(
         *(
-            _fetch_reading_average(session, sem, _READINGS_ENDPOINTS[k], k)
+            _fetch_reading_average(session, sem, _READINGS_ENDPOINTS[k], k, headers)
             for k in keys
         ),
         return_exceptions=True,
@@ -263,6 +270,7 @@ async def _fetch_reading_average(
     sem: asyncio.Semaphore,
     url: str,
     metric_key: str,
+    headers: dict[str, str] | None = None,
 ) -> float | None:
     """Return station-average reading for a metric endpoint.
 
@@ -274,7 +282,7 @@ async def _fetch_reading_average(
     async with sem:
         response = None
         try:
-            response = await _fetch_with_retry(session, url)
+            response = await _fetch_with_retry(session, url, headers=headers)
             if response.status != 200:
                 _LOGGER.debug("Skipping %s due to HTTP %s", metric_key, response.status)
                 response.release()

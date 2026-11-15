@@ -141,6 +141,7 @@ class Platform:
     WEATHER = "weather"
     CALENDAR = "calendar"
     CAMERA = "camera"
+    EVENT = "event"
 
 
 class HomeAssistant:
@@ -157,6 +158,7 @@ class ConfigEntry:
         self.version = 1
         self.runtime_data = None
         self.subentries: dict = {}
+        self.options: dict = {}
         self._on_unload: list = []
 
     def async_on_unload(self, func):
@@ -197,6 +199,51 @@ class ConfigSubentryFlow:
     pass
 
 
+class OptionsFlow:
+    def async_create_entry(self, *, data, title=""):
+        return {"type": "create_entry", "data": data}
+
+    def async_show_form(self, *, step_id, data_schema=None, errors=None):
+        return {
+            "type": "form",
+            "step_id": step_id,
+            "data_schema": data_schema,
+            "errors": errors,
+        }
+
+    def add_suggested_values_to_schema(self, schema, suggested_values):
+        return schema
+
+
+class EventEntity:
+    """Mirrors HA's EventEntity: last event type + attributes, restored on add."""
+
+    _attr_event_types: list = []
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @property
+    def event_types(self):
+        return self._attr_event_types
+
+    def _trigger_event(self, event_type, event_attributes=None):
+        if event_type not in self.event_types:
+            raise ValueError(event_type)
+        self._last_event_type = event_type
+        self._last_event_attributes = event_attributes
+        self.fired = [*getattr(self, "fired", []), (event_type, event_attributes)]
+
+    @property
+    def state_attributes(self):
+        attrs = {"event_type": getattr(self, "_last_event_type", None)}
+        attrs |= getattr(self, "_last_event_attributes", None) or {}
+        return attrs
+
+    async def async_added_to_hass(self):
+        return None
+
+
 class SensorEntityDescription:
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
@@ -224,6 +271,9 @@ class _Selector:
     def __init__(self, config=None):
         self.config = config
 
+    def __call__(self, value):
+        return value
+
 
 class _SelectorConfig(dict):
     def __init__(self, **kwargs):
@@ -231,6 +281,8 @@ class _SelectorConfig(dict):
 
 
 class _SelectorEnum:
+    LIST = "list"
+    DROPDOWN = "dropdown"
     EMAIL = "email"
     PASSWORD = "password"
     BOX = "box"
@@ -383,6 +435,7 @@ _HA_MODULES: dict[str, ModuleType] = {
     "homeassistant.helpers.event": _mod(
         "homeassistant.helpers.event",
         async_track_time_change=MagicMock(return_value=MagicMock()),
+        async_track_time_interval=MagicMock(return_value=MagicMock()),
     ),
     "homeassistant.helpers.issue_registry": _mod(
         "homeassistant.helpers.issue_registry",
@@ -398,6 +451,9 @@ _HA_MODULES: dict[str, ModuleType] = {
         NumberSelector=_Selector,
         NumberSelectorConfig=_SelectorConfig,
         NumberSelectorMode=_SelectorEnum,
+        SelectSelector=_Selector,
+        SelectSelectorConfig=_SelectorConfig,
+        SelectSelectorMode=_SelectorEnum,
     ),
     "homeassistant.helpers.device_registry": _mod(
         "homeassistant.helpers.device_registry",
@@ -422,6 +478,9 @@ _HA_MODULES: dict[str, ModuleType] = {
         CalendarEntity=CalendarEntity,
         CalendarEvent=CalendarEvent,
     ),
+    "homeassistant.components.event": _mod(
+        "homeassistant.components.event", EventEntity=EventEntity
+    ),
     "homeassistant.components.camera": _mod(
         "homeassistant.components.camera", Camera=Camera
     ),
@@ -439,6 +498,7 @@ _HA_MODULES: dict[str, ModuleType] = {
         ConfigFlowResult=dict,
         ConfigSubentry=ConfigSubentry,
         ConfigSubentryFlow=ConfigSubentryFlow,
+        OptionsFlow=OptionsFlow,
         SubentryFlowResult=dict,
         SOURCE_USER="user",
         SOURCE_RECONFIGURE="reconfigure",

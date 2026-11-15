@@ -1,0 +1,121 @@
+# Self-assessment against Home Assistant's integration quality scale
+# (https://developers.home-assistant.io/docs/core/integration-quality-scale/).
+# hassfest only validates this file for core integrations; here it is a
+# checklist of what is done and what is left. Keep it honest when editing.
+rules:
+  # Bronze
+  action-setup:
+    status: exempt
+    comment: The integration registers no actions.
+  appropriate-polling: done
+  brands: done
+  common-modules:
+    status: todo
+    comment: >-
+      One coordinator module per data source is deliberate, but the entities
+      have no shared base class in entity.py yet (device info is repeated).
+  config-flow: done
+  config-flow-test-coverage: done
+  dependency-transparency: done
+  docs-actions:
+    status: exempt
+    comment: The integration registers no actions.
+  docs-conditions:
+    status: exempt
+    comment: The integration provides no conditions.
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  docs-triggers:
+    status: exempt
+    comment: >-
+      No device triggers; the event entities are documented in the README
+      entity reference.
+  entity-event-setup: done
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure:
+    status: done
+    comment: >-
+      The main entry needs no credentials. The SP account subentry signs in
+      (with MFA) before it is created.
+  test-before-setup: done
+  unique-config-entry: done
+
+  # Silver
+  action-exceptions:
+    status: exempt
+    comment: The integration registers no actions.
+  config-entry-unloading: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  entity-unavailable: done
+  integration-owner: done
+  log-when-unavailable: done
+  parallel-updates: done
+  reauthentication-flow:
+    status: exempt
+    comment: >-
+      The only credentials are per SP account subentry. A rejected session
+      opens a repair issue and the subentry's reconfigure flow signs in again;
+      a config-entry reauth would take every public data source down too.
+  test-coverage:
+    status: todo
+    comment: Unit tests cover about 90% of the integration (95% is the target).
+
+  # Gold
+  devices: done
+  diagnostics: done
+  discovery:
+    status: exempt
+    comment: A cloud service; there is nothing on the network to discover.
+  discovery-update-info:
+    status: exempt
+    comment: A cloud service; there is nothing on the network to discover.
+  docs-data-update: done
+  docs-examples: done
+  docs-known-limitations:
+    status: todo
+    comment: >-
+      Limitations are spread over the entity reference and troubleshooting;
+      there is no single section yet.
+  docs-supported-devices:
+    status: exempt
+    comment: A service integration with no physical devices.
+  docs-supported-functions: done
+  docs-troubleshooting: done
+  docs-use-cases: done
+  dynamic-devices: done
+  entity-category: done
+  entity-device-class: done
+  entity-disabled-by-default: done
+  entity-translations: done
+  exception-translations:
+    status: todo
+    comment: >-
+      SP account errors are translated; the public sources' UpdateFailed
+      messages are still plain English.
+  icon-translations: done
+  reconfiguration-flow:
+    status: done
+    comment: >-
+      SP accounts have a reconfigure flow; the public sources are configured
+      in the options flow (the entry itself has only a name).
+  repair-issues: done
+  stale-devices:
+    status: todo
+    comment: >-
+      Turning a data source off leaves its device and entities in the
+      registries as "no longer provided" until the user deletes them.
+
+  # Platinum
+  async-dependency:
+    status: todo
+    comment: The vendored SP Group client is synchronous urllib (runs in the executor).
+  inject-websession:
+    status: todo
+    comment: >-
+      Every public source uses Home Assistant's aiohttp session; the vendored
+      SP Group client uses urllib.
+  strict-typing: todo

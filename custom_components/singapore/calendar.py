@@ -25,6 +25,8 @@ async def async_setup_entry(
 ) -> None:
     """Set up public holiday calendar."""
     coordinator = entry.runtime_data.holiday
+    if coordinator is None:  # Public holidays turned off in the options.
+        return
     async_add_entities([SingaporePublicHolidayCalendar(coordinator, entry.entry_id)])
 
 

@@ -14,6 +14,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .const import data_gov_headers
+
 _LOGGER = logging.getLogger(__name__)
 
 COE_API_URL = (
@@ -78,7 +80,9 @@ class CoeCoordinator(DataUpdateCoordinator[CoeData]):
         for attempt in range(1, _MAX_FETCH_ATTEMPTS + 1):
             try:
                 async with session.get(
-                    COE_API_URL, timeout=aiohttp.ClientTimeout(total=30)
+                    COE_API_URL,
+                    headers=data_gov_headers(self.config_entry),
+                    timeout=aiohttp.ClientTimeout(total=30),
                 ) as response:
                     if response.status != 200:
                         raise UpdateFailed(

@@ -1,0 +1,72 @@
+blueprint:
+  name: Singapore – public holiday tomorrow
+  description: >-
+    The evening before a Singapore public holiday, send a reminder and run
+    actions of your choice, for example turn off a weekday alarm or skip the
+    morning routine. Uses the **Public Holidays** calendar from the Singapore
+    integration.
+  domain: automation
+  author: Singapore for Home Assistant
+  source_url: https://github.com/kianhean/singapore-homeassistant/blob/main/blueprints/automation/singapore/holiday_tomorrow.yaml
+  homeassistant:
+    min_version: 2025.4.0
+  input:
+    calendar:
+      name: Holiday calendar
+      default: calendar.public_holidays
+      selector:
+        entity:
+          filter:
+            - integration: singapore
+              domain: calendar
+    check_time:
+      name: Time to check
+      description: When to look at tomorrow (the evening before).
+      default: "20:00:00"
+      selector:
+        time: {}
+    notify_action:
+      name: Notify action
+      description: >-
+        The action that sends the notification, for example
+        notify.mobile_app_your_phone. Leave as notify.notify to use the default.
+      default: notify.notify
+      selector:
+        text: {}
+    holiday_actions:
+      name: Actions for a holiday (optional)
+      description: >-
+        What to do when tomorrow is a holiday, for example turn off
+        input_boolean.weekday_alarm.
+      default: []
+      selector:
+        action: {}
+
+mode: single
+
+variables:
+  calendar: !input calendar
+
+triggers:
+  - trigger: time
+    at: !input check_time
+
+actions:
+  - action: calendar.get_events
+    target:
+      entity_id: !input calendar
+    data:
+      start_date_time: "{{ (today_at() + timedelta(days=1)).isoformat() }}"
+      duration:
+        hours: 24
+    response_variable: agenda
+  - variables:
+      holidays: "{{ agenda[calendar].events | map(attribute='summary') | list }}"
+  - condition: template
+    value_template: "{{ holidays | count > 0 }}"
+  - action: !input notify_action
+    data:
+      title: Public holiday tomorrow
+      message: "Tomorrow is {{ holidays | join(' and ') }}."
+  - choose: []
+    default: !input holiday_actions

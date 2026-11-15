@@ -14,6 +14,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .const import scaled_interval
+
 _LOGGER = logging.getLogger(__name__)
 
 # AEM servlet that proxies to LTA DataMall TrainServiceAlerts.
@@ -81,7 +83,7 @@ class TrainStatusCoordinator(DataUpdateCoordinator[TrainStatusData]):
             _LOGGER,
             config_entry=config_entry,
             name="Singapore MRT/LRT Train Status",
-            update_interval=UPDATE_INTERVAL,
+            update_interval=scaled_interval(config_entry, UPDATE_INTERVAL),
             # Parsed data is a dataclass, so unchanged polls skip state writes.
             always_update=False,
         )

@@ -37,11 +37,11 @@
 | 🌦️ **Weather**<br>A weather entity for every NEA forecast area, with hourly and 4-day forecasts, live temperature, humidity, wind and rain, plus NEA rain radar images | 😷 **Air quality**<br>PSI and six pollutants, overall and per region, ready for a Map card | ☀️ **UV index**<br>NEA's hourly UV index and exposure level (low to extreme), with today's peak |
 | 🚇 **MRT/LRT**<br>Network and per-line status (normal, planned works, disruption) with LTA's message | 🛂 **Checkpoints**<br>Woodlands and Tuas traffic camera stills as camera entities | 🚗 **COE**<br>Category A–E premiums, refreshed after each bidding exercise |
 | ⚡ **Lightning**<br>Live strikes and the distance to the nearest one from your home | 🦟 **Dengue**<br>Active NEA clusters and how far the nearest is from your home | 🌊 **Flash floods**<br>PUB flood alerts as they're issued and cancelled |
-| 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🎉 **Public holidays**<br>MOM's holiday list as a calendar | 🧩 **Blueprints**<br>[One-click automations](#one-click-blueprints) for lightning, MRT disruptions, floods, haze and COE |
+| 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🎉 **Public holidays**<br>MOM's holiday list as a calendar | 🧩 **Blueprints**<br>[One-click automations](#one-click-blueprints) for lightning, MRT disruptions, floods, haze, COE, rain, UV, dengue and holidays |
 | 🏠 **Your SP account** *(optional)*<br>Sign in once to get your own electricity, water and gas usage, down to the half hour on a smart meter | 📊 **Energy dashboard**<br>Hourly electricity with cost at the current SP tariff, plus monthly water, ready for [Home Assistant's Energy dashboard](#energy-dashboard-electricity-and-water) | 🧾 **Bills**<br>Last bill, amount due, meter readings and SP Green Goals, for [reminders and dashboards](#your-sp-account) |
 
 The public data needs no API keys and no account: one config entry, and a diagnostics download when
-something looks off. Linking your SP Group e-account is optional ([how](#optional-link-your-sp-group-e-account));
+something looks off. You choose which data sources run ([Options](#options)). Linking your SP Group e-account is optional ([how](#optional-link-your-sp-group-e-account));
 that part is built on [maci0/home-assistant-sp](https://github.com/maci0/home-assistant-sp) by
 [@maci0](https://github.com/maci0) ([Credits](#credits)).
 
@@ -67,6 +67,24 @@ Weather, MRT/LRT, Air Quality, PUB, NEA, Traffic Cameras, Public Holidays).
 The lightning and dengue distances are measured from the home location in
 **Settings → System → General**, so make sure it's set.
 
+### Options
+
+Open **Settings → Devices & Services → Singapore → Configure** to change:
+
+- **Data sources:** untick any you don't need (for example lightning, radar or checkpoint
+  cameras). A source you turn off stops polling data.gov.sg and its entities are no longer
+  provided; delete them from the entity list if you don't want them back. Everything is on
+  by default, and sources added in later releases start out on.
+- **data.gov.sg API key** (optional): a free key from
+  [data.gov.sg](https://data.gov.sg) raises the rate limits, which means fewer HTTP 429
+  errors. It's sent only to data.gov.sg.
+- **Polling:** *Reduced* polls the fast sources (flood alerts, lightning, traffic cameras,
+  radar, trains, weather, PSI, UV) three times less often, for example lightning every
+  6 minutes instead of 2.
+
+Saving reloads the integration. Turning off SP Group tariffs also leaves SP account cost
+statistics unpriced (usage is still imported).
+
 ### Optional: link your SP Group e-account
 
 1. Open **Settings → Devices & Services → Singapore**.
@@ -85,6 +103,14 @@ premise address.
 > `sensor.energy_electricity_tariff`. Installs that started before v0.3.0 keep their
 > original IDs (for example `sensor.singapore_electricity_tariff`), so existing dashboards
 > and automations keep working. This README uses the IDs a new install gets.
+
+### Removing the integration
+
+1. Go to **Settings → Devices & Services → Singapore**, open the three-dot menu and choose
+   **Delete**. This removes every entity, the SP accounts and their stored session tokens, and
+   any Singapore repair notices. Imported SP Energy statistics stay in the recorder until you
+   delete them under **Developer tools → Statistics**.
+2. To remove the code too, uninstall **Singapore** in HACS and restart Home Assistant.
 
 ## Recipes
 
@@ -107,6 +133,10 @@ and so on from drop-downs. For the notify action, enter your phone's, for exampl
 | 🌊 **PUB flash-flood alert** | Notify for each new flash-flood alert, anywhere or only near home | <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fflood_alert.yaml"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Import the flood_alert.yaml blueprint"></a> |
 | 😷 **Haze mode** | Turn purifiers or fans on above a PSI level and off when the air clears | <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fhaze_purifier.yaml"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Import the haze_purifier.yaml blueprint"></a> |
 | 🚗 **COE results** | One notification with every category's premium after each bidding exercise | <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fcoe_results.yaml"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Import the coe_results.yaml blueprint"></a> |
+| 🌧️ **Rain expected** | Notify when the 2-hour forecast for your area turns to rain or thundery showers (bring in the laundry) | <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Frain_forecast.yaml"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Import the rain_forecast.yaml blueprint"></a> |
+| ☀️ **High UV** | Remind you to cover up when the UV index reaches a level you choose | <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fuv_high.yaml"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Import the uv_high.yaml blueprint"></a> |
+| 🦟 **Dengue cluster nearby** | Notify when an active dengue cluster is within a distance of home | <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fdengue_nearby.yaml"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Import the dengue_nearby.yaml blueprint"></a> |
+| 🎉 **Public holiday tomorrow** | The evening before a public holiday, remind you and run actions, such as turning off a weekday alarm | <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fholiday_tomorrow.yaml"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Import the holiday_tomorrow.yaml blueprint"></a> |
 
 The blueprints live in [`blueprints/automation/singapore/`](blueprints/automation/singapore) and
 need Home Assistant 2025.4 or newer.
@@ -554,6 +584,12 @@ daily at **19:30**, after each bidding exercise.
 Each sensor includes `category`, `description`, `month`, `bidding_no`, and `source` as
 state attributes.
 
+`event.coe_new_results` (COE New results) is an event entity that fires `new_results` once
+per bidding exercise, with `exercise` (e.g. `2026-11 #2`), `month`, `bidding_no` and
+`category_a` … `category_e` as attributes. The last exercise is remembered across restarts,
+so results published while Home Assistant was off still fire; a new install fires from the
+next exercise.
+
 <p align="center">
   <img src="images/coe-sensors.jpeg" alt="Singapore COE device page showing Category A to E certificate of entitlement sensors" width="320">
 </p>
@@ -625,6 +661,12 @@ Tracks both an overall network status and a per-line status for each MRT/LRT lin
 |-----------|------|-------------|
 | `sensor.mrt_lrt_status` | MRT/LRT Status | Overall network status: `normal`, `planned`, or `disruption`; `details` attribute holds LTA's messages |
 | `sensor.mrt_lrt_<line>_status` | e.g. MRT/LRT Circle Line Status | Per-line status, e.g. `sensor.mrt_lrt_circle_line_status` |
+| `event.mrt_lrt_service_alert` | MRT/LRT Service alert | Event entity: fires `disruption` when a line is disrupted, `planned` when a normal line gets a planned notice, and `resolved` when a disrupted line recovers. Attributes `line`, `status`, `details` |
+
+Trigger an automation on the event entity with a **State** trigger on
+`event.mrt_lrt_service_alert` (its state is the time of the last event) and read
+`trigger.to_state.attributes.event_type` and `.line`. Events are worked out by comparing
+polls, so a line already disrupted when Home Assistant starts fires nothing until it changes.
 
 Lines: North-South, East-West, North East, Circle, Downtown, Thomson-East Coast,
 Bukit Panjang LRT, Sengkang LRT, Punggol LRT.
@@ -918,7 +960,21 @@ sensor.air_quality_psi_east:
   either way.
 - **HTTP 429 in the log:** data.gov.sg rate-limits bursts of requests, which can happen
   when Home Assistant starts. Weather and dengue requests retry right away; other
-  sources try again on their next scheduled update.
+  sources try again on their next scheduled update. If it keeps happening, add a free
+  data.gov.sg API key, switch **Polling** to *Reduced*, or turn off sources you don't use
+  (see [Options](#options)).
+- **"… has been failing for a day" repair:** a data source has returned data the integration
+  can't read for 24 hours, which usually means the site or API changed. Check the
+  [issues](https://github.com/kianhean/singapore-homeassistant/issues) and report it with the
+  diagnostics file. The repair clears itself after the next successful update, or when you turn
+  that source off.
+- **SP Group tariffs unavailable for days:** the tariff is scraped from spgroup.com.sg, which
+  sometimes refuses connections (TLS errors) from some networks. The rest of the integration
+  is unaffected; if you don't need tariffs, turn the source off.
+- **Entities left over after turning a source off:** they show as *no longer provided*. Select
+  them under **Settings → Devices & services → Entities** and delete them.
+- **Language:** entity names, states and the setup forms are translated into English and
+  Simplified Chinese (简体中文). Entity IDs are always generated from the English names.
 
 ## Data sources
 

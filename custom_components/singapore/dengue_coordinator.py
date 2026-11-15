@@ -14,6 +14,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .const import data_gov_headers
+
 _LOGGER = logging.getLogger(__name__)
 
 DENGUE_DATASET_ID = "d_dbfabf16158d1b0e1c420627c0819168"
@@ -253,7 +255,9 @@ class DengueClusterCoordinator(DataUpdateCoordinator[DengueData]):
         """GET url as JSON, retrying HTTP 429 up to _MAX_RETRIES times."""
         for attempt in range(_MAX_RETRIES + 1):
             async with session.get(
-                url, timeout=aiohttp.ClientTimeout(total=30)
+                url,
+                headers=data_gov_headers(self.config_entry),
+                timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 # poll-download / initiate-download answer 201 Created on success.
                 if 200 <= response.status < 300:

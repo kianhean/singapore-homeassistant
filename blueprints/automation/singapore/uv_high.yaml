@@ -1,0 +1,69 @@
+blueprint:
+  name: Singapore – high UV
+  description: >-
+    Get a reminder to cover up when NEA's hourly UV index reaches a level you
+    choose (NEA's bands: 0–2 low, 3–5 moderate, 6–7 high, 8–10 very high,
+    11+ extreme). Uses the **NEA UV Index** sensor from the Singapore
+    integration. Fires once each time the index crosses the threshold.
+  domain: automation
+  author: Singapore for Home Assistant
+  source_url: https://github.com/kianhean/singapore-homeassistant/blob/main/blueprints/automation/singapore/uv_high.yaml
+  homeassistant:
+    min_version: 2025.4.0
+  input:
+    uv_sensor:
+      name: UV index sensor
+      default: sensor.nea_uv_index
+      selector:
+        entity:
+          filter:
+            - integration: singapore
+              domain: sensor
+    threshold:
+      name: UV index threshold
+      description: Notify when the index reaches this value or higher.
+      default: 8
+      selector:
+        number:
+          min: 1
+          max: 15
+          step: 1
+    notify_action:
+      name: Notify action
+      description: >-
+        The action that sends the notification, for example
+        notify.mobile_app_your_phone. Leave as notify.notify to use the default.
+      default: notify.notify
+      selector:
+        text: {}
+    extra_actions:
+      name: Extra actions (optional)
+      description: Anything else to do, for example lower the blinds.
+      default: []
+      selector:
+        action: {}
+
+mode: single
+max_exceeded: silent
+
+# Trigger templates only see trigger_variables (not variables).
+trigger_variables:
+  uv_sensor: !input uv_sensor
+  threshold: !input threshold
+
+triggers:
+  # A template (not numeric_state, whose "above" is strict) so that
+  # "reaches 8" includes 8.
+  - trigger: template
+    value_template: >-
+      {{ states(uv_sensor) | is_number and states(uv_sensor) | float >= threshold }}
+
+actions:
+  - action: !input notify_action
+    data:
+      title: High UV
+      message: >-
+        UV index is {{ states(uv_sensor) | int }}. Use sunscreen, a hat and
+        shade.
+  - choose: []
+    default: !input extra_actions
