@@ -559,5 +559,28 @@ except ImportError:
     sys.modules.setdefault("bs4", _mod("bs4", BeautifulSoup=BeautifulSoup))
 
 
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def datagov_time(monkeypatch):
+    """A fake clock for the shared data.gov.sg limiter: sleeping advances it.
+
+    Returns a dict whose "sleeps" list records every wait, so tests can check
+    the limiter's pacing and 429 back-off without real delays.
+    """
+    from custom_components.singapore import datagov
+
+    state = {"now": 1000.0, "sleeps": []}
+
+    async def _sleep(seconds):
+        state["sleeps"].append(round(seconds, 3))
+        state["now"] += seconds
+
+    monkeypatch.setattr(datagov, "_sleep", _sleep)
+    monkeypatch.setattr(datagov, "_clock", lambda: state["now"])
+    return state
+
+
 def pytest_configure(config):
     config.addinivalue_line("markers", "asyncio: mark test as asyncio")

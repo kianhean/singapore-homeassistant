@@ -15,6 +15,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import data_gov_headers, scaled_interval
+from .datagov import MAX_RETRIES, HostLimiter, limiter_for, retry_seconds
 from .psi_coordinator import DEFAULT_REGION_LOCATIONS
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,8 +38,6 @@ _READINGS_ENDPOINTS = {
 }
 
 _READINGS_CONCURRENCY = 2  # cap parallel requests to avoid 429s
-_MAX_RETRIES = 3  # retry attempts on 429
-_RETRY_BACKOFF_BASE = 2  # base backoff in seconds (doubles per attempt)
 
 
 _WIND_DIRECTION_DEGREES: dict[str, float] = {
@@ -147,16 +146,21 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
 
     async def _async_update_data(self) -> WeatherData:
         session = async_get_clientsession(self.hass)
-        timeout = aiohttp.ClientTimeout(total=30)
         headers = data_gov_headers(self.config_entry)
         two_hr_resp: aiohttp.ClientResponse | None = None
         four_day_resp: aiohttp.ClientResponse | None = None
         day_resp: aiohttp.ClientResponse | None = None
         try:
+            # One shared limiter paces these with every other coordinator's
+            # api-open.data.gov.sg requests (see datagov.py).
+            forecasts = limiter_for(self.hass, WEATHER_URL)
             two_hr_resp, four_day_resp, day_resp = await asyncio.gather(
-                session.get(WEATHER_URL, headers=headers, timeout=timeout),
-                session.get(FOUR_DAY_URL, headers=headers, timeout=timeout),
-                session.get(TWENTY_FOUR_HR_URL, headers=headers, timeout=timeout),
+                *(
+                    _fetch_with_retry(
+                        session, url, 30, headers=headers, limiter=forecasts
+                    )
+                    for url in (WEATHER_URL, FOUR_DAY_URL, TWENTY_FOUR_HR_URL)
+                )
             )
             if two_hr_resp.status != 200:
                 raise UpdateFailed(
@@ -182,7 +186,10 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
                     day_resp.status,
                 )
             parsed.readings = await _fetch_aggregated_readings(
-                session, self._readings_sem, headers
+                session,
+                self._readings_sem,
+                headers,
+                limiter_for(self.hass, next(iter(_READINGS_ENDPOINTS.values()))),
             )
             return parsed
         except (aiohttp.ClientError, TimeoutError) as err:
@@ -213,44 +220,47 @@ async def _fetch_with_retry(
     url: str,
     timeout: int = 20,
     headers: dict[str, str] | None = None,
+    limiter: HostLimiter | None = None,
 ) -> aiohttp.ClientResponse:
-    """GET url, retrying up to _MAX_RETRIES times on HTTP 429.
+    """GET url through ``limiter``, retrying HTTP 429 up to MAX_RETRIES times.
 
-    Respects the Retry-After response header when present; falls back to
-    exponential backoff (_RETRY_BACKOFF_BASE ** attempt seconds).
-
+    A 429 pauses the limiter's whole host for the time the response asks for
+    (see datagov.retry_seconds), so other coordinators wait too.
     Callers must consume or release the returned response.
     """
+    if limiter is None:
+        limiter = HostLimiter(burst=None, interval=0.0)
     client_timeout = aiohttp.ClientTimeout(total=timeout)
-    response = await session.get(url, headers=headers, timeout=client_timeout)
-    for attempt in range(_MAX_RETRIES):
-        if response.status != 429:
-            return response
-        retry_after = float(
-            response.headers.get("Retry-After", _RETRY_BACKOFF_BASE**attempt)
-        )
-        _LOGGER.debug(
-            "429 on %s; waiting %.1fs before retry %d/%d",
-            url,
-            retry_after,
-            attempt + 1,
-            _MAX_RETRIES,
-        )
-        response.release()
-        await asyncio.sleep(retry_after)
+    for attempt in range(MAX_RETRIES + 1):
+        await limiter.async_wait_turn()
         response = await session.get(url, headers=headers, timeout=client_timeout)
-    return response  # last response (may still be 429 if all retries exhausted)
+        if response.status != 429 or attempt == MAX_RETRIES:
+            return response  # may still be 429 once the retries are used up
+        wait = await retry_seconds(response)
+        response.release()
+        limiter.pause(wait)
+        _LOGGER.debug(
+            "429 on %s; pausing %.1fs before retry %d/%d",
+            url,
+            wait,
+            attempt + 1,
+            MAX_RETRIES,
+        )
+    raise AssertionError("unreachable")  # pragma: no cover
 
 
 async def _fetch_aggregated_readings(
     session: aiohttp.ClientSession,
     sem: asyncio.Semaphore,
     headers: dict[str, str] | None = None,
+    limiter: HostLimiter | None = None,
 ) -> WeatherReadings:
     keys = list(_READINGS_ENDPOINTS.keys())
     results = await asyncio.gather(
         *(
-            _fetch_reading_average(session, sem, _READINGS_ENDPOINTS[k], k, headers)
+            _fetch_reading_average(
+                session, sem, _READINGS_ENDPOINTS[k], k, headers, limiter
+            )
             for k in keys
         ),
         return_exceptions=True,
@@ -271,6 +281,7 @@ async def _fetch_reading_average(
     url: str,
     metric_key: str,
     headers: dict[str, str] | None = None,
+    limiter: HostLimiter | None = None,
 ) -> float | None:
     """Return station-average reading for a metric endpoint.
 
@@ -282,7 +293,9 @@ async def _fetch_reading_average(
     async with sem:
         response = None
         try:
-            response = await _fetch_with_retry(session, url, headers=headers)
+            response = await _fetch_with_retry(
+                session, url, headers=headers, limiter=limiter
+            )
             if response.status != 200:
                 _LOGGER.debug("Skipping %s due to HTTP %s", metric_key, response.status)
                 response.release()

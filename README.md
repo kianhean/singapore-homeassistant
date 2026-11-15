@@ -961,10 +961,13 @@ sensor.air_quality_psi_east:
   SP app, wait a few minutes, then try again. After a wrong password the next attempt waits
   60 seconds, so Auth0 doesn't lock the account. The rest of the integration keeps working
   either way.
-- **HTTP 429 in the log:** data.gov.sg rate-limits bursts of requests, which can happen
-  when Home Assistant starts. Weather and dengue requests retry right away; other
-  sources try again on their next scheduled update. If it keeps happening, add a free
-  data.gov.sg API key, switch **Polling** to *Reduced*, or turn off sources you don't use
+- **HTTP 429 in the log:** without an API key, data.gov.sg's real-time API allows about
+  6 requests per 10 seconds from your Home Assistant, across all its datasets. The
+  integration paces its requests to stay under that (at most 5 per 10 s, shared by every
+  source), and if a 429 still happens, every source waits the 10 seconds data.gov.sg asks
+  for and then retries. So you shouldn't see more than the odd debug line. If you also run
+  other data.gov.sg integrations or scripts from the same network, they share that limit: a
+  free API key, **Polling** → *Reduced*, or turning off unused sources gives more headroom
   (see [Options](#options)).
 - **"… has been failing for a day" repair:** a data source has returned data the integration
   can't read for 24 hours, which usually means the site or API changed. Check the

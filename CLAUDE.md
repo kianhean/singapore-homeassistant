@@ -10,6 +10,7 @@ custom_components/singapore/
 ├── __init__.py             # Entry setup/teardown; creates and stores coordinators
 ├── const.py                # DOMAIN, option keys, SOURCES + helpers (enabled_sources, data_gov_headers,
 │                           #   scaled_interval); imported by config_flow without pulling in coordinators
+├── datagov.py              # Shared per-host data.gov.sg limiter (pacing + host-wide 429 pause/retry)
 ├── health.py               # SourceHealthMonitor: hourly check, "source_failing_<source>" repair issues
 ├── coordinator.py          # SPGroupCoordinator: fetches + parses SP Group tariff page
 ├── coe_coordinator.py      # CoeCoordinator: fetches COE results from data.gov.sg API
@@ -67,6 +68,7 @@ tests/
 ├── test_sensor.py               # Sensor value, unit, attributes, unique_id, None-safety
 ├── test_weather.py              # Weather entity condition mapping + forecast tests
 ├── test_diagnostics.py          # Diagnostics serialization
+├── test_datagov.py              # Limiter pacing vs the measured limit, 429 pause/retry, API key scoping
 ├── test_options.py              # Option helpers, sources off, health monitor, event entities
 ├── test_translations.py         # Every translations/*.json mirrors strings.json keys + placeholders
 └── test_e2e.py                  # Live scrape tests (run with -m e2e, skipped in CI by default)
@@ -153,6 +155,29 @@ must be added to `SOURCES`, `SOURCE_NAMES`, `_COORDINATORS` in `__init__.py`, a
 
 Weather, holidays and trains are the blocking first refreshes (`_BLOCKING_SOURCES`); every
 other source loads in the background.
+
+## data.gov.sg rate limits (datagov.py)
+
+Measured 2026-11-15 without a key: `api-open.data.gov.sg` allows ~6 requests per ~10 s per
+client **across all endpoints**, then 429s everything for ~10 s. The 429 has no `Retry-After`;
+the body says "try again in 10 seconds". `api.data.gov.sg` (v1) didn't throttle 40 in a row.
+
+Every data.gov.sg request goes through `data_gov_get(hass, session, url, **kwargs)` (an
+`async with` drop-in for `session.get`) or, in the weather coordinator, `_fetch_with_retry(...,
+limiter=limiter_for(hass, url))`. One `HostLimiter` per host lives in `hass.data`, shared by
+all coordinators:
+- `api-open` is paced: burst `_BURST` (2), then one per `_INTERVAL` (3 s), ≤5 per 10 s
+  (GCRA: the slot is booked without awaiting, then one sleep). Other hosts aren't paced.
+- A 429 (any host) → `retry_seconds()` (Retry-After, else the body's "try again in N
+  seconds", else 10 s, cap 60) → `pause()` the **whole host**, retry up to `MAX_RETRIES` (2);
+  the last 429 goes back to the caller (transient: last-known data).
+- `x-api-key` is stripped for non-data.gov.sg hosts (dengue's file is a presigned S3 URL).
+- Tests: `tests/conftest.py` has an autouse fake clock (`datagov_time`: sleeps advance it and
+  are recorded); `tests_ha/conftest.py` makes the sleeps no-ops. Don't call `asyncio.sleep`
+  for 429s in coordinators; don't add per-coordinator 429 loops.
+- `test_startup_burst_stays_under_the_measured_limit` replays startup + 30 min of polling
+  against that limit; it fails on the earlier, too-fast pacing (burst 3 / 2.5 s), which got a
+  live 429.
 
 ## Repairs for failing sources
 
@@ -353,9 +378,9 @@ Home Assistant) with manual retry on HTTP 429.  The coordinator uses
 from data.gov.sg.
 
 - `_READINGS_CONCURRENCY = 2` — `asyncio.Semaphore` caps the 5 parallel readings requests
-  to 2 in-flight at a time, avoiding 429s from data.gov.sg.
-- `_fetch_with_retry()` — retries up to `_MAX_RETRIES = 3` times on HTTP 429, respecting
-  the `Retry-After` response header (falls back to exponential backoff).
+  to 2 in-flight at a time.
+- `_fetch_with_retry()` — goes through the shared `datagov` limiter (pacing on api-open,
+  host-wide pause + up to 2 retries on 429); see "data.gov.sg rate limits".
 
 Forecast parsing supports both common payload styles:
 - `items[0].forecasts` (legacy shape)
@@ -505,8 +530,7 @@ every **6 hours**: GET `.../v1/public/api/datasets/{id}/poll-download` → `data
 `nearest_cluster()` computes the distance from `hass.config` home lat/lon to the nearest
 polygon edge (0 if inside; ray casting + local equirectangular projection), which feeds
 `sensor.nea_nearest_dengue_cluster`. Zero features is valid (no active clusters).
-`_get_json` retries HTTP 429 up to 3 times (numeric `Retry-After`, capped at 60 s, else
-2/4/8 s backoff). While no data has loaded, a failed refresh sets `update_interval` to
+`_get_json` goes through `data_gov_get` (shared limiter; 429 retried there). While no data has loaded, a failed refresh sets `update_interval` to
 `RETRY_INTERVAL` (10 min) instead of waiting the full 6 h; the next success restores it.
 
 ## How the Lightning Coordinator Works
@@ -678,9 +702,9 @@ Both commands must exit cleanly — CI will fail otherwise.
 - All HA I/O must be `async`; use `async_`-prefixed HA helpers
 - Use `async_get_clientsession(hass)` for aiohttp — never create a bare `aiohttp.ClientSession`
 - All coordinators use `async_get_clientsession(hass)` for aiohttp requests
-- `weather_coordinator.py` handles HTTP 429 rate limits from data.gov.sg with
-  `_fetch_with_retry()` (3 retries, respects `Retry-After` header, exponential backoff)
-  and an `asyncio.Semaphore` capping concurrent readings requests at 2
+- Every data.gov.sg request goes through the shared limiter in `datagov.py`
+  (`data_gov_get` / `limiter_for`), which paces api-open.data.gov.sg and handles HTTP 429
+  for all coordinators at once
 - Entity unique IDs must be stable: `{entry_id}_{suffix}`
 - Entities use `_attr_attribution` for data credit, and icons come from `icons.json`
   (icon translations) keyed by translation key — do not set `_attr_icon`

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import math
 from dataclasses import dataclass, field
@@ -15,6 +14,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import data_gov_headers
+from .datagov import data_gov_get
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,9 +34,6 @@ RETRY_INTERVAL = timedelta(minutes=10)
 
 # data.gov.sg rate-limits bursts (HA startup fires several integrations' requests
 # at once), so retry HTTP 429 with Retry-After / exponential backoff.
-_MAX_RETRIES = 3
-_RETRY_BACKOFF_BASE = 2  # seconds; doubles per attempt
-_MAX_RETRY_WAIT = 60.0  # seconds; cap on a server-supplied Retry-After
 
 _EARTH_RADIUS_KM = 6371.0088
 
@@ -224,17 +221,6 @@ def _parse_dengue_geojson(payload: dict) -> DengueData:
     return DengueData(clusters=clusters)
 
 
-def _retry_after_seconds(header: str | None, attempt: int) -> float:
-    """Seconds to wait before retrying: Retry-After if numeric, else backoff."""
-    try:
-        wait = float(header) if header is not None else None
-    except (TypeError, ValueError):
-        wait = None
-    if wait is None or wait < 0:
-        wait = float(_RETRY_BACKOFF_BASE ** (attempt + 1))
-    return min(wait, _MAX_RETRY_WAIT)
-
-
 class DengueClusterCoordinator(DataUpdateCoordinator[DengueData]):
     """Downloads the NEA dengue clusters GeoJSON from data.gov.sg."""
 
@@ -252,30 +238,20 @@ class DengueClusterCoordinator(DataUpdateCoordinator[DengueData]):
         )
 
     async def _get_json(self, session: aiohttp.ClientSession, url: str) -> dict:
-        """GET url as JSON, retrying HTTP 429 up to _MAX_RETRIES times."""
-        for attempt in range(_MAX_RETRIES + 1):
-            async with session.get(
-                url,
-                headers=data_gov_headers(self.config_entry),
-                timeout=aiohttp.ClientTimeout(total=30),
-            ) as response:
-                # poll-download / initiate-download answer 201 Created on success.
-                if 200 <= response.status < 300:
-                    return await response.json(content_type=None)
-                if response.status != 429 or attempt == _MAX_RETRIES:
-                    raise UpdateFailed(f"{url} returned HTTP {response.status}")
-                wait = _retry_after_seconds(
-                    response.headers.get("Retry-After"), attempt
-                )
-            _LOGGER.debug(
-                "HTTP 429 from %s; retrying in %.1fs (%d/%d)",
-                url,
-                wait,
-                attempt + 1,
-                _MAX_RETRIES,
-            )
-            await asyncio.sleep(wait)
-        raise UpdateFailed(f"{url} returned HTTP 429")  # pragma: no cover
+        """GET url as JSON (rate-limited; HTTP 429 is retried by data_gov_get)."""
+        async with data_gov_get(
+            self.hass,
+            session,
+            url,
+            # Only data.gov.sg gets the key, never the presigned S3 file URL
+            # (data_gov_get also strips it for any other host).
+            headers=data_gov_headers(self.config_entry),
+            timeout=aiohttp.ClientTimeout(total=30),
+        ) as response:
+            # poll-download / initiate-download answer 201 Created on success.
+            if 200 <= response.status < 300:
+                return await response.json(content_type=None)
+            raise UpdateFailed(f"{url} returned HTTP {response.status}")
 
     async def _download_url(self, session: aiohttp.ClientSession) -> str:
         """Get a signed S3 URL for the dataset file (initiating a download if needed)."""

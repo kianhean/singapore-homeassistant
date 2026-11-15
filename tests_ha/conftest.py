@@ -19,6 +19,7 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
     AiohttpClientMocker,
 )
 
+from custom_components.singapore import datagov
 from custom_components.singapore.coe_coordinator import COE_API_URL
 from custom_components.singapore.coordinator import TARIFF_URL
 from custom_components.singapore.dengue_coordinator import POLL_DOWNLOAD_URL
@@ -325,6 +326,20 @@ def _png(size: tuple[int, int]) -> bytes:
     out = io.BytesIO()
     Image.new("RGBA", size).save(out, format="PNG")
     return out.getvalue()
+
+
+@pytest.fixture(autouse=True)
+def no_datagov_waits(monkeypatch) -> None:
+    """Skip the shared data.gov.sg limiter's real sleeps (pacing, 429 pauses).
+
+    Its timing is unit-tested with a fake clock (tests/test_datagov.py); here
+    it would only add seconds per setup, and hang under a frozen clock.
+    """
+
+    async def _no_sleep(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr(datagov, "_sleep", _no_sleep)
 
 
 @pytest.fixture(autouse=True)

@@ -11,7 +11,6 @@ from custom_components.singapore.dengue_coordinator import (
     DengueData,
     UpdateFailed,
     _parse_dengue_geojson,
-    _retry_after_seconds,
     distance_to_cluster_km,
     nearest_cluster,
 )
@@ -169,7 +168,7 @@ async def test_coordinator_initiates_download_when_poll_has_no_url():
 
 
 @pytest.mark.asyncio
-async def test_coordinator_retries_429_then_succeeds():
+async def test_coordinator_retries_429_then_succeeds(datagov_time):
     session = MagicMock()
     session.get = MagicMock(
         side_effect=[
@@ -179,46 +178,36 @@ async def test_coordinator_retries_429_then_succeeds():
             _response(payload=_geojson(_feature("A", 4))),
         ]
     )
-    sleep = AsyncMock()
     coordinator = DengueClusterCoordinator(MagicMock())
     with (
         patch(
             "custom_components.singapore.dengue_coordinator.async_get_clientsession",
             return_value=session,
         ),
-        patch("custom_components.singapore.dengue_coordinator.asyncio.sleep", sleep),
     ):
         await coordinator.async_refresh()
     assert coordinator.last_update_success is True
     assert coordinator.data.total_cases == 4
-    assert [c.args[0] for c in sleep.await_args_list] == [5.0, 4.0]
+    # Retry-After first, then data.gov.sg's default 10 s block.
+    assert datagov_time["sleeps"] == [5.0, 10.0]
     assert coordinator.update_interval == UPDATE_INTERVAL
-
-
-def test_retry_after_seconds():
-    assert _retry_after_seconds("3", 0) == 3.0
-    assert _retry_after_seconds("9999", 0) == 60.0
-    assert _retry_after_seconds("Wed, 21 Oct 2026 07:28:00 GMT", 0) == 2.0
-    assert _retry_after_seconds(None, 2) == 8.0
 
 
 @pytest.mark.asyncio
 async def test_coordinator_http_error_fallback_and_failure():
     session = MagicMock()
     session.get = MagicMock(return_value=_response(status=429))
-    sleep = AsyncMock()
     coordinator = DengueClusterCoordinator(MagicMock())
     with (
         patch(
             "custom_components.singapore.dengue_coordinator.async_get_clientsession",
             return_value=session,
         ),
-        patch("custom_components.singapore.dengue_coordinator.asyncio.sleep", sleep),
     ):
         await coordinator.async_refresh()
         assert coordinator.last_update_success is False
-        # 1 attempt + 3 retries, then give up and retry soon (no data yet).
-        assert session.get.call_count == 4
+        # 1 attempt + 2 retries, then give up and retry soon (no data yet).
+        assert session.get.call_count == 3
         assert coordinator.update_interval == RETRY_INTERVAL
 
         coordinator.data = DengueData()

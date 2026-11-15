@@ -14,6 +14,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import data_gov_headers, scaled_interval
+from .datagov import data_gov_get
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -92,7 +93,9 @@ class PsiCoordinator(DataUpdateCoordinator[PsiData]):
     async def _async_update_data(self) -> PsiData:
         session = async_get_clientsession(self.hass)
         try:
-            async with session.get(
+            async with data_gov_get(
+                self.hass,
+                session,
                 PSI_URL,
                 headers=data_gov_headers(self.config_entry),
                 timeout=aiohttp.ClientTimeout(total=30),

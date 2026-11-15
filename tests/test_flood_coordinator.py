@@ -182,6 +182,7 @@ def test_uncancelled_alert_expires():
 
 def _mock_session(status: int, payload: dict | None = None) -> MagicMock:
     response = AsyncMock()
+    response.headers = {}  # real mapping: the data.gov.sg limiter reads it on 429
     response.status = status
     response.json = AsyncMock(return_value=payload)
     response.__aenter__ = AsyncMock(return_value=response)

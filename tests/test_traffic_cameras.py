@@ -53,6 +53,7 @@ def test_checkpoint_cameras_cover_woodlands_and_tuas():
 
 def _session(status: int = 200, json_payload=None, body: bytes = b"jpeg"):
     response = AsyncMock()
+    response.headers = {}  # real mapping: the data.gov.sg limiter reads it on 429
     response.status = status
     response.json = AsyncMock(return_value=json_payload)
     response.read = AsyncMock(return_value=body)
