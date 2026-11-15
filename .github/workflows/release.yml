@@ -47,6 +47,17 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # HACS installs this zip (hacs.json: zip_release + filename) instead of the source
+      # archive, so GitHub counts every install and update: the README downloads badge.
+      # Files sit at the zip's root; HACS extracts them into custom_components/singapore.
+      - name: Build HACS zip
+        if: steps.tag_check.outputs.exists == 'false'
+        run: |
+          cd custom_components/singapore
+          zip -r ../../singapore.zip . -x '*__pycache__*'
+          cd ../..
+          unzip -l singapore.zip | grep -q ' manifest.json$'
+
       - name: Create GitHub release
         if: steps.tag_check.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
@@ -54,3 +65,5 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
           generate_release_notes: true
+          files: singapore.zip
+          fail_on_unmatched_files: true

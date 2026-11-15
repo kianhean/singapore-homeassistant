@@ -14,6 +14,9 @@
 <p align="center">
   <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-Default-41BDF5.svg" alt="HACS Default"></a>
   <a href="https://github.com/kianhean/singapore-homeassistant/releases"><img src="https://img.shields.io/github/v/release/kianhean/singapore-homeassistant" alt="Latest release"></a>
+  <a href="https://github.com/kianhean/singapore-homeassistant/stargazers"><img src="https://img.shields.io/github/stars/kianhean/singapore-homeassistant" alt="GitHub stars"></a>
+  <a href="https://github.com/kianhean/singapore-homeassistant/releases"><img src="https://img.shields.io/github/downloads/kianhean/singapore-homeassistant/total" alt="Downloads"></a>
+  <a href="https://analytics.home-assistant.io/custom_integrations.json"><img src="https://img.shields.io/badge/dynamic/json?label=active%20installs&color=41BDF5&query=%24.singapore.total&url=https%3A%2F%2Fanalytics.home-assistant.io%2Fcustom_integrations.json" alt="Active installs (Home Assistant analytics)"></a>
   <a href="https://github.com/kianhean/singapore-homeassistant/actions/workflows/tests.yml"><img src="https://github.com/kianhean/singapore-homeassistant/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <img src="https://img.shields.io/badge/Home%20Assistant-2025.4%2B-41BDF5?logo=home-assistant&logoColor=white" alt="Home Assistant 2025.4 or newer">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/kianhean/singapore-homeassistant" alt="MIT License"></a>

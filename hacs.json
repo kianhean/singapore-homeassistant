@@ -1,6 +1,8 @@
 {
   "name": "Singapore",
   "content_in_root": false,
+  "zip_release": true,
+  "filename": "singapore.zip",
   "homeassistant": "2025.4.0",
   "country": "SG"
 }

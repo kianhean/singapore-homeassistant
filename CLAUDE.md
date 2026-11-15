@@ -727,6 +727,10 @@ Both commands must exit cleanly — CI will fail otherwise.
 - Always bump `custom_components/singapore/manifest.json` `version` for every PR that changes
   shipped integration behavior/code, so merge-to-main release automation can create the next
   GitHub release tag from that version.
+- HACS installs the `singapore.zip` release asset (`hacs.json`: `zip_release` + `filename`),
+  which `release.yml` builds from `custom_components/singapore/` (files at the zip root). It
+  feeds the README downloads badge; a release without that asset can't be installed via HACS,
+  so don't publish releases by hand without attaching it.
 - Translations live in `translations/en.json` and must mirror `strings.json`. Other languages
   (`zh-Hans.json`) must have exactly the same keys and `{placeholders}`; when you add a string,
   add its translation too (`tests/test_translations.py` fails otherwise). zh-Hans isn't in
