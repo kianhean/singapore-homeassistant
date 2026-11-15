@@ -219,6 +219,9 @@
       },
       "rain_radar": {
         "name": "降雨雷达 {range}"
+      },
+      "rain_radar_animation": {
+        "name": "降雨雷达 {range} 动画"
       }
     },
     "event": {

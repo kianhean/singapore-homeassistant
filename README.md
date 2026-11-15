@@ -37,7 +37,7 @@
 
 | | | |
 |---|---|---|
-| 🌦️ **Weather**<br>A weather entity for every NEA forecast area, with hourly and 4-day forecasts, live temperature, humidity, wind and rain, plus NEA rain radar images | 😷 **Air quality**<br>PSI and six pollutants, overall and per region, ready for a Map card | ☀️ **UV index**<br>NEA's hourly UV index and exposure level (low to extreme), with today's peak |
+| 🌦️ **Weather**<br>A weather entity for every NEA forecast area, with hourly and 4-day forecasts, live temperature, humidity, wind and rain, plus NEA rain radar images and animated loops | 😷 **Air quality**<br>PSI and six pollutants, overall and per region, ready for a Map card | ☀️ **UV index**<br>NEA's hourly UV index and exposure level (low to extreme), with today's peak |
 | 🚇 **MRT/LRT**<br>Network and per-line status (normal, planned works, disruption) with LTA's message | 🛂 **Checkpoints**<br>Woodlands and Tuas traffic camera stills as camera entities | 🚗 **COE**<br>Category A–E premiums, refreshed after each bidding exercise |
 | ⚡ **Lightning**<br>Live strikes and the distance to the nearest one from your home | 🦟 **Dengue**<br>Active NEA clusters and how far the nearest is from your home | 🌊 **Flash floods**<br>PUB flood alerts as they're issued and cancelled |
 | 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🎉 **Public holidays**<br>MOM's holiday list as a calendar | 🧩 **Blueprints**<br>[One-click automations](#one-click-blueprints) for lightning, MRT disruptions, floods, haze, COE, rain, UV, dengue, holidays and SP bills |
@@ -404,6 +404,9 @@ cards:
     name: Rain Radar 240 km
     show_state: false
 ```
+
+For the last hour as a moving loop, use `camera.weather_rain_radar_70_km_animation` and
+`camera.weather_rain_radar_240_km_animation` instead (see [Rain radar](#rain-radar)).
 
 <p align="center">
   <img src="images/rain-radar.jpg" alt="Picture-entity cards of NEA rain radar: the 70 km view over a map of Singapore with light scattered echoes, and the 240 km view over Johor, the Riau Islands and Sumatra with showers east of Johor" width="480">
@@ -776,6 +779,11 @@ centred on Singapore, at each range NEA publishes. The 70 km and 240 km images a
 NEA's own base maps from its [rain areas page](https://www.nea.gov.sg/weather/rain-areas),
 cropped and scaled exactly as that page shows them.
 
+Two more cameras animate the **last hour** (12 frames, 5 minutes apart) for the near (70 km)
+and far (240 km) maps: a looping GIF with the capture time in the corner of each frame,
+holding briefly on the latest one. The frames come from the same API call as the still
+image, so the loop costs no extra data.gov.sg requests; each new frame is downloaded once.
+
 <details>
 <summary>Entities and attributes</summary>
 
@@ -784,15 +792,20 @@ cropped and scaled exactly as that page shows them.
 | `camera.weather_rain_radar_70_km` | 70 km | Singapore on NEA's map (853 × 479 JPEG) |
 | `camera.weather_rain_radar_240_km` | 240 km | Johor, Riau Islands and Sumatra on NEA's map (853 × 853 JPEG) |
 | `camera.weather_rain_radar_480_km` | 480 km | Bare radar overlay, no map (480 × 480 transparent PNG); **disabled by default** |
+| `camera.weather_rain_radar_70_km_animation` | 70 km | Last hour over Singapore on NEA's map (853 × 479 animated GIF) |
+| `camera.weather_rain_radar_240_km_animation` | 240 km | Last hour over the region on NEA's map (853 × 853 animated GIF) |
 
 Rain colours run cyan/green (light), yellow (moderate) and orange/red/magenta (heavy).
 Attributes: `range`, `basemap` (whether this range has an NEA map), `image_timestamp` (the
 radar capture time), the full radar image's bounding box as `north` / `south` / `east` /
-`west`, and the radar station's `center_latitude` / `center_longitude`.
+`west`, and the radar station's `center_latitude` / `center_longitude`. The animations add
+`frame_count` and `first_frame_timestamp` (the oldest frame; `image_timestamp` is the newest).
+Just after midnight the loop also uses the previous day's images, so it stays an hour long.
 
 A radar camera shows as unavailable until its first image loads, and keeps its last image if a
 later fetch fails. The base map is downloaded once from nea.gov.sg; if that fails, the camera
-shows the bare overlay and tries the map again after 30 minutes.
+shows the bare overlay and tries the map again after 30 minutes. An animation needs its map:
+until it loads, the animation camera keeps its last loop (or has no image yet).
 
 NEA has no map for the 480 km range, so that camera is disabled by default. To use it anyway
 (for example on a Picture Elements card over your own map), enable it under **Settings →

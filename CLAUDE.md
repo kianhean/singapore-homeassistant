@@ -24,14 +24,14 @@ custom_components/singapore/
 ├── lightning_coordinator.py # LightningCoordinator: NEA lightning strikes, 30-min rolling window
 ├── uv_coordinator.py       # UvCoordinator: NEA hourly UV index + exposure bands
 ├── radar_coordinator.py    # RadarCoordinator: NEA rain radar PNGs (70/240/480 km)
-├── radar_image.py          # Pure-Pillow compositing of radar onto NEA base maps (BASEMAPS)
+├── radar_image.py          # Pure-Pillow compositing of radar onto NEA base maps (BASEMAPS) + GIF loops
 ├── sp_account_coordinator.py # SpAccountCoordinator: one per SP e-account subentry (usage, bills, stats)
 ├── sp_account_sensor.py    # SP e-account sensors built from mapper SensorSpecs (added dynamically)
 ├── sp_account/             # Vendored from maci0/home-assistant-sp (MIT, see its LICENSE); no HA imports
 │   ├── client.py           # Sync urllib Auth0/Jarvis/Njord client (runs in the executor), MFA, cooldown
 │   ├── const.py / models.py / mapper.py / history.py  # constants, dataclasses, specs, statistics
 │   └── LICENSE             # Upstream MIT licence: must ship with the vendored code
-├── camera.py               # Camera entities (checkpoint traffic cameras + rain radar)
+├── camera.py               # Camera entities (checkpoint traffic cameras + rain radar still/animated)
 ├── calendar.py             # Calendar entity (Singapore public holidays)
 ├── event.py                # Event entities: COE new results, MRT/LRT service alerts
 ├── weather.py              # Weather entities (one per Singapore forecast area)
@@ -634,6 +634,26 @@ that camera serves the bare PNG and is disabled by default
 `BASEMAP_RETRY_SECONDS` on failure) rather than bundled, because they are NEA website assets,
 not open data. Composited output is JPEG (`content_type` is set per image). Pillow is a Home
 Assistant core dependency, so it isn't in `manifest.json`; it is in `requirements_test.txt`.
+### Animated radar
+
+Each range is fetched with `?date=YYYY-MM-DD` (Singapore date, `SGT`): the same endpoint then
+returns the day's images newest first (~2 h, 25 records on the first page), each with its own
+presigned URL, so `records[0]` is still the latest image and **the loop costs no extra API
+call**. `_parse_radar` keeps the records within `ANIMATION_WINDOW` (1 h) of the latest as
+`RadarImage.frames` (oldest first, deduplicated by timestamp). Until `_EARLIER_DAY_UNTIL`
+after midnight the previous day is fetched too (a failure there is only logged; today's list
+may even be empty then). `_now()` exists so tests can pin the clock (`tests/test_radar.py`
+pins midday by default).
+
+`SingaporeRainRadarAnimationCamera` (subclass of the still camera, `rain_radar_animation`
+translation key, unique id `{entry_id}_rain_radar_animation_{range}`) exists only for ranges
+in `BASEMAPS`. It keeps each frame's overlay bytes keyed by timestamp (one download per new
+frame; a failed frame is skipped and retried next request) and rebuilds the GIF only when the
+set of frames changes. `animate_radar()` draws every frame like `composite_radar()`, adds the
+HH:MM label, and quantizes all frames to one palette built from a half-size stack of the loop
+(no flicker, rain colours from any frame kept): ~250 KB (70 km) / ~650 KB (240 km), <1 s.
+No base map → no new GIF (the last one is served).
+
 data.gov.sg returns 403 to urllib's default User-Agent (aiohttp's is fine), which is why
 `fetch_radar.py` sets one.
 

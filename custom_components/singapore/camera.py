@@ -1,9 +1,10 @@
-"""Camera platform: LTA checkpoint traffic cameras and NEA rain radar images."""
+"""Camera platform: LTA checkpoint traffic cameras and NEA rain radar (still + animated)."""
 
 from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime
 
 import aiohttp
 from homeassistant.components.camera import Camera
@@ -15,8 +16,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SingaporeConfigEntry
 from .const import DOMAIN
-from .radar_coordinator import RADAR_RANGES, RadarCoordinator, RadarImage
-from .radar_image import BASEMAPS, composite_radar
+from .radar_coordinator import RADAR_RANGES, SGT, RadarCoordinator, RadarImage
+from .radar_image import BASEMAPS, animate_radar, composite_radar
 from .traffic_coordinator import CHECKPOINT_CAMERAS, TrafficImagesCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -44,6 +45,12 @@ async def async_setup_entry(
         entities += [
             SingaporeRainRadarCamera(radar, entry.entry_id, radar_range)
             for radar_range in RADAR_RANGES
+        ]
+        # Animations only where NEA has a base map (70 km near, 240 km far).
+        entities += [
+            SingaporeRainRadarAnimationCamera(radar, entry.entry_id, radar_range)
+            for radar_range in RADAR_RANGES
+            if radar_range in BASEMAPS
         ]
     async_add_entities(entities)
 
@@ -280,3 +287,94 @@ class SingaporeRainRadarCamera(CoordinatorEntity[RadarCoordinator], Camera):
             entry_type=DeviceEntryType.SERVICE,
             configuration_url="https://www.nea.gov.sg",
         )
+
+
+class SingaporeRainRadarAnimationCamera(SingaporeRainRadarCamera):
+    """The last hour of NEA rain radar on NEA's base map, as a looping GIF.
+
+    Frames come from the same API call as the still image (``RadarImage.frames``).
+    Each frame's overlay is downloaded once and kept while it is in the window, so a
+    new poll costs one small download; the GIF is rebuilt only when the set of
+    frames changes. Without the base map there is no animation (the last one built,
+    if any, is served) until the map can be fetched again.
+    """
+
+    _attr_translation_key = "rain_radar_animation"
+
+    def __init__(
+        self, coordinator: RadarCoordinator, entry_id: str, radar_range: str
+    ) -> None:
+        super().__init__(coordinator, entry_id, radar_range)
+        self.content_type = "image/gif"
+        self._attr_unique_id = f"{entry_id}_rain_radar_animation_{radar_range}"
+        self._overlays: dict[datetime, bytes] = {}
+
+    @property
+    def available(self) -> bool:
+        radar = self._radar
+        return super().available and radar is not None and bool(radar.frames)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs = super().extra_state_attributes
+        radar = self._radar
+        frames = radar.frames if radar is not None else []
+        attrs["frame_count"] = len(frames)
+        attrs["first_frame_timestamp"] = (
+            frames[0].timestamp.isoformat() if frames else None
+        )
+        return attrs
+
+    async def async_camera_image(
+        self, width: int | None = None, height: int | None = None
+    ) -> bytes | None:
+        """Return the animated GIF of the frames currently in the window."""
+        radar = self._radar
+        if radar is None or not radar.frames or self._basemap_spec is None:
+            return self._cached_image
+        basemap = await self._async_get_basemap()
+        if basemap is None:
+            return self._cached_image
+
+        wanted = {frame.timestamp for frame in radar.frames}
+        self._overlays = {t: b for t, b in self._overlays.items() if t in wanted}
+        for frame in radar.frames:
+            if frame.timestamp not in self._overlays:
+                overlay = await _download_image(
+                    self.hass,
+                    frame.image_url,
+                    f"Rain radar {self._range} {frame.timestamp:%H:%M}",
+                )
+                if overlay is not None:  # a missing frame is retried next time
+                    self._overlays[frame.timestamp] = overlay
+
+        frames = [
+            (frame.timestamp, self._overlays[frame.timestamp])
+            for frame in radar.frames
+            if frame.timestamp in self._overlays
+        ]
+        if not frames:
+            return self._cached_image
+        key = tuple(stamp for stamp, _ in frames)
+        if key == self._cached_key and self._cached_image is not None:
+            return self._cached_image
+
+        try:
+            image = await self.hass.async_add_executor_job(
+                animate_radar,
+                basemap,
+                [(f"{stamp.astimezone(SGT):%H:%M}", data) for stamp, data in frames],
+                self._basemap_spec,
+            )
+        except OSError as err:  # PIL.UnidentifiedImageError is an OSError
+            _LOGGER.warning("Could not animate rain radar %s: %s", self._range, err)
+            # A corrupt base map would fail every time: fetch it again later. A
+            # corrupt frame is dropped so the next request downloads it again.
+            self._basemap = None
+            self._basemap_failed_at = time.monotonic()
+            self._overlays.clear()
+            return self._cached_image
+
+        self._cached_key = key
+        self._cached_image = image
+        return image
