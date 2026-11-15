@@ -53,9 +53,7 @@ jobs:
       - name: Build HACS zip
         if: steps.tag_check.outputs.exists == 'false'
         run: |
-          cd custom_components/singapore
-          zip -r ../../singapore.zip . -x '*__pycache__*'
-          cd ../..
+          git archive --format=zip -o singapore.zip "HEAD:custom_components/singapore"
           unzip -l singapore.zip | grep -q ' manifest.json$'
 
       - name: Create GitHub release
@@ -67,3 +65,24 @@ jobs:
           generate_release_notes: true
           files: singapore.zip
           fail_on_unmatched_files: true
+
+      # With zip_release, HACS installs every version (including "Redownload" of an older
+      # one) from its singapore.zip, so give each release that predates the zip one built
+      # from its own tag. Idempotent: releases that already have the asset are skipped.
+      - name: Attach HACS zip to older releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --limit 1000 --json tagName --jq '.[].tagName' |
+          while read -r tag; do
+            if gh release view "$tag" --json assets --jq '.assets[].name' | grep -qx singapore.zip; then
+              continue
+            fi
+            if ! git cat-file -e "$tag:custom_components/singapore/manifest.json" 2>/dev/null; then
+              echo "::warning::$tag has no custom_components/singapore; skipped"
+              continue
+            fi
+            git archive --format=zip -o /tmp/singapore.zip "$tag:custom_components/singapore"
+            gh release upload "$tag" /tmp/singapore.zip
+            echo "Attached singapore.zip to $tag"
+          done
