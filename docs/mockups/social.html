@@ -13,29 +13,39 @@
   .chips svg.mdi { width: 18px; height: 18px; color: var(--c); }
   .right { position: absolute; right: -40px; top: 70px; width: 520px; display: flex; flex-direction: column; gap: 10px; transform: rotate(-4deg); }
   .right .card { box-shadow: 0 20px 40px rgba(0,0,0,.5); }
+  .right .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat { padding: 14px 16px; }
+  .stat .sname { color: var(--muted); font-size: 14px; }
+  .stat .sval { font-size: 28px; font-weight: 400; margin-top: 4px; }
+  .stat .sval span { font-size: 15px; color: var(--muted); }
+  .chart { padding: 4px 10px 0; }
+  .legend { display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--muted); font-size: 12px; padding: 2px 0 12px; }
   .url { position: absolute; left: 72px; bottom: 40px; color: #8a8a8a; font-size: 18px; }
 </style></head>
 <body>
   <div class="left">
     <div class="kicker"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" class="mark">   <circle cx="128" cy="128" r="124" fill="#EF3340"/>   <path d="M128 52 L210 124 Q214 128 208 132 L190 132 L190 192 Q190 202 180 202 L76 202 Q66 202 66 192 L66 132 L48 132 Q42 128 46 124 Z"         fill="#FFFFFF" stroke="#FFFFFF" stroke-width="10" stroke-linejoin="round"/>   <circle cx="128" cy="156" r="24" fill="#EF3340"/> </svg>HACS INTEGRATION</div>
     <h1><span>Singapore</span><br>for Home Assistant</h1>
-    <div class="lead">Weather, PSI, MRT status, COE, tariffs, floods, dengue and lightning, from official sources. No API keys.</div>
+    <div class="lead"><b style="color:#fff">Your own SP Group electricity, water and bills</b> in the Energy dashboard. Plus weather, PSI, MRT, COE, floods and lightning from official sources.</div>
     <div class="chips">
+      <span class="chip" style="--c:#ef3340"><i m="mdiHomeLightningBolt"></i>SP account</span>
+      <span class="chip" style="--c:#03a9f4"><i m="mdiChartBar"></i>Energy dashboard</span>
       <span class="chip" style="--c:#ffc107"><i m="mdiWeatherLightningRainy"></i>NEA weather</span>
       <span class="chip" style="--c:#4caf50"><i m="mdiAirFilter"></i>PSI</span>
       <span class="chip" style="--c:#fa9e0d"><i m="mdiTrain"></i>MRT/LRT</span>
-      <span class="chip" style="--c:#64b5f6"><i m="mdiCarHatchback"></i>COE</span>
-      <span class="chip" style="--c:#ffb300"><i m="mdiFlash"></i>Lightning</span>
       <span class="chip" style="--c:#03a9f4"><i m="mdiHomeFlood"></i>Floods</span>
     </div>
   </div>
   <div class="right">
-    <div class="card tile"><span class="bubble" style="--c:var(--amber)"><i m="mdiMapMarkerDistance"></i></span><div><div class="name">Nearest lightning</div><div class="state">7.4 km</div></div></div>
-    <div class="card tile"><span class="bubble" style="--c:var(--green)"><i m="mdiAirFilter"></i></span><div><div class="name">PSI</div><div class="state">42</div></div></div>
-    <div class="card tile"><span class="bubble" style="--c:var(--red)"><i m="mdiAlert"></i></span><div><div class="name">Circle Line</div><div class="state">Disruption</div></div></div>
-    <div class="card tile"><span class="bubble" style="--c:var(--blue)"><i m="mdiCar"></i></span><div><div class="name">COE Category A</div><div class="state">95,501 SGD</div></div></div>
-    <div class="card tile"><span class="bubble" style="--c:var(--yellow)"><i m="mdiSolarPower"></i></span><div><div class="name">Solar export</div><div class="state">23.47 ¢/kWh</div></div></div>
-    <div class="card tile"><span class="bubble" style="--c:var(--orange)"><i m="mdiMapMarkerDistance"></i></span><div><div class="name">Nearest dengue cluster</div><div class="state">1.2 km</div></div></div>
+    <div class="grid2">
+      <div class="card stat"><div class="sname">Electricity used</div><div class="sval">153.1<span> kWh</span></div></div>
+      <div class="card stat"><div class="sname">Estimated cost</div><div class="sval">45.50<span> SGD</span></div></div>
+    </div>
+    <div class="card"><div class="card-title">Daily electricity</div><div class="chart"><svg viewBox="0 0 360 150" width="100%"><line x1="34" x2="354" y1="128.0" y2="128.0" stroke="#2f2f2f"/><text x="28" y="132.0" text-anchor="end" font-size="10" fill="#9b9b9b">0</text><line x1="34" x2="354" y1="68.0" y2="68.0" stroke="#2f2f2f"/><text x="28" y="72.0" text-anchor="end" font-size="10" fill="#9b9b9b">7</text><line x1="34" x2="354" y1="8.0" y2="8.0" stroke="#2f2f2f"/><text x="28" y="12.0" text-anchor="end" font-size="10" fill="#9b9b9b">14</text><rect x="35.6" y="27.7" width="7.5" height="100.3" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="46.3" y="27.7" width="7.5" height="100.3" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="56.9" y="16.6" width="7.5" height="111.4" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="67.6" y="17.4" width="7.5" height="110.6" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="78.3" y="26.9" width="7.5" height="101.1" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="88.9" y="23.4" width="7.5" height="104.6" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="99.6" y="25.1" width="7.5" height="102.9" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="110.3" y="26.0" width="7.5" height="102.0" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="120.9" y="26.9" width="7.5" height="101.1" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="131.6" y="12.3" width="7.5" height="115.7" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="142.3" y="13.1" width="7.5" height="114.9" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="152.9" y="26.9" width="7.5" height="101.1" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="163.6" y="28.6" width="7.5" height="99.4" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="174.3" y="28.6" width="7.5" height="99.4" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="184.9" y="29.4" width="7.5" height="98.6" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="195.6" y="29.4" width="7.5" height="98.6" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="206.3" y="13.1" width="7.5" height="114.9" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="216.9" y="12.3" width="7.5" height="115.7" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="227.6" y="25.1" width="7.5" height="102.9" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="238.3" y="27.7" width="7.5" height="100.3" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="248.9" y="29.4" width="7.5" height="98.6" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="259.6" y="26.9" width="7.5" height="101.1" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="270.3" y="29.4" width="7.5" height="98.6" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="280.9" y="14.0" width="7.5" height="114.0" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="291.6" y="12.3" width="7.5" height="115.7" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="302.3" y="26.9" width="7.5" height="101.1" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="312.9" y="26.0" width="7.5" height="102.0" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="323.6" y="25.1" width="7.5" height="102.9" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="334.3" y="26.9" width="7.5" height="101.1" rx="1" fill="#03a9f4" fill-opacity=".85"/><rect x="344.9" y="69.7" width="7.5" height="58.3" rx="1" fill="#03a9f4" fill-opacity=".85"/><text x="39.3" y="144" text-anchor="middle" font-size="10" fill="#9b9b9b">15 Oct</text><text x="114.0" y="144" text-anchor="middle" font-size="10" fill="#9b9b9b">22 Oct</text><text x="188.7" y="144" text-anchor="middle" font-size="10" fill="#9b9b9b">29 Oct</text><text x="263.3" y="144" text-anchor="middle" font-size="10" fill="#9b9b9b">5 Nov</text><text x="338.0" y="144" text-anchor="middle" font-size="10" fill="#9b9b9b">12 Nov</text></svg></div><div class="legend"><span class="dot" style="background:#03a9f4"></span>Electricity</div></div>
+    <div class="grid2">
+      <div class="card tile"><span class="bubble" style="--c:var(--red)"><i m="mdiCashClock"></i></span><div><div class="name">Amount due</div><div class="state">116.38 SGD</div></div></div>
+      <div class="card tile"><span class="bubble" style="--c:var(--green)"><i m="mdiAirFilter"></i></span><div><div class="name">PSI</div><div class="state">42</div></div></div>
+    </div>
   </div>
   <div class="url">github.com/kianhean/singapore-homeassistant</div>
 </body></html>

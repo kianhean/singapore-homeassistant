@@ -6,9 +6,9 @@
 </h1>
 
 <p align="center">
-  Weather, PSI, MRT status, COE prices, utility tariffs, flash floods, dengue and lightning,<br>
-  straight from official Singapore government sources. No API keys, no accounts.<br>
-  Optionally, link your SP Group e-account for your own electricity, water and bill readings.
+  <b>Your own SP Group electricity, water and bills, right in Home Assistant's Energy dashboard.</b><br>
+  Plus weather, PSI, MRT status, COE prices, flash floods, dengue and lightning,<br>
+  straight from official Singapore government sources. No API keys needed.
 </p>
 
 <p align="center">
@@ -33,20 +33,89 @@
   <sub>An example dashboard built only from Home Assistant's built-in cards. The integration provides the entities; <a href="examples/dashboard.yaml">this YAML</a> builds the dashboard. Camera stills are real LTA images.</sub>
 </p>
 
+## Your SP Group account, in Home Assistant
+
+Sign in with the email and password you use in the SP app, and your flat or house's own
+electricity, water and bills land in Home Assistant. No smart plugs, clamps or extra hardware:
+the data comes from the meters SP already reads.
+
+> [!TIP]
+> The SP account support is built on **[maci0/home-assistant-sp](https://github.com/maci0/home-assistant-sp)**
+> by Marcel W. Wysocki ([@maci0](https://github.com/maci0)), whose SP API client, sign-in, MFA
+> and Energy statistics code is included here under the MIT License. Thank you, Marcel!
+> ([Credits](#credits))
+
+<p align="center">
+  <img src="images/sp-account-dashboard.png" alt="SP account dashboard: this month's electricity use (153.1 kWh) and estimated cost (45.50 SGD), last month's 371.4 kWh, the 29.72 cents/kWh tariff, today's usage, daily and hourly electricity bar charts, amount due and last bill of 116.38 SGD, a bar chart of monthly bills, and Green Goals usage against a 350 kWh target" width="100%">
+  <br>
+  <sub>The dashboard from <a href="examples/sp_account_dashboard.yaml">examples/sp_account_dashboard.yaml</a>, built only from Home Assistant's built-in cards. Example account data.</sub>
+</p>
+
+- 📊 **Energy dashboard, ready to go.** Electricity (hourly on a smart meter) with its cost at
+  the current SP tariff, plus water and gas, as statistics for Home Assistant's
+  built-in [Energy dashboard](#energy-dashboard-electricity-and-water).
+- ⏪ **A year of history on day one.** About 13 months of past usage is imported on the first
+  poll, so the month and year views fill in straight away.
+- 🌡️ **See what the air-con costs.** Half-hourly smart-meter readings show the evening spikes;
+  put them next to `sensor.weather_temperature` and the hot afternoons stand out.
+- 🧾 **Never miss a bill.** Last bill, amount due, meter readings, prepaid credit and Green Goals
+  as sensors, plus a [one-click blueprint](#one-click-blueprints) that tells you when a new bill
+  arrives and reminds you before it's due.
+- 🔒 **Your password is never stored.** Only the session tokens SP returns are kept, and they
+  renew themselves. MFA (SMS, email or authenticator app) works, and you can link more than
+  one account.
+
+**[Link your SP account →](#optional-link-your-sp-group-e-account)** It's optional and takes a
+minute; everything else works without it. Questions about it? See the [FAQ](#faq).
+
+> [!NOTE]
+> This is a community project, not affiliated with or endorsed by SP Group. Account data comes
+> from the same unofficial APIs the SP app uses, which SP can change without notice.
+
 ## What's inside
 
 | | | |
 |---|---|---|
+| 🏠 **Your SP account** *(optional)*<br>Sign in once to get your own electricity, water and gas usage, down to the half hour on a smart meter | 📊 **Energy dashboard**<br>Hourly electricity with cost at the current SP tariff, plus monthly water, ready for [Home Assistant's Energy dashboard](#energy-dashboard-electricity-and-water) | 🧾 **Bills**<br>Last bill, amount due, meter readings and SP Green Goals, for [reminders and dashboards](#your-sp-account) |
 | 🌦️ **Weather**<br>A weather entity for every NEA forecast area, with hourly and 4-day forecasts, live temperature, humidity, wind and rain, plus NEA rain radar images and animated loops | 😷 **Air quality**<br>PSI and six pollutants, overall and per region, ready for a Map card | ☀️ **UV index**<br>NEA's hourly UV index and exposure level (low to extreme), with today's peak |
 | 🚇 **MRT/LRT**<br>Network and per-line status (normal, planned works, disruption) with LTA's message | 🛂 **Checkpoints**<br>Woodlands and Tuas traffic camera stills as camera entities | 🚗 **COE**<br>Category A–E premiums, refreshed after each bidding exercise |
 | ⚡ **Lightning**<br>Live strikes and the distance to the nearest one from your home | 🦟 **Dengue**<br>Active NEA clusters and how far the nearest is from your home | 🌊 **Flash floods**<br>PUB flood alerts as they're issued and cancelled |
 | 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🎉 **Public holidays**<br>MOM's holiday list as a calendar | 🧩 **Blueprints**<br>[One-click automations](#one-click-blueprints) for lightning, MRT disruptions, floods, haze, COE, rain, UV, dengue, holidays and SP bills |
-| 🏠 **Your SP account** *(optional)*<br>Sign in once to get your own electricity, water and gas usage, down to the half hour on a smart meter | 📊 **Energy dashboard**<br>Hourly electricity with cost at the current SP tariff, plus monthly water, ready for [Home Assistant's Energy dashboard](#energy-dashboard-electricity-and-water) | 🧾 **Bills**<br>Last bill, amount due, meter readings and SP Green Goals, for [reminders and dashboards](#your-sp-account) |
 
 The public data needs no API keys and no account: one config entry, and a diagnostics download when
 something looks off. You choose which data sources run ([Options](#options)). Linking your SP Group e-account is optional ([how](#optional-link-your-sp-group-e-account));
 that part is built on [maci0/home-assistant-sp](https://github.com/maci0/home-assistant-sp) by
 [@maci0](https://github.com/maci0) ([Credits](#credits)).
+
+## What's new
+
+- **v0.13** Animated rain radar loops (the last hour, over NEA's base map) and HACS installs
+  from a release zip.
+- **v0.12** Choose your data sources, an optional data.gov.sg API key and reduced polling
+  ([Options](#options)); repair notices for broken sources; event entities for new COE results
+  and MRT/LRT alerts; five more blueprints; Simplified Chinese (简体中文).
+- **v0.11** [Link your SP Group e-account](#your-sp-group-account-in-home-assistant) for your
+  own usage, bills and the Energy dashboard, built on
+  [maci0/home-assistant-sp](https://github.com/maci0/home-assistant-sp) by
+  [@maci0](https://github.com/maci0).
+
+Full notes for every version are on the [Releases](https://github.com/kianhean/singapore-homeassistant/releases)
+page. Upgrading from before v0.3.0? Your entity IDs are kept; see the
+[note under Setup](#optional-link-your-sp-group-e-account).
+
+## Contents
+
+- [Installation](#installation) and [Setup](#setup): [Options](#options),
+  [linking your SP account](#optional-link-your-sp-group-e-account),
+  [removing the integration](#removing-the-integration)
+- [Recipes](#recipes): [one-click blueprints](#one-click-blueprints) and
+  [copy-paste automations](#or-copy-the-yaml)
+- [Dashboard ideas](#dashboard-ideas): [your SP account](#your-sp-account) and the
+  [Energy dashboard](#energy-dashboard-electricity-and-water)
+- [Entity reference](#entity-reference): every sensor, camera, weather, calendar and event entity
+- [FAQ](#faq) and [Troubleshooting](#troubleshooting)
+- [Data sources](#data-sources), [Development](#development), [Contributing](#contributing),
+  [Credits](#credits)
 
 ## Installation
 
@@ -416,13 +485,8 @@ For the last hour as a moving loop, use `camera.weather_rain_radar_70_km_animati
 
 ### Your SP account
 
-<p align="center">
-  <img src="images/sp-account-dashboard.png" alt="SP account dashboard: this month's electricity use (153.1 kWh) and estimated cost (45.50 SGD), last month's 371.4 kWh, the 29.72 cents/kWh tariff, today's usage, daily and hourly electricity bar charts, amount due and last bill of 116.38 SGD, a bar chart of monthly bills, and Green Goals usage against a 350 kWh target" width="100%">
-  <br>
-  <sub>The dashboard from <a href="examples/sp_account_dashboard.yaml">examples/sp_account_dashboard.yaml</a>, built only from Home Assistant's built-in cards. Example account data.</sub>
-</p>
-
-With an SP account linked, **[`examples/sp_account_dashboard.yaml`](examples/sp_account_dashboard.yaml)**
+The dashboard pictured [at the top](#your-sp-group-account-in-home-assistant): with an SP account
+linked, **[`examples/sp_account_dashboard.yaml`](examples/sp_account_dashboard.yaml)**
 adds an *SP account* dashboard built only from built-in cards. Find-and-replace its two
 placeholders (your device slug and premise ID, explained at the top of the file), then paste it in.
 It shows:
@@ -961,6 +1025,64 @@ sensor.air_quality_psi_east:
     source: data.gov.sg / NEA
 ```
 
+</details>
+
+## FAQ
+
+<details>
+<summary><b>Is it safe to give the integration my SP password?</b></summary>
+
+The password is only used to sign in and is never stored. Home Assistant keeps the session
+tokens SP returns (in its config storage, like any other integration's credentials), and they
+renew themselves. Diagnostics downloads leave out your address, account number, premise ID,
+username and tokens. Deleting the account or the integration removes the tokens.
+</details>
+
+<details>
+<summary><b>Do I need a smart meter?</b></summary>
+
+No. With a smart meter you get electricity by the half hour (published a few hours late) and
+hourly bars on the Energy dashboard. Without one, SP only has billed months, so you get one
+reading per month. Water is monthly either way.
+</details>
+
+<details>
+<summary><b>I buy electricity from an Open Electricity Market retailer. Does it still work?</b></summary>
+
+Yes. Usage comes from SP, who reads the meters whichever retailer you use, and the retailer's name
+is an attribute of the *Account* sensor. The **cost** on the Energy dashboard is an estimate at
+SP Group's regulated tariff, so it won't match your retailer's rate; the **Last bill** sensor has
+the amount SP billed.
+</details>
+
+<details>
+<summary><b>Does it work with prepaid (PPMS) accounts?</b></summary>
+
+Yes. A *Prepaid credit* sensor appears when SP reports a prepaid balance, and there's a
+[low-credit automation](#with-a-linked-sp-account) to copy.
+</details>
+
+<details>
+<summary><b>Can I add more than one SP account?</b></summary>
+
+Yes, click **Add SP account** again. Each account gets its own device and its own set of Energy
+statistics (the statistic ID contains the premise ID).
+</details>
+
+<details>
+<summary><b>Do I need an API key or account for the rest?</b></summary>
+
+No. Everything except the SP account uses public data. A free
+[data.gov.sg](https://data.gov.sg) key is optional and only raises the rate limits
+([Options](#options)).
+</details>
+
+<details>
+<summary><b>Is this an official app from SP Group, NEA, LTA or GovTech?</b></summary>
+
+No. It's a community project, not affiliated with or endorsed by any of them. The public data
+comes from the official open-data sources listed under [Data sources](#data-sources); the SP
+account uses the unofficial APIs behind the SP app, which SP can change without notice.
 </details>
 
 ## Troubleshooting
