@@ -812,10 +812,17 @@ def _parse_utility(utility: object, kind: str) -> UtilitySeries | None:
         start = _parse_period_start(item.get("period"))
         status = _optional_str(item.get("status"))
         previous = _optional_float(consumption.get("previous"))
+        peers = item.get("peer_comparison")
+        peers = peers if isinstance(peers, dict) else {}
         if start is not None:
             periods.append(
                 PeriodReading(
-                    start=start, amount=amount, previous=previous, status=status
+                    start=start,
+                    amount=amount,
+                    previous=previous,
+                    status=status,
+                    peer_average=_optional_float(peers.get("average")),
+                    peer_efficient=_optional_float(peers.get("efficient")),
                 )
             )
     if not periods:

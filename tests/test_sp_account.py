@@ -38,6 +38,10 @@ from custom_components.singapore.sp_account_coordinator import (
     same_tokens,
     session_from_data,
 )
+from custom_components.singapore.sp_account_insights import (
+    INSIGHT_KEYS,
+    INSIGHT_OPTIONS,
+)
 from custom_components.singapore.sp_account_sensor import (
     TRANSLATION_PREFIX,
     SpAccountSensor,
@@ -261,6 +265,14 @@ async def test_sensors_added_on_first_data_with_subentry_and_prefixed_keys():
     entities = add_entities.call_args.args[0]
     assert add_entities.call_args.kwargs == {"config_subentry_id": "sub1"}
     expected = {spec.key for spec in sensors_from_usage(coordinator.data, FIXED_NOW)}
+    # Plus the derived insights the fixture supports (no tariff: no costs).
+    expected |= {
+        "electricity_vs_peers",
+        "water_vs_peers",
+        "electricity_goal_remaining",
+        "bill_status",
+        "meter_reading_window",
+    }
     assert {e.entity_description.key for e in entities} == expected
 
     premise = coordinator.data.premise_id
@@ -372,6 +384,13 @@ def test_every_sp_sensor_key_has_translation_and_strings_mirror_en():
     for spec in sensors_from_usage(usage, FIXED_NOW):
         key = f"{TRANSLATION_PREFIX}{spec.translation_key}"
         assert key in strings["entity"]["sensor"], key
+    icons = json.loads((COMPONENT / "icons.json").read_text())["entity"]["sensor"]
+    for key in INSIGHT_KEYS:
+        entry = strings["entity"]["sensor"][f"{TRANSLATION_PREFIX}{key}"]
+        assert f"{TRANSLATION_PREFIX}{key}" in icons
+        if key in INSIGHT_OPTIONS:
+            assert set(entry["state"]) == set(INSIGHT_OPTIONS[key]), key
+    assert "sp_account_dates" in strings["entity"]["calendar"]
     sub = strings["config_subentries"][SUBENTRY_TYPE_SP_ACCOUNT]
     assert set(sub["step"]) == {"user", "mfa", "reconfigure"}
     assert "electricity_price" not in sub["step"]["user"]["data"]

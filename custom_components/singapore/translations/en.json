@@ -22,6 +22,9 @@
     "calendar": {
       "public_holidays": {
         "name": "Public holidays"
+      },
+      "sp_account_dates": {
+        "name": "Bills and meter readings"
       }
     },
     "sensor": {
@@ -211,6 +214,52 @@
       },
       "sp_tariff": {
         "name": "SP tariff"
+      },
+      "sp_electricity_always_on": {
+        "name": "Always-on power"
+      },
+      "sp_electricity_yesterday": {
+        "name": "Electricity yesterday"
+      },
+      "sp_electricity_cost_yesterday": {
+        "name": "Electricity cost yesterday"
+      },
+      "sp_electricity_cost_today": {
+        "name": "Electricity cost today"
+      },
+      "sp_electricity_cost_month": {
+        "name": "Electricity cost this month"
+      },
+      "sp_electricity_projected_cost": {
+        "name": "Projected electricity cost"
+      },
+      "sp_electricity_vs_peers": {
+        "name": "Electricity vs similar homes"
+      },
+      "sp_water_vs_peers": {
+        "name": "Water vs similar homes"
+      },
+      "sp_electricity_goal_remaining": {
+        "name": "Electricity goal remaining"
+      },
+      "sp_water_goal_remaining": {
+        "name": "Water goal remaining"
+      },
+      "sp_bill_status": {
+        "name": "Bill status",
+        "state": {
+          "paid": "Paid",
+          "due": "Due",
+          "overdue": "Overdue"
+        }
+      },
+      "sp_meter_reading_window": {
+        "name": "Meter reading window",
+        "state": {
+          "upcoming": "Upcoming",
+          "open": "Open",
+          "closed": "Closed"
+        }
       }
     },
     "camera": {

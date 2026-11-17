@@ -91,6 +91,15 @@ def _sp_account_diagnostics(coordinator: SpAccountCoordinator) -> dict[str, Any]
         "has_ev_session": usage.ev_session is not None,
         "fcu_count": len(usage.fcus),
         "has_tariff": usage.tariff is not None,
+        "has_peer_comparison": any(
+            period.peer_average is not None
+            for period in (*usage.electricity_periods, *usage.water_periods)
+        ),
+        "has_meter_reading_window": bool(
+            usage.meter_reading
+            and usage.meter_reading.start
+            and usage.meter_reading.end
+        ),
         "sensor_keys": [spec.key for spec in coordinator.sensor_specs],
     }
 

@@ -2,8 +2,9 @@
 
 Adapted from maci0/home-assistant-sp (MIT, Copyright (c) 2026 Marcel W.
 Wysocki): https://github.com/maci0/home-assistant-sp. The set of sensors and
-their values come from the vendored ``sp_account.mapper``; this module turns
-each ``SensorSpec`` into an entity attached to the account's config subentry.
+their values come from the vendored ``sp_account.mapper`` plus the derived
+``sp_account_insights``; this module turns each ``SensorSpec`` into an entity
+attached to the account's config subentry.
 Translation keys carry an ``sp_`` prefix so they cannot clash with this
 integration's other sensor keys (``sp_electricity`` vs the tariff sensors).
 """
@@ -19,6 +20,7 @@ from homeassistant.components.sensor import (
 from homeassistant.const import (
     EntityCategory,
     UnitOfEnergy,
+    UnitOfPower,
     UnitOfTemperature,
     UnitOfVolume,
 )
@@ -31,6 +33,7 @@ from .const import DOMAIN
 from .sp_account.const import ATTRIBUTION
 from .sp_account.mapper import SensorSpec
 from .sp_account_coordinator import SpAccountCoordinator
+from .sp_account_insights import INSIGHT_OPTIONS
 
 TRANSLATION_PREFIX = "sp_"
 
@@ -38,6 +41,7 @@ _UNITS = {
     "kWh": UnitOfEnergy.KILO_WATT_HOUR,
     "m³": UnitOfVolume.CUBIC_METERS,
     "°C": UnitOfTemperature.CELSIUS,
+    "W": UnitOfPower.WATT,
 }
 
 
@@ -126,6 +130,7 @@ class SpAccountSensor(CoordinatorEntity[SpAccountCoordinator], SensorEntity):
                 EntityCategory(spec.entity_category) if spec.entity_category else None
             ),
             suggested_display_precision=spec.suggested_display_precision,
+            options=INSIGHT_OPTIONS.get(spec.key),
         )
 
     @callback

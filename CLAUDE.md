@@ -27,6 +27,9 @@ custom_components/singapore/
 ├── radar_image.py          # Pure-Pillow compositing of radar onto NEA base maps (BASEMAPS) + GIF loops
 ├── sp_account_coordinator.py # SpAccountCoordinator: one per SP e-account subentry (usage, bills, stats)
 ├── sp_account_sensor.py    # SP e-account sensors built from mapper SensorSpecs (added dynamically)
+├── sp_account_insights.py  # Derived SP sensors (always-on, yesterday, costs, projection, vs similar
+│                           #   homes, goal remaining, bill status, meter reading window); no HA imports
+├── sp_account_calendar.py  # Per-account calendar: bill due dates + meter reading window
 ├── sp_account/             # Vendored from maci0/home-assistant-sp (MIT, see its LICENSE); no HA imports
 │   ├── client.py           # Sync urllib Auth0/Jarvis/Njord client (runs in the executor), MFA, cooldown
 │   ├── const.py / models.py / mapper.py / history.py  # constants, dataclasses, specs, statistics
@@ -62,6 +65,7 @@ tests/
 ├── test_lightning_coordinator.py # Lightning parser, rolling window, coordinator, sensors
 ├── test_uv_coordinator.py       # UV parser (v1/v2), exposure bands, coordinator, sensors
 ├── test_sp_account.py           # SP account coordinator, sensors, flow helpers, reload listener
+├── test_sp_account_insights.py  # Derived SP sensors, account calendar, peer (similar homes) statistics
 ├── sp_account/                  # Vendored upstream client/mapper/history tests + recorded fixtures
 ├── test_radar.py                # Radar parser, per-range fallback, radar camera entity + cache
 ├── test_calendar.py             # Calendar event and range query tests
@@ -602,6 +606,24 @@ headers) when touching this code.
   `unit_class` is only included when the running HA's `StatisticMetaData` has it (2025.4
   rejects it, newer HA warns without it). The poll passes its readings into the import task
   because HA starts tasks eagerly, before `coordinator.data` is set.
+- **Insights** (`sp_account_insights.py`): sensors worked out from the same poll, no extra
+  requests: always-on power (median of the last 7 full days' lowest half-hour, in W), electricity
+  yesterday (once its 23:30 slot is in) and its cost, cost today / this month, projected cost
+  (month so far + 7-day daily average for the rest), electricity/water vs similar homes (%),
+  Green Goals remaining, bill status (`paid`/`due`/`overdue` from amount due + latest bill's due
+  date; payment transactions are deliberately not read) and meter reading window
+  (`upcoming`/`open`/`closed` from SMRD `latest_submission_period`). Cost insights need the
+  tariff price; `async_tariff_updated` calls `async_update_listeners` so they appear/re-price
+  without waiting for the next poll. Enum options are in `INSIGHT_OPTIONS` (SensorSpec has none).
+  The coordinator merges them into `sensor_specs` / `spec_for` / `extra_attributes`, cached per
+  (data, now, price).
+- **Similar homes**: Jarvis charts carry `peer_comparison.{average,efficient}` per billed period;
+  the vendored `_parse_utility` keeps them on `PeriodReading` (a listed local change). They are
+  imported as monthly state series `singapore:<premise>_{electricity,water}_{monthly,peer_average,
+  peer_efficient}` (one row per billing month, value as state and sum, like `last_bill`).
+- `sp_account_calendar.py`: one calendar per account (`sp_account_dates`), added when the
+  account's data first loads, on the account device: all-day events on each bill's due date and
+  a timed event for the meter reading window.
 - Sensor translation keys are the mapper keys prefixed with `sp_` (`entity.sensor.sp_*`);
   unique ids are `{entry_id}_sp_{premise_id}_{key}`; entities are added with
   `config_subentry_id`. Diagnostics report SP accounts as flags/counts only (no address,
