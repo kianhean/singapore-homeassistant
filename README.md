@@ -39,6 +39,12 @@ Sign in with the email and password you use in the SP app, and your flat or hous
 electricity, water and bills land in Home Assistant. No smart plugs, clamps or extra hardware:
 the data comes from the meters SP already reads.
 
+> [!TIP]
+> The SP account support is built on **[maci0/home-assistant-sp](https://github.com/maci0/home-assistant-sp)**
+> by Marcel W. Wysocki ([@maci0](https://github.com/maci0)), whose SP API client, sign-in, MFA
+> and Energy statistics code is included here under the MIT License. Thank you, Marcel!
+> ([Credits](#credits))
+
 <p align="center">
   <img src="images/sp-account-dashboard.png" alt="SP account dashboard: this month's electricity use (153.1 kWh) and estimated cost (45.50 SGD), last month's 371.4 kWh, the 29.72 cents/kWh tariff, today's usage, daily and hourly electricity bar charts, amount due and last bill of 116.38 SGD, a bar chart of monthly bills, and Green Goals usage against a 350 kWh target" width="100%">
   <br>
@@ -89,7 +95,9 @@ that part is built on [maci0/home-assistant-sp](https://github.com/maci0/home-as
   ([Options](#options)); repair notices for broken sources; event entities for new COE results
   and MRT/LRT alerts; five more blueprints; Simplified Chinese (简体中文).
 - **v0.11** [Link your SP Group e-account](#your-sp-group-account-in-home-assistant) for your
-  own usage, bills and the Energy dashboard.
+  own usage, bills and the Energy dashboard, built on
+  [maci0/home-assistant-sp](https://github.com/maci0/home-assistant-sp) by
+  [@maci0](https://github.com/maci0).
 
 Full notes for every version are on the [Releases](https://github.com/kianhean/singapore-homeassistant/releases)
 page. Upgrading from before v0.3.0? Your entity IDs are kept; see the
