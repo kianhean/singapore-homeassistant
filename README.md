@@ -60,7 +60,11 @@ the data comes from the meters SP already reads.
   one account.
 
 **[Link your SP account →](#optional-link-your-sp-group-e-account)** It's optional and takes a
-minute; everything else works without it.
+minute; everything else works without it. Questions about it? See the [FAQ](#faq).
+
+> [!NOTE]
+> This is a community project, not affiliated with or endorsed by SP Group. Account data comes
+> from the same unofficial APIs the SP app uses, which SP can change without notice.
 
 ## What's inside
 
@@ -76,6 +80,34 @@ The public data needs no API keys and no account: one config entry, and a diagno
 something looks off. You choose which data sources run ([Options](#options)). Linking your SP Group e-account is optional ([how](#optional-link-your-sp-group-e-account));
 that part is built on [maci0/home-assistant-sp](https://github.com/maci0/home-assistant-sp) by
 [@maci0](https://github.com/maci0) ([Credits](#credits)).
+
+## What's new
+
+- **v0.13** Animated rain radar loops (the last hour, over NEA's base map) and HACS installs
+  from a release zip.
+- **v0.12** Choose your data sources, an optional data.gov.sg API key and reduced polling
+  ([Options](#options)); repair notices for broken sources; event entities for new COE results
+  and MRT/LRT alerts; five more blueprints; Simplified Chinese (简体中文).
+- **v0.11** [Link your SP Group e-account](#your-sp-group-account-in-home-assistant) for your
+  own usage, bills and the Energy dashboard.
+
+Full notes for every version are on the [Releases](https://github.com/kianhean/singapore-homeassistant/releases)
+page. Upgrading from before v0.3.0? Your entity IDs are kept; see the
+[note under Setup](#optional-link-your-sp-group-e-account).
+
+## Contents
+
+- [Installation](#installation) and [Setup](#setup): [Options](#options),
+  [linking your SP account](#optional-link-your-sp-group-e-account),
+  [removing the integration](#removing-the-integration)
+- [Recipes](#recipes): [one-click blueprints](#one-click-blueprints) and
+  [copy-paste automations](#or-copy-the-yaml)
+- [Dashboard ideas](#dashboard-ideas): [your SP account](#your-sp-account) and the
+  [Energy dashboard](#energy-dashboard-electricity-and-water)
+- [Entity reference](#entity-reference): every sensor, camera, weather, calendar and event entity
+- [FAQ](#faq) and [Troubleshooting](#troubleshooting)
+- [Data sources](#data-sources), [Development](#development), [Contributing](#contributing),
+  [Credits](#credits)
 
 ## Installation
 
@@ -985,6 +1017,64 @@ sensor.air_quality_psi_east:
     source: data.gov.sg / NEA
 ```
 
+</details>
+
+## FAQ
+
+<details>
+<summary><b>Is it safe to give the integration my SP password?</b></summary>
+
+The password is only used to sign in and is never stored. Home Assistant keeps the session
+tokens SP returns (in its config storage, like any other integration's credentials), and they
+renew themselves. Diagnostics downloads leave out your address, account number, premise ID,
+username and tokens. Deleting the account or the integration removes the tokens.
+</details>
+
+<details>
+<summary><b>Do I need a smart meter?</b></summary>
+
+No. With a smart meter you get electricity by the half hour (published a few hours late) and
+hourly bars on the Energy dashboard. Without one, SP only has billed months, so you get one
+reading per month. Water is monthly either way.
+</details>
+
+<details>
+<summary><b>I buy electricity from an Open Electricity Market retailer. Does it still work?</b></summary>
+
+Yes. Usage comes from SP, who reads the meters whichever retailer you use, and the retailer's name
+is an attribute of the *Account* sensor. The **cost** on the Energy dashboard is an estimate at
+SP Group's regulated tariff, so it won't match your retailer's rate; the **Last bill** sensor has
+the amount SP billed.
+</details>
+
+<details>
+<summary><b>Does it work with prepaid (PPMS) accounts?</b></summary>
+
+Yes. A *Prepaid credit* sensor appears when SP reports a prepaid balance, and there's a
+[low-credit automation](#with-a-linked-sp-account) to copy.
+</details>
+
+<details>
+<summary><b>Can I add more than one SP account?</b></summary>
+
+Yes, click **Add SP account** again. Each account gets its own device and its own set of Energy
+statistics (the statistic ID contains the premise ID).
+</details>
+
+<details>
+<summary><b>Do I need an API key or account for the rest?</b></summary>
+
+No. Everything except the SP account uses public data. A free
+[data.gov.sg](https://data.gov.sg) key is optional and only raises the rate limits
+([Options](#options)).
+</details>
+
+<details>
+<summary><b>Is this an official app from SP Group, NEA, LTA or GovTech?</b></summary>
+
+No. It's a community project, not affiliated with or endorsed by any of them. The public data
+comes from the official open-data sources listed under [Data sources](#data-sources); the SP
+account uses the unofficial APIs behind the SP app, which SP can change without notice.
 </details>
 
 ## Troubleshooting
