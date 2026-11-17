@@ -56,6 +56,9 @@ class PeriodReading:
     amount: float
     previous: float | None = None
     status: str | None = None
+    # Similar homes' usage for the same billed period (Jarvis peer_comparison).
+    peer_average: float | None = None
+    peer_efficient: float | None = None
 
 
 @dataclass(frozen=True)

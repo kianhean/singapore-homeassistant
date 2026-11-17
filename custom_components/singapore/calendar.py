@@ -1,4 +1,4 @@
-"""Calendar platform for Singapore public holidays."""
+"""Calendar platform: Singapore public holidays, plus SP e-account dates."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from homeassistant.util import dt as dt_util
 from . import SingaporeConfigEntry
 from .const import DOMAIN
 from .holiday_coordinator import PublicHoliday, PublicHolidayCoordinator
+from .sp_account_calendar import async_setup_sp_account_calendars
 
 PARALLEL_UPDATES = 0
 
@@ -23,11 +24,16 @@ async def async_setup_entry(
     entry: SingaporeConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up public holiday calendar."""
+    """Set up the public holiday calendar and each SP account's calendar."""
     coordinator = entry.runtime_data.holiday
-    if coordinator is None:  # Public holidays turned off in the options.
-        return
-    async_add_entities([SingaporePublicHolidayCalendar(coordinator, entry.entry_id)])
+    if coordinator is not None:  # None: public holidays turned off in the options.
+        async_add_entities(
+            [SingaporePublicHolidayCalendar(coordinator, entry.entry_id)]
+        )
+    for unsub in async_setup_sp_account_calendars(
+        entry.entry_id, entry.runtime_data.sp_accounts, async_add_entities
+    ):
+        entry.async_on_unload(unsub)
 
 
 class SingaporePublicHolidayCalendar(

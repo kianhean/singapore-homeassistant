@@ -11,6 +11,9 @@ fixes can be pulled in:
 - ``history.external_statistic_id`` folds a premise id to the characters the
   recorder accepts.
 - The executor thread name prefix.
+- ``PeriodReading.peer_average`` / ``peer_efficient``: ``_parse_utility``
+  keeps each billed period's ``peer_comparison`` (similar homes) instead of
+  dropping it.
 
 The Home Assistant glue lives one level up in ``sp_account_coordinator.py``,
 ``sp_account_sensor.py`` and ``config_flow.py``.

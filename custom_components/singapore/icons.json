@@ -3,6 +3,9 @@
     "calendar": {
       "public_holidays": {
         "default": "mdi:calendar-star"
+      },
+      "sp_account_dates": {
+        "default": "mdi:calendar-account"
       }
     },
     "sensor": {
@@ -165,6 +168,51 @@
       },
       "sp_tariff": {
         "default": "mdi:tag-outline"
+      },
+      "sp_electricity_always_on": {
+        "default": "mdi:power-standby"
+      },
+      "sp_electricity_yesterday": {
+        "default": "mdi:history"
+      },
+      "sp_electricity_cost_yesterday": {
+        "default": "mdi:cash"
+      },
+      "sp_electricity_cost_today": {
+        "default": "mdi:cash-fast"
+      },
+      "sp_electricity_cost_month": {
+        "default": "mdi:cash-multiple"
+      },
+      "sp_electricity_projected_cost": {
+        "default": "mdi:chart-line"
+      },
+      "sp_electricity_vs_peers": {
+        "default": "mdi:home-group"
+      },
+      "sp_water_vs_peers": {
+        "default": "mdi:home-group"
+      },
+      "sp_electricity_goal_remaining": {
+        "default": "mdi:target"
+      },
+      "sp_water_goal_remaining": {
+        "default": "mdi:target-account"
+      },
+      "sp_bill_status": {
+        "default": "mdi:receipt-text-outline",
+        "state": {
+          "paid": "mdi:check-circle-outline",
+          "due": "mdi:cash-clock",
+          "overdue": "mdi:alert-circle-outline"
+        }
+      },
+      "sp_meter_reading_window": {
+        "default": "mdi:counter",
+        "state": {
+          "open": "mdi:pencil-box-outline",
+          "closed": "mdi:check-circle-outline"
+        }
       }
     },
     "camera": {

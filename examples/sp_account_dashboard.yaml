@@ -69,6 +69,51 @@ views:
             name: Last 30 min
             color: amber
             grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.1_example_road_singapore_projected_electricity_cost
+            name: Projected
+            color: amber
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.1_example_road_singapore_electricity_yesterday
+            name: Yesterday
+            color: amber
+            grid_options: { columns: 6 }
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: You vs similar homes
+            icon: mdi:home-group
+          - type: tile
+            entity: sensor.1_example_road_singapore_electricity_vs_similar_homes
+            name: Electricity
+            color: teal
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.1_example_road_singapore_water_vs_similar_homes
+            name: Water
+            color: blue
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.1_example_road_singapore_always_on_power
+            name: Always-on power
+            color: deep-purple
+            state_content: [state, estimated_yearly_cost]
+            grid_options: { columns: 12 }
+          - type: statistics-graph
+            title: Electricity vs similar homes
+            entities:
+              - entity: singapore:2001590888_electricity_monthly
+                name: You
+              - entity: singapore:2001590888_electricity_peer_average
+                name: Similar homes
+              - entity: singapore:2001590888_electricity_peer_efficient
+                name: Efficient homes
+            chart_type: bar
+            period: month
+            days_to_show: 365
+            stat_types: [state]
 
       - type: grid
         cards:
@@ -108,6 +153,16 @@ views:
             entity: sensor.1_example_road_singapore_last_bill
             name: Last bill
             grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.1_example_road_singapore_bill_status
+            name: Bill status
+            state_content: [state, due_date]
+            grid_options: { columns: 12 }
+          - type: tile
+            entity: sensor.1_example_road_singapore_meter_reading_window
+            name: Meter reading
+            state_content: [state, period]
+            grid_options: { columns: 12 }
           - type: statistics-graph
             title: Monthly bills
             entities:
@@ -127,5 +182,7 @@ views:
                 attribute: goal_target
                 name: Target
                 suffix: kWh
+              - entity: sensor.1_example_road_singapore_electricity_goal_remaining
+                name: Left before target
               - entity: sensor.1_example_road_singapore_electricity_meter
                 name: Meter reading

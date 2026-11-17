@@ -26,7 +26,7 @@ import logging
 import time
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import suppress
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, TypeVar
 
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
@@ -75,7 +75,8 @@ from .sp_account.history import (
     unimported,
 )
 from .sp_account.mapper import SensorSpec, UsageViewCache, extra_attributes
-from .sp_account.models import PeriodReading, UsageReadings
+from .sp_account.models import PeriodReading, UsageReadings, UtilitySeries
+from .sp_account_insights import Insight, insights
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -85,6 +86,24 @@ ISSUE_AUTH_FAILED = "sp_account_auth_failed"
 # Statistic names are written to the database once and never translated, so
 # they stay fixed English, like the vendored STATISTIC_NAME_* constants.
 STATISTIC_NAME_WATER = "SP Group water"
+# Monthly series for "you vs similar homes": your billed usage per period and
+# SP's peer figures for the same period (one row per billing month, the value
+# as its state, like the bill series).
+STATISTIC_KEY_MONTHLY = "{utility}_monthly"
+STATISTIC_KEY_PEER_AVERAGE = "{utility}_peer_average"
+STATISTIC_KEY_PEER_EFFICIENT = "{utility}_peer_efficient"
+STATISTIC_NAMES_MONTHLY = {
+    "electricity": (
+        "SP Group electricity per billing month",
+        "SP Group electricity, similar homes average",
+        "SP Group electricity, efficient similar homes",
+    ),
+    "water": (
+        "SP Group water per billing month",
+        "SP Group water, similar homes average",
+        "SP Group water, efficient similar homes",
+    ),
+}
 
 _PointT = TypeVar("_PointT", bound=HasStart)
 
@@ -127,6 +146,35 @@ def _amount(point: PeriodReading) -> float:
     return point.amount
 
 
+def _hourly(start: datetime) -> datetime:
+    """A statistics row start: the top of the hour, in UTC."""
+    return start.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
+
+
+def monthly_points(
+    series: UtilitySeries,
+) -> tuple[tuple[PeriodReading, ...], ...]:
+    """Your usage, the peer average and the efficient peers, per billed period.
+
+    Each is one point per billing period (newest wins on a shared hour); a
+    period SP did not compare is left out of the peer series only.
+    """
+    ordered = sorted(series.periods, key=lambda item: item.start)
+    usage = {_hourly(p.start): p.amount for p in ordered}
+    average = {
+        _hourly(p.start): p.peer_average for p in ordered if p.peer_average is not None
+    }
+    efficient = {
+        _hourly(p.start): p.peer_efficient
+        for p in ordered
+        if p.peer_efficient is not None
+    }
+    return tuple(
+        tuple(PeriodReading(start=start, amount=value) for start, value in rows.items())
+        for rows in (usage, average, efficient)
+    )
+
+
 class SpAccountCoordinator(DataUpdateCoordinator[UsageReadings]):
     """Polls one SP e-account every 30 minutes and imports Energy statistics."""
 
@@ -160,6 +208,13 @@ class SpAccountCoordinator(DataUpdateCoordinator[UsageReadings]):
         self._imported_premise: str | None = None
         self._imported_points: dict[str, datetime] = {}
         self._spec_cache = UsageViewCache()
+        self._insight_cache: tuple[
+            UsageReadings | None,
+            datetime | None,
+            float | None,
+            tuple[SensorSpec, ...],
+            dict[str, Insight],
+        ] = (None, None, None, (), {})
         self._now = self.client.clock.now()
 
     # ------------------------------------------------------------------
@@ -182,12 +237,36 @@ class SpAccountCoordinator(DataUpdateCoordinator[UsageReadings]):
 
     @property
     def sensor_specs(self) -> tuple[SensorSpec, ...]:
-        """The current sensor specs, built once per poll for every entity."""
-        return self._spec_cache.specs(self.data, self.now)
+        """The current sensor specs, built once per poll for every entity.
+
+        The mapper's readings first, then the derived insights
+        (``sp_account_insights``), which also depend on the scraped tariff.
+        """
+        mapped = self._spec_cache.specs(self.data, self.now)
+        return mapped + self._insights()[0]
 
     def spec_for(self, key: str) -> SensorSpec | None:
         """One spec by key, so an entity does not scan the list to find it."""
+        insight = self._insights()[1].get(key)
+        if insight is not None:
+            return insight.spec
         return self._spec_cache.spec_for(self.data, self.now, key)
+
+    def _insights(self) -> tuple[tuple[SensorSpec, ...], dict[str, Insight]]:
+        """This poll's derived sensors, rebuilt when the data or price changes."""
+        usage, now, price = self.data, self.now, self.electricity_price
+        cached_usage, cached_now, cached_price, specs, by_key = self._insight_cache
+        if usage is cached_usage and now is cached_now and price == cached_price:
+            return specs, by_key
+        found = (
+            insights(usage, self._spec_cache.view(usage, now), now, price)
+            if usage is not None
+            else ()
+        )
+        by_key = {item.spec.key: item for item in found}
+        specs = tuple(item.spec for item in found)
+        self._insight_cache = (usage, now, price, specs, by_key)
+        return specs, by_key
 
     @property
     def now(self) -> datetime:
@@ -198,6 +277,9 @@ class SpAccountCoordinator(DataUpdateCoordinator[UsageReadings]):
         usage = self.data
         if usage is None:
             return {}
+        insight = self._insights()[1].get(key)
+        if insight is not None:
+            return dict(insight.attributes)
         now = self.now
         return extra_attributes(usage, key, now, self._spec_cache.view(usage, now))
 
@@ -235,6 +317,8 @@ class SpAccountCoordinator(DataUpdateCoordinator[UsageReadings]):
 
     async def async_tariff_updated(self) -> None:
         """Re-price the cost series when the scraped tariff changes (quarterly)."""
+        # The cost insights are priced from the tariff: refresh (or add) them.
+        self.async_update_listeners()
         if self.electricity_price != self._imported_price:
             await self.async_import_billed_history()
 
@@ -478,6 +562,31 @@ class SpAccountCoordinator(DataUpdateCoordinator[UsageReadings]):
                     metadata(SENSOR_KEY_WATER, STATISTIC_NAME_WATER, UNIT_M3, "volume"),
                     points,
                     _cumulative,
+                )
+        for utility, series, unit, unit_class in (
+            ("electricity", usage.electricity, UNIT_KWH, "energy"),
+            ("water", usage.water, UNIT_M3, "volume"),
+        ):
+            if series is None or series.unit != unit:
+                continue
+            names = STATISTIC_NAMES_MONTHLY[utility]
+            keys = (
+                STATISTIC_KEY_MONTHLY,
+                STATISTIC_KEY_PEER_AVERAGE,
+                STATISTIC_KEY_PEER_EFFICIENT,
+            )
+            for key_format, name, points in zip(
+                keys, names, monthly_points(series), strict=True
+            ):
+                if not points:
+                    continue
+                key = key_format.format(utility=utility)
+                self._add_external_statistics(
+                    usage.premise_id,
+                    external_statistic_id(usage.premise_id, key),
+                    metadata(key, name, unit, unit_class),
+                    points,
+                    _amount,
                 )
         bill_points = monthly_bill_points(usage.bills)
         if bill_points:

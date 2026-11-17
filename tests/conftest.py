@@ -78,6 +78,15 @@ class DataUpdateCoordinator:
     async def _async_update_data(self):
         raise NotImplementedError
 
+    def async_add_listener(self, update_callback):
+        listeners = self.__dict__.setdefault("_listeners", [])
+        listeners.append(update_callback)
+        return lambda: listeners.remove(update_callback)
+
+    def async_update_listeners(self):
+        for update_callback in list(self.__dict__.get("_listeners", [])):
+            update_callback()
+
 
 class CoordinatorEntity:
     def __class_getitem__(cls, item):
@@ -262,6 +271,10 @@ class UnitOfVolume:
     CUBIC_METERS = "m³"
 
 
+class UnitOfPower:
+    WATT = "W"
+
+
 class IssueSeverity:
     ERROR = "error"
     WARNING = "warning"
@@ -352,8 +365,11 @@ class CalendarEntity:
 
 
 class CalendarEvent(dict):
+    """Dict access for older tests, attribute access like HA's dataclass."""
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.__dict__.update(kwargs)
 
 
 class DeviceInfo(dict):
@@ -402,6 +418,7 @@ _HA_MODULES: dict[str, ModuleType] = {
         EntityCategory=EntityCategory,
         UnitOfEnergy=UnitOfEnergy,
         UnitOfVolume=UnitOfVolume,
+        UnitOfPower=UnitOfPower,
         UnitOfTemperature=UnitOfTemperature,
         UnitOfSpeed=UnitOfSpeed,
         UnitOfPrecipitationDepth=UnitOfPrecipitationDepth,

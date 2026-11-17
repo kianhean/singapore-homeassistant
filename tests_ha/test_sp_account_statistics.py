@@ -6,7 +6,8 @@ Separate module because the recorder must be set up before ``hass`` (the
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -20,7 +21,11 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
     async_wait_recording_done,
 )
 
+from custom_components.singapore.sp_account.client import HttpResponse
+from custom_components.singapore.sp_account.const import JARVIS_AMI_PATH
 from custom_components.singapore.sp_account.history import external_statistic_id
+from custom_components.singapore.sp_account.models import SG_TZ
+from tests.sp_account.conftest import FIXED_NOW
 
 from .test_sp_account import _add_account, _setup
 
@@ -28,6 +33,31 @@ from .test_sp_account import _add_account, _setup
 @pytest.fixture
 async def mock_recorder_before_hass(async_test_recorder) -> None:
     """Set up the recorder test database before hass starts."""
+
+
+def _month_of_ami() -> bytes:
+    """31 days of half-hour slots up to the fixed clock (0.15 kWh at 03:00).
+
+    The recorded AMI fixture holds four slots, too few for the insights that
+    need full days (always-on power, yesterday, projected cost).
+    """
+    start = datetime(2026, 7, 3, tzinfo=SG_TZ)
+    rows = []
+    at = start
+    while at < FIXED_NOW:
+        amount = 0.15 if (at.hour, at.minute) == (3, 0) else 0.4
+        rows.append({"date": at.isoformat(), "amount": None, "consumption": amount})
+        at += timedelta(minutes=30)
+    body = {"unit": "kWh", "history": [{"data": rows}]}
+    return json.dumps(body).encode()
+
+
+@pytest.fixture
+def sp_month_of_ami(sp_transport):
+    sp_transport.responses[JARVIS_AMI_PATH] = HttpResponse(
+        status=200, body=_month_of_ami()
+    )
+    return sp_transport
 
 
 async def test_energy_statistics_are_imported(
@@ -41,8 +71,64 @@ async def test_energy_statistics_are_imported(
     ids = await recorder_mock.async_add_executor_job(list_statistic_ids, hass)
     statistic_ids = {item["statistic_id"] for item in ids}
     usage = entry.runtime_data.sp_accounts[next(iter(entry.subentries))].data
-    for key in ("electricity", "electricity_cost", "water", "last_bill"):
+    for key in (
+        "electricity",
+        "electricity_cost",
+        "water",
+        "last_bill",
+        "electricity_monthly",
+        "electricity_peer_average",
+        "electricity_peer_efficient",
+        "water_monthly",
+        "water_peer_average",
+        "water_peer_efficient",
+    ):
         assert external_statistic_id(usage.premise_id, key) in statistic_ids
+
+    peer_id = external_statistic_id(usage.premise_id, "electricity_peer_average")
+    rows = await recorder_mock.async_add_executor_job(
+        statistics_during_period,
+        hass,
+        datetime(2026, 1, 1, tzinfo=UTC),
+        None,
+        {peer_id},
+        "month",
+        None,
+        {"state"},
+    )
+    assert [row["state"] for row in rows[peer_id]] == [200.0, 200.0]
+
+
+async def test_insight_sensors_and_calendar_in_real_ha(
+    recorder_mock, hass: HomeAssistant, mock_sources, sp_month_of_ami
+) -> None:
+    entry = await _setup(hass)
+    await _add_account(hass, entry)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    prefix = "sensor.1_example_road_singapore_"
+    always_on = hass.states.get(f"{prefix}always_on_power")
+    assert always_on.state == "300.0"  # 0.15 kWh in 30 min
+    assert always_on.attributes["unit_of_measurement"] == "W"
+    assert hass.states.get(f"{prefix}electricity_yesterday").state == "18.95"
+    assert hass.states.get(f"{prefix}bill_status").state == "due"
+    window = hass.states.get(f"{prefix}meter_reading_window")
+    assert window.state == "upcoming"
+    assert window.attributes["options"] == ["upcoming", "open", "closed"]
+    assert hass.states.get(f"{prefix}electricity_vs_similar_homes").state == "-29"
+    for key in (
+        "electricity_cost_yesterday",
+        "electricity_cost_today",
+        "electricity_cost_this_month",
+        "projected_electricity_cost",
+    ):
+        state = hass.states.get(f"{prefix}{key}")
+        assert state is not None, key  # priced from the scraped tariff
+        assert float(state.state) > 0
+    calendar = hass.states.get(
+        "calendar.1_example_road_singapore_bills_and_meter_readings"
+    )
+    assert calendar is not None
 
 
 EXAMPLE = Path(__file__).parent.parent / "examples" / "sp_account_dashboard.yaml"
@@ -62,7 +148,7 @@ def _cards(node):
 
 
 async def test_example_sp_dashboard_matches_a_real_install(
-    recorder_mock, hass: HomeAssistant, mock_sources, sp_transport
+    recorder_mock, hass: HomeAssistant, mock_sources, sp_month_of_ami
 ) -> None:
     """examples/sp_account_dashboard.yaml only uses entities/statistics that exist.
 

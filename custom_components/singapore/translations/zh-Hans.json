@@ -22,6 +22,9 @@
     "calendar": {
       "public_holidays": {
         "name": "公共假期"
+      },
+      "sp_account_dates": {
+        "name": "账单与抄表"
       }
     },
     "sensor": {
@@ -211,6 +214,52 @@
       },
       "sp_tariff": {
         "name": "SP 电价"
+      },
+      "sp_electricity_always_on": {
+        "name": "待机功率"
+      },
+      "sp_electricity_yesterday": {
+        "name": "昨日用电量"
+      },
+      "sp_electricity_cost_yesterday": {
+        "name": "昨日电费"
+      },
+      "sp_electricity_cost_today": {
+        "name": "今日电费"
+      },
+      "sp_electricity_cost_month": {
+        "name": "本月电费"
+      },
+      "sp_electricity_projected_cost": {
+        "name": "本月预计电费"
+      },
+      "sp_electricity_vs_peers": {
+        "name": "用电量与同类住户对比"
+      },
+      "sp_water_vs_peers": {
+        "name": "用水量与同类住户对比"
+      },
+      "sp_electricity_goal_remaining": {
+        "name": "用电目标剩余"
+      },
+      "sp_water_goal_remaining": {
+        "name": "用水目标剩余"
+      },
+      "sp_bill_status": {
+        "name": "账单状态",
+        "state": {
+          "paid": "已付清",
+          "due": "待付款",
+          "overdue": "已逾期"
+        }
+      },
+      "sp_meter_reading_window": {
+        "name": "抄表提交期",
+        "state": {
+          "upcoming": "即将开始",
+          "open": "进行中",
+          "closed": "已结束"
+        }
       }
     },
     "camera": {

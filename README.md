@@ -41,7 +41,7 @@
 | 🚇 **MRT/LRT**<br>Network and per-line status (normal, planned works, disruption) with LTA's message | 🛂 **Checkpoints**<br>Woodlands and Tuas traffic camera stills as camera entities | 🚗 **COE**<br>Category A–E premiums, refreshed after each bidding exercise |
 | ⚡ **Lightning**<br>Live strikes and the distance to the nearest one from your home | 🦟 **Dengue**<br>Active NEA clusters and how far the nearest is from your home | 🌊 **Flash floods**<br>PUB flood alerts as they're issued and cancelled |
 | 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🎉 **Public holidays**<br>MOM's holiday list as a calendar | 🧩 **Blueprints**<br>[One-click automations](#one-click-blueprints) for lightning, MRT disruptions, floods, haze, COE, rain, UV, dengue, holidays and SP bills |
-| 🏠 **Your SP account** *(optional)*<br>Sign in once to get your own electricity, water and gas usage, down to the half hour on a smart meter | 📊 **Energy dashboard**<br>Hourly electricity with cost at the current SP tariff, plus monthly water, ready for [Home Assistant's Energy dashboard](#energy-dashboard-electricity-and-water) | 🧾 **Bills**<br>Last bill, amount due, meter readings and SP Green Goals, for [reminders and dashboards](#your-sp-account) |
+| 🏠 **Your SP account** *(optional)*<br>Sign in once to get your own electricity, water and gas usage, down to the half hour on a smart meter | 📊 **Energy dashboard**<br>Hourly electricity with cost at the current SP tariff, plus monthly water, ready for [Home Assistant's Energy dashboard](#energy-dashboard-electricity-and-water) | 🧾 **Bills**<br>Last bill, bill status, meter readings and SP Green Goals, plus how you compare with similar homes, for [reminders and dashboards](#your-sp-account) |
 
 The public data needs no API keys and no account: one config entry, and a diagnostics download when
 something looks off. You choose which data sources run ([Options](#options)). Linking your SP Group e-account is optional ([how](#optional-link-your-sp-group-e-account));
@@ -417,7 +417,7 @@ For the last hour as a moving loop, use `camera.weather_rain_radar_70_km_animati
 ### Your SP account
 
 <p align="center">
-  <img src="images/sp-account-dashboard.png" alt="SP account dashboard: this month's electricity use (153.1 kWh) and estimated cost (45.50 SGD), last month's 371.4 kWh, the 29.72 cents/kWh tariff, today's usage, daily and hourly electricity bar charts, amount due and last bill of 116.38 SGD, a bar chart of monthly bills, and Green Goals usage against a 350 kWh target" width="100%">
+  <img src="images/sp-account-dashboard.png" alt="SP account dashboard: this month's electricity use (153.1 kWh) and estimated cost (45.50 SGD), last month's 371.4 kWh, the 29.72 cents/kWh tariff, today's usage, a projected 108.96 SGD for the month and 11.79 kWh yesterday; usage 7% below similar homes for electricity and 12% for water, 160 W always-on power, and a monthly bar chart of your usage against similar and efficient homes; daily and hourly electricity bar charts; amount due and last bill of 116.38 SGD, bill status due on November 17, 2026, the meter reading window upcoming, a bar chart of monthly bills, and Green Goals usage against a 350 kWh target with 203.7 kWh left" width="100%">
   <br>
   <sub>The dashboard from <a href="examples/sp_account_dashboard.yaml">examples/sp_account_dashboard.yaml</a>, built only from Home Assistant's built-in cards. Example account data.</sub>
 </p>
@@ -428,11 +428,16 @@ placeholders (your device slug and premise ID, explained at the top of the file)
 It shows:
 
 - **This month:** kWh used and the estimated cost so far (Statistic cards on the imported
-  statistics), last month's kWh for comparison, the current SP tariff, and today's usage.
+  statistics), last month's kWh for comparison, the current SP tariff, today's usage, the
+  projected cost for the whole month, and yesterday's total.
+- **You vs similar homes:** how your last billed month of electricity and water compares with
+  SP's average for similar homes, your always-on (standby) power with what it costs a year, and
+  a monthly chart of your usage against similar and efficient homes.
 - **Usage:** daily bars for the last 30 days, and hourly bars for the last 3 days from the
   smart meter. That's where the evening air-con hours show up.
-- **Bills:** amount due, the last bill, a bar chart of every bill in the
-  past year, your Green Goals usage against its target, and the meter reading.
+- **Bills:** amount due, the last bill, whether it's paid, due or overdue (with the due date),
+  the meter-reading submission window, a bar chart of every bill in the past year, your Green
+  Goals usage against its target and what's left, and the meter reading.
 
 A test runs the example against a real Home Assistant, so every entity and statistic in it exists
 on a new install.
@@ -440,23 +445,10 @@ on a new install.
 **The Energy dashboard** is the other half: see the
 [step-by-step setup below](#energy-dashboard-electricity-and-water).
 
-**Today's estimated cost.** Combine the account's usage with the tariff the integration
-scrapes, using a template sensor in `configuration.yaml`:
-
-```yaml
-template:
-  - sensor:
-      - name: Electricity cost today
-        unique_id: sp_electricity_cost_today
-        unit_of_measurement: SGD
-        device_class: monetary
-        state: >-
-          {{ (states('sensor.1_example_road_singapore_electricity_today') | float(0)
-              * states('sensor.energy_electricity_tariff') | float(0) / 100) | round(2) }}
-        availability: >-
-          {{ has_value('sensor.1_example_road_singapore_electricity_today')
-             and has_value('sensor.energy_electricity_tariff') }}
-```
+**Bill due dates and meter-reading windows on a calendar.** Each account also has a calendar,
+`calendar.<your_address>_bills_and_meter_readings`: every bill's due date as an all-day event,
+and the meter-reading submission window as a timed one. Add it to a Calendar card, or trigger
+automations on its events.
 
 **Weather and usage together.** A History graph card with **Electricity last 30 min** and
 `sensor.weather_temperature` shows how much a hot afternoon costs you in air-con. Put both
@@ -555,6 +547,25 @@ appear only when SP returns data for them). New ones are added without a reload.
 | Unread notifications, Bill delivery, FCU (Tengah cooling), SP tariff | When SP returns them |
 | Account | Account status; carries the address, account number and retailer as attributes |
 
+Worked out from the same poll (no extra requests to SP):
+
+| Name | What it is |
+|------|------------|
+| Always-on power | Your standby load in W: the lowest half-hour of each of the last 7 full days (median), with `estimated_yearly_kwh` / `estimated_yearly_cost` |
+| Electricity yesterday | Yesterday's AMI total, once its last half-hour is in; `peak_half_hour` and `peak_half_hour_kwh` |
+| Electricity cost yesterday / today / this month | AMI kWh × the scraped SP tariff (incl. GST) |
+| Projected electricity cost | This month so far plus the last 7 full days' average for the rest of the month; `projected_kwh` |
+| Electricity vs similar homes / Water vs similar homes | Last billed month against SP's average for similar homes, in % (negative is below); `similar_homes_average`, `efficient_homes` |
+| Electricity goal remaining / Water goal remaining | Green Goals target minus usage so far (negative is over); `on_track` if this month's pace stays under the target |
+| Bill status | `paid` / `due` / `overdue`, from the amount due and the latest bill's due date; `due_date`, `days_until_due` |
+| Meter reading window | `upcoming` / `open` / `closed`, for homes that submit their own meter readings; `opens`, `closes`, `period` |
+
+The cost sensors need the SP Group tariff source on (they're priced from it). Most need a smart
+meter (AMI); *vs similar homes* and the goals come from SP's monthly figures.
+
+A calendar, **Bills and meter readings**, carries every bill's due date and the meter-reading
+window.
+
 **Energy dashboard.** After the first poll, long-term statistics are imported (setup steps:
 [Energy dashboard: electricity and water](#energy-dashboard-electricity-and-water)):
 
@@ -569,6 +580,10 @@ appear only when SP returns data for them). New ones are added without a reload.
 - Water: **SP Group water** (`singapore:<premise_id>_water`), billed months in m³.
 - Gas: **SP Group gas** (`singapore:<premise_id>_gas`) when SP returns gas data.
 - **SP Group bill** (`singapore:<premise_id>_last_bill`) has one point per billed month.
+- **Similar homes** (`singapore:<premise_id>_electricity_monthly`, `..._electricity_peer_average`,
+  `..._electricity_peer_efficient`, and the same for `water`) have one point per billing month:
+  your usage, SP's average for similar homes and its efficient homes. Plot them together in a
+  Statistics graph card (`period: month`, `stat_types: [state]`).
 - Don't use *Electricity cumulative*, *Electricity last billed*, *Electricity meter* or
   *Electricity this month* as a grid source. They measure different things.
 
