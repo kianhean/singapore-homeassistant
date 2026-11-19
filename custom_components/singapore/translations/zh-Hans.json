@@ -353,6 +353,15 @@
     },
     "usage_failed": {
       "message": "无法从 SP Group 获取用量：{error}"
+    },
+    "http_error": {
+      "message": "{source} 返回了 HTTP {status}"
+    },
+    "fetch_failed": {
+      "message": "无法获取 {source}：{error}"
+    },
+    "bad_payload": {
+      "message": "{source} 返回的数据格式不符合预期：{detail}"
     }
   },
   "issues": {
@@ -369,7 +378,7 @@
     "step": {
       "init": {
         "title": "新加坡选项",
-        "description": "选择要运行的数据源。关闭的数据源会停止轮询，其实体将不再提供（如不需要，可从实体列表中删除）。保存后集成会重新加载。",
+        "description": "选择要运行的数据源。关闭的数据源会停止轮询，其实体和设备会被移除（重新开启即可恢复）。保存后集成会重新加载。",
         "data": {
           "sources": "数据源",
           "api_key": "data.gov.sg API 密钥",

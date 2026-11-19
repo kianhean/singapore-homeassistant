@@ -12,6 +12,8 @@ custom_components/singapore/
 │                           #   scaled_interval); imported by config_flow without pulling in coordinators
 ├── datagov.py              # Shared per-host data.gov.sg limiter (pacing + host-wide 429 pause/retry)
 ├── health.py               # SourceHealthMonitor: hourly check, "source_failing_<source>" repair issues
+├── entity.py               # SingaporeEntity base, DEVICES (device per source group), ENTITY_SOURCES
+├── errors.py               # source_error(): translated UpdateFailed (http_error/fetch_failed/bad_payload)
 ├── coordinator.py          # SPGroupCoordinator: fetches + parses SP Group tariff page
 ├── coe_coordinator.py      # CoeCoordinator: fetches COE results from data.gov.sg API
 ├── holiday_coordinator.py  # PublicHolidayCoordinator: fetches + parses MOM holidays
@@ -74,6 +76,10 @@ tests/
 ├── test_diagnostics.py          # Diagnostics serialization
 ├── test_datagov.py              # Limiter pacing vs the measured limit, 429 pause/retry, API key scoping
 ├── test_options.py              # Option helpers, sources off, health monitor, event entities
+├── test_entity.py               # Entity→source/device mapping, stale entity/device cleanup, device delete
+├── test_errors.py               # Translated update errors match strings.json
+├── test_sp_account_flow.py      # SP subentry flow (sign-in, MFA, reconfigure) + entry user step
+├── test_sp_account_statistics.py # SP statistics import against a fake recorder
 ├── test_translations.py         # Every translations/*.json mirrors strings.json keys + placeholders
 └── test_e2e.py                  # Live scrape tests (run with -m e2e, skipped in CI by default)
 
@@ -155,7 +161,17 @@ Platforms read it via `entry.runtime_data.<coordinator>` (see `sensor.py`, `weat
 Saving options fires the update listener; `_async_entry_updated` reloads when
 `entry.options != runtime_data.options` (before the SP-subentry check). A new data source
 must be added to `SOURCES`, `SOURCE_NAMES`, `_COORDINATORS` in `__init__.py`, a
-`SingaporeData` field, `selector.sources.options` in strings.json, and use both helpers.
+`SingaporeData` field, `selector.sources.options` in strings.json, a `DEVICES` entry (or an
+existing device's `sources`) and `ENTITY_SOURCES` keys in `entity.py`, and use both helpers.
+
+Turning a source off removes its entities and devices on the reload: `async_remove_stale`
+(`__init__.py`) maps each registry entry to a source with `entity.entity_source(platform,
+translation_key)` and drops a service device once every source in `DEVICES[key].sources` is off
+(Weather is shared by weather + radar; NEA by dengue + lightning + UV). Devices are looked up
+with `dr.async_entries_for_config_entry`: `async_get_device(identifiers=...)` is deprecated in
+2026.10 and its replacement doesn't exist in 2025.4. `async_remove_config_entry_device` lets
+the user delete any device that is no longer provided. **A new entity's translation key must be
+added to `ENTITY_SOURCES`** (`tests/test_entity.py` fails otherwise).
 
 Weather, holidays and trains are the blocking first refreshes (`_BLOCKING_SOURCES`); every
 other source loads in the background.
@@ -302,11 +318,11 @@ pytest tests/test_e2e.py -v -s -m e2e
 Real Home Assistant compatibility tests (`tests_ha/`). These catch HA API changes the
 stubbed unit tests cannot. Each `pytest-homeassistant-custom-component` release pins an
 exact HA version; CI runs the minimum (`0.13.232` → HA 2025.4.0, Python 3.13), current
-stable (`0.13.367` → HA 2026.9.4, Python 3.14) and newest (non-blocking) harness:
+stable (`0.13.375` → HA 2026.10.4, Python 3.14) and newest (non-blocking) harness:
 
 ```bash
 uv venv --python 3.14 .venv-ha
-uv pip install --python .venv-ha/bin/python pytest-homeassistant-custom-component==0.13.367 "beautifulsoup4>=4.12.3" PyTurboJPEG
+uv pip install --python .venv-ha/bin/python pytest-homeassistant-custom-component==0.13.375 "beautifulsoup4>=4.12.3" PyTurboJPEG
 .venv-ha/bin/python -m pytest tests_ha -v
 ```
 
@@ -748,6 +764,12 @@ Both commands must exit cleanly — CI will fail otherwise.
   (`data_gov_get` / `limiter_for`), which paces api-open.data.gov.sg and handles HTTP 429
   for all coordinators at once
 - Entity unique IDs must be stable: `{entry_id}_{suffix}`
+- Public-source entities subclass `entity.SingaporeEntity[Coordinator]`, set `_device` (a
+  `DEVICES` key) and pass the unique-id suffix to `super().__init__(coordinator, entry_id,
+  suffix)`; don't build `DeviceInfo` by hand. (SP account entities keep their own per-premise
+  device.)
+- Raise update errors with `errors.source_error(ERROR_HTTP | ERROR_FETCH | ERROR_PAYLOAD,
+  SOURCE_X, ...)`, not a bare `UpdateFailed("...")`, so they are translated.
 - Entities use `_attr_attribution` for data credit, and icons come from `icons.json`
   (icon translations) keyed by translation key — do not set `_attr_icon`
 - Platforms use `AddConfigEntryEntitiesCallback` (not the legacy `AddEntitiesCallback`)

@@ -93,6 +93,8 @@ that part is built on [maci0/home-assistant-sp](https://github.com/maci0/home-as
 
 ## What's new
 
+- **v0.15** Turning a data source off now removes its entities and devices, update errors are
+  translated, and there's a [Known limitations](#known-limitations) section.
 - **v0.13** Animated rain radar loops (the last hour, over NEA's base map) and HACS installs
   from a release zip.
 - **v0.12** Choose your data sources, an optional data.gov.sg API key and reduced polling
@@ -117,7 +119,7 @@ page. Upgrading from before v0.3.0? Your entity IDs are kept; see the
 - [Dashboard ideas](#dashboard-ideas): [your SP account](#your-sp-account) and the
   [Energy dashboard](#energy-dashboard-electricity-and-water)
 - [Entity reference](#entity-reference): every sensor, camera, weather, calendar and event entity
-- [FAQ](#faq) and [Troubleshooting](#troubleshooting)
+- [FAQ](#faq), [Troubleshooting](#troubleshooting) and [Known limitations](#known-limitations)
 - [Data sources](#data-sources), [Development](#development), [Contributing](#contributing),
   [Credits](#credits)
 
@@ -148,9 +150,9 @@ The lightning and dengue distances are measured from the home location in
 Open **Settings → Devices & Services → Singapore → Configure** to change:
 
 - **Data sources:** untick any you don't need (for example lightning, radar or checkpoint
-  cameras). A source you turn off stops polling data.gov.sg and its entities are no longer
-  provided; delete them from the entity list if you don't want them back. Everything is on
-  by default, and sources added in later releases start out on.
+  cameras). A source you turn off stops polling data.gov.sg, and its entities and devices
+  are removed; turn it back on and they come back. Everything is on by default, and sources
+  added in later releases start out on.
 - **data.gov.sg API key** (optional): a free key from
   [data.gov.sg](https://data.gov.sg) raises the rate limits, which means fewer HTTP 429
   errors. It's sent only to data.gov.sg.
@@ -1134,10 +1136,48 @@ account uses the unofficial APIs behind the SP app, which SP can change without 
 - **SP Group tariffs unavailable for days:** the tariff is scraped from spgroup.com.sg, which
   sometimes refuses connections (TLS errors) from some networks. The rest of the integration
   is unaffected; if you don't need tariffs, turn the source off.
-- **Entities left over after turning a source off:** they show as *no longer provided*. Select
-  them under **Settings → Devices & services → Entities** and delete them.
+- **Entities left over after turning a source off:** since v0.15 they are removed on the
+  reload that follows. A device the integration no longer provides can also be deleted from its
+  device page (**⋮ → Delete**); devices still in use refuse, as they would come straight back.
 - **Language:** entity names, states and the setup forms are translated into English and
   Simplified Chinese (简体中文). Entity IDs are always generated from the English names.
+
+## Known limitations
+
+What the integration can't do, mostly because of what the sources publish:
+
+- **COE results** are fetched once a day at 19:30, after LTA usually publishes them. Results
+  that appear earlier show up at 19:30 (or when you reload the integration).
+- **SP Group tariffs** are read from the tariff page on spgroup.com.sg, so a redesign of that
+  page can break them until a fix is released. Some networks get TLS errors from the site.
+- **Public holidays** are read from MOM's web page and cover the current year onwards.
+- **Hourly forecasts** have a condition only, in NEA's ~6-hour periods for five regions; NEA
+  gives no hourly temperature. The daily (4-day) outlook is Singapore-wide, so it's the same
+  for every area.
+- **MRT/LRT status** comes from the endpoint behind mytransport.sg, which isn't a documented
+  API. Planned works are read from LTA's notice text.
+- **Flood alerts:** data.gov.sg only returns the last ~50 minutes of messages, so the alert list
+  is built up across polls. An alert whose *Cancel* was missed (for example while Home
+  Assistant was off) is dropped after 3 hours.
+- **Checkpoint cameras** are the four Woodlands and Tuas cameras only. LTA's feed sometimes
+  leaves a camera out (camera 2702 was missing on 7 November 2026), and that camera is
+  unavailable until it's back.
+- **Rain radar:** NEA has no base map for the 480 km image, so that camera shows bare rain blobs
+  and is disabled by default, with no animation. The base maps are loaded from NEA's website
+  at runtime.
+- **UV index** is published hourly from 7 am to 7 pm only. **Lightning** keeps a 30-minute
+  window and includes strikes beyond Singapore (Batam, Johor). **Dengue clusters** update every
+  6 hours. Distances are measured from your Home Assistant home location.
+- **PSI and pollutant headline values** are the highest of the five regions (as NEA headlines
+  them); use the regional sensors for your area.
+- **data.gov.sg rate limits:** without an API key, about 6 requests per 10 seconds per network,
+  shared with anything else you run against data.gov.sg (see
+  [Troubleshooting](#troubleshooting)).
+- **SP accounts** use the unofficial APIs behind the SP app, which SP can change without notice.
+  They're polled every 30 minutes; smart-meter readings arrive a few hours late, homes without a
+  smart meter get one reading per billed month, and water is monthly for everyone. Energy
+  dashboard costs are estimated at SP Group's regulated tariff, not your retailer's rate.
+- **Entity IDs** are always generated from the English names, whatever your language.
 
 ## Data sources
 

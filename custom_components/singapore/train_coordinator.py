@@ -14,7 +14,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import scaled_interval
+from .const import SOURCE_TRAIN, scaled_interval
+from .errors import ERROR_FETCH, ERROR_HTTP, source_error
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -103,9 +104,7 @@ class TrainStatusCoordinator(DataUpdateCoordinator[TrainStatusData]):
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status != 200:
-                    raise UpdateFailed(
-                        f"mytransport.sg train status returned HTTP {response.status}"
-                    )
+                    raise source_error(ERROR_HTTP, SOURCE_TRAIN, status=response.status)
                 payload = await response.json(content_type=None)
         except (aiohttp.ClientError, TimeoutError) as err:
             if self.data is not None:
@@ -114,7 +113,7 @@ class TrainStatusCoordinator(DataUpdateCoordinator[TrainStatusData]):
                     err,
                 )
                 return self.data
-            raise UpdateFailed(f"Error fetching train status data: {err}") from err
+            raise source_error(ERROR_FETCH, SOURCE_TRAIN, error=err) from err
         except UpdateFailed as err:
             if self.data is not None:
                 _LOGGER.warning(

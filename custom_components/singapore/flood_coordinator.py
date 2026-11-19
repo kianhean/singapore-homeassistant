@@ -12,8 +12,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import data_gov_headers, scaled_interval
+from .const import SOURCE_FLOOD, data_gov_headers, scaled_interval
 from .datagov import data_gov_get
+from .errors import ERROR_FETCH, ERROR_HTTP, ERROR_PAYLOAD, source_error
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -129,10 +130,10 @@ def _parse_flood_messages(payload: dict) -> tuple[list[_FloodMessage], datetime 
     doesn't have the expected envelope at all.
     """
     if not isinstance(payload, dict) or not isinstance(payload.get("data"), dict):
-        raise UpdateFailed("Unexpected flood-alerts payload shape")
+        raise source_error(ERROR_PAYLOAD, SOURCE_FLOOD, detail="no data object")
     records = payload["data"].get("records")
     if not isinstance(records, list):
-        raise UpdateFailed("Flood-alerts payload has no records list")
+        raise source_error(ERROR_PAYLOAD, SOURCE_FLOOD, detail="no records list")
 
     messages: list[_FloodMessage] = []
     latest: datetime | None = None
@@ -223,9 +224,7 @@ class FloodAlertCoordinator(DataUpdateCoordinator[FloodAlertData]):
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status != 200:
-                    raise UpdateFailed(
-                        f"data.gov.sg flood alerts returned HTTP {response.status}"
-                    )
+                    raise source_error(ERROR_HTTP, SOURCE_FLOOD, status=response.status)
                 payload = await response.json(content_type=None)
         except (aiohttp.ClientError, TimeoutError) as err:
             if self.data is not None:
@@ -233,7 +232,7 @@ class FloodAlertCoordinator(DataUpdateCoordinator[FloodAlertData]):
                     "Error fetching flood alerts (%s); using last known values", err
                 )
                 return self.data
-            raise UpdateFailed(f"Error fetching flood alerts: {err}") from err
+            raise source_error(ERROR_FETCH, SOURCE_FLOOD, error=err) from err
         except UpdateFailed as err:
             if self.data is not None:
                 _LOGGER.warning(

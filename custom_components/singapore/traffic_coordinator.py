@@ -13,8 +13,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import data_gov_headers, scaled_interval
+from .const import SOURCE_TRAFFIC, data_gov_headers, scaled_interval
 from .datagov import data_gov_get
+from .errors import ERROR_FETCH, ERROR_HTTP, ERROR_PAYLOAD, source_error
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,10 +75,10 @@ def _parse_traffic_images(payload: dict) -> TrafficImagesData:
     """
     items = payload.get("items") if isinstance(payload, dict) else None
     if not isinstance(items, list) or not items or not isinstance(items[0], dict):
-        raise UpdateFailed("Unexpected traffic-images payload shape")
+        raise source_error(ERROR_PAYLOAD, SOURCE_TRAFFIC, detail="no items list")
     cameras = items[0].get("cameras")
     if not isinstance(cameras, list):
-        raise UpdateFailed("Traffic-images payload has no cameras list")
+        raise source_error(ERROR_PAYLOAD, SOURCE_TRAFFIC, detail="no cameras list")
 
     result: dict[str, TrafficCamera] = {}
     for cam in cameras:
@@ -125,8 +126,8 @@ class TrafficImagesCoordinator(DataUpdateCoordinator[TrafficImagesData]):
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status != 200:
-                    raise UpdateFailed(
-                        f"data.gov.sg traffic images returned HTTP {response.status}"
+                    raise source_error(
+                        ERROR_HTTP, SOURCE_TRAFFIC, status=response.status
                     )
                 payload = await response.json(content_type=None)
         except (aiohttp.ClientError, TimeoutError) as err:
@@ -135,7 +136,7 @@ class TrafficImagesCoordinator(DataUpdateCoordinator[TrafficImagesData]):
                     "Error fetching traffic images (%s); using last known values", err
                 )
                 return self.data
-            raise UpdateFailed(f"Error fetching traffic images: {err}") from err
+            raise source_error(ERROR_FETCH, SOURCE_TRAFFIC, error=err) from err
         except UpdateFailed as err:
             if self.data is not None:
                 _LOGGER.warning(

@@ -13,8 +13,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import data_gov_headers, scaled_interval
+from .const import SOURCE_PSI, data_gov_headers, scaled_interval
 from .datagov import data_gov_get
+from .errors import ERROR_FETCH, ERROR_HTTP, ERROR_PAYLOAD, source_error
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -101,9 +102,7 @@ class PsiCoordinator(DataUpdateCoordinator[PsiData]):
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status != 200:
-                    raise UpdateFailed(
-                        f"data.gov.sg PSI endpoint returned HTTP {response.status}"
-                    )
+                    raise source_error(ERROR_HTTP, SOURCE_PSI, status=response.status)
                 payload = await response.json(content_type=None)
         except (aiohttp.ClientError, TimeoutError) as err:
             if self.data is not None:
@@ -111,7 +110,7 @@ class PsiCoordinator(DataUpdateCoordinator[PsiData]):
                     "Error fetching PSI data (%s); using last known values", err
                 )
                 return self.data
-            raise UpdateFailed(f"Error fetching PSI data: {err}") from err
+            raise source_error(ERROR_FETCH, SOURCE_PSI, error=err) from err
         except UpdateFailed as err:
             if self.data is not None:
                 _LOGGER.warning(
@@ -122,7 +121,9 @@ class PsiCoordinator(DataUpdateCoordinator[PsiData]):
 
         parsed = _parse_psi(payload)
         if "psi_twenty_four_hourly" not in parsed.national:
-            raise UpdateFailed("No PSI readings found in data.gov.sg payload")
+            raise source_error(
+                ERROR_PAYLOAD, SOURCE_PSI, detail="No PSI readings found"
+            )
         return parsed
 
 

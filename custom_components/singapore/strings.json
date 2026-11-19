@@ -353,6 +353,15 @@
     },
     "usage_failed": {
       "message": "Could not fetch usage from SP Group: {error}"
+    },
+    "http_error": {
+      "message": "{source} returned HTTP {status}"
+    },
+    "fetch_failed": {
+      "message": "Could not fetch {source}: {error}"
+    },
+    "bad_payload": {
+      "message": "{source} sent data in an unexpected format: {detail}"
     }
   },
   "issues": {
@@ -369,7 +378,7 @@
     "step": {
       "init": {
         "title": "Singapore options",
-        "description": "Choose which data sources run. A source you turn off stops polling and its entities are no longer provided (remove them from the entity list if you don't want them back). Saving reloads the integration.",
+        "description": "Choose which data sources run. A source you turn off stops polling, and its entities and devices are removed (turn it back on to get them back). Saving reloads the integration.",
         "data": {
           "sources": "Data sources",
           "api_key": "data.gov.sg API key",

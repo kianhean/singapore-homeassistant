@@ -10,12 +10,10 @@ import aiohttp
 from homeassistant.components.camera import Camera
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SingaporeConfigEntry
-from .const import DOMAIN
+from .entity import DEVICE_TRAFFIC, DEVICE_WEATHER, SingaporeEntity
 from .radar_coordinator import RADAR_RANGES, SGT, RadarCoordinator, RadarImage
 from .radar_image import BASEMAPS, animate_radar, composite_radar
 from .traffic_coordinator import CHECKPOINT_CAMERAS, TrafficImagesCoordinator
@@ -71,22 +69,20 @@ async def _download_image(hass: HomeAssistant, url: str, label: str) -> bytes | 
         return None
 
 
-class SingaporeCheckpointCamera(CoordinatorEntity[TrafficImagesCoordinator], Camera):
+class SingaporeCheckpointCamera(SingaporeEntity[TrafficImagesCoordinator], Camera):
     """Latest LTA still image for a Woodlands / Tuas checkpoint camera."""
 
-    _attr_has_entity_name = True
+    _device = DEVICE_TRAFFIC
     _attr_translation_key = "checkpoint_camera"
     _attr_attribution = "Data provided by LTA via data.gov.sg"
 
     def __init__(
         self, coordinator: TrafficImagesCoordinator, entry_id: str, camera_id: str
     ) -> None:
-        super().__init__(coordinator)
+        super().__init__(coordinator, entry_id, f"traffic_camera_{camera_id}")
         Camera.__init__(self)
-        self._entry_id = entry_id
         self._camera_id = camera_id
         name, self._checkpoint, self._description = CHECKPOINT_CAMERAS[camera_id]
-        self._attr_unique_id = f"{entry_id}_traffic_camera_{camera_id}"
         self._attr_translation_placeholders = {"location": name}
         self._cached_url: str | None = None
         self._cached_image: bytes | None = None
@@ -138,21 +134,8 @@ class SingaporeCheckpointCamera(CoordinatorEntity[TrafficImagesCoordinator], Cam
         self._cached_image = image
         return image
 
-    @property
-    def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._entry_id}_traffic_cameras")},
-            name="Traffic Cameras",
-            manufacturer="Singapore",
-            model="LTA Traffic Images",
-            entry_type=DeviceEntryType.SERVICE,
-            configuration_url=(
-                "https://data.gov.sg/datasets/d_6cdb6b405b25aaaacbaf7689bcc6fae0/view"
-            ),
-        )
 
-
-class SingaporeRainRadarCamera(CoordinatorEntity[RadarCoordinator], Camera):
+class SingaporeRainRadarCamera(SingaporeEntity[RadarCoordinator], Camera):
     """Latest NEA rain radar image for one radar range.
 
     For the 70 km and 240 km ranges the transparent radar PNG is drawn on NEA's own
@@ -161,19 +144,18 @@ class SingaporeRainRadarCamera(CoordinatorEntity[RadarCoordinator], Camera):
     also falls back to the bare overlay while its base map can't be fetched.
     """
 
-    _attr_has_entity_name = True
+    # Same device as the weather entities and readings sensors.
+    _device = DEVICE_WEATHER
     _attr_translation_key = "rain_radar"
     _attr_attribution = "Data provided by NEA via data.gov.sg; map by NEA"
 
     def __init__(
         self, coordinator: RadarCoordinator, entry_id: str, radar_range: str
     ) -> None:
-        super().__init__(coordinator)
+        super().__init__(coordinator, entry_id, f"rain_radar_{radar_range}")
         Camera.__init__(self)
         self.content_type = "image/png"
-        self._entry_id = entry_id
         self._range = radar_range
-        self._attr_unique_id = f"{entry_id}_rain_radar_{radar_range}"
         self._attr_translation_placeholders = {"range": RADAR_RANGES[radar_range]}
         self._basemap_spec = BASEMAPS.get(radar_range)
         # Without an NEA map (480 km) the image is just coloured blobs: keep the
@@ -275,18 +257,6 @@ class SingaporeRainRadarCamera(CoordinatorEntity[RadarCoordinator], Camera):
         self._cached_key = key
         self._cached_image = image
         return image
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        # Same device as the weather entities and readings sensors.
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._entry_id}_weather")},
-            name="Weather",
-            manufacturer="Singapore",
-            model="NEA Weather",
-            entry_type=DeviceEntryType.SERVICE,
-            configuration_url="https://www.nea.gov.sg",
-        )
 
 
 class SingaporeRainRadarAnimationCamera(SingaporeRainRadarCamera):

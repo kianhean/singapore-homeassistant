@@ -1,6 +1,6 @@
 """Tests for weather payload parsing and coordinator output models."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -696,3 +696,151 @@ async def test_weather_coordinator_twenty_four_hour(day_status):
         assert coordinator.data.regional_forecast[0].regions == {"east": "Cloudy"}
     else:
         assert coordinator.data.regional_forecast is None
+
+
+# -- helper edge cases -------------------------------------------------------
+
+
+def _response(status: int = 200, payload: dict | None = None) -> MagicMock:
+    response = MagicMock()
+    response.status = status
+    response.json = AsyncMock(return_value=payload or {})
+    response.text = AsyncMock(return_value="")
+    response.headers = {}
+    return response
+
+
+async def test_fetch_with_retry_retries_429_then_returns_200():
+    import asyncio  # noqa: F401  (keeps the fake clock fixture in charge)
+
+    from custom_components.singapore.weather_coordinator import _fetch_with_retry
+
+    session = MagicMock()
+    busy, ok = _response(429), _response(200)
+    session.get = AsyncMock(side_effect=[busy, ok])
+    assert await _fetch_with_retry(session, "https://example.com/x") is ok
+    busy.release.assert_called_once()
+    assert session.get.await_count == 2
+
+
+async def test_fetch_with_retry_gives_up_after_max_retries():
+    from custom_components.singapore.datagov import MAX_RETRIES
+    from custom_components.singapore.weather_coordinator import _fetch_with_retry
+
+    session = MagicMock()
+    responses = [_response(429) for _ in range(MAX_RETRIES + 1)]
+    session.get = AsyncMock(side_effect=responses)
+    result = await _fetch_with_retry(session, "https://example.com/x")
+    assert result is responses[-1]
+    assert result.status == 429
+
+
+async def test_reading_average_skips_errors_and_averages_values():
+    import asyncio
+
+    from custom_components.singapore.weather_coordinator import (
+        _fetch_reading_average,
+    )
+
+    sem = asyncio.Semaphore(1)
+    session = MagicMock()
+    payload = {"items": [{"readings": [{"value": 30}, {"value": "x"}, {"value": 31}]}]}
+    session.get = AsyncMock(return_value=_response(200, payload))
+    assert await _fetch_reading_average(session, sem, "u", "temperature") == 30.5
+
+    session.get = AsyncMock(return_value=_response(500))
+    assert await _fetch_reading_average(session, sem, "u", "temperature") is None
+
+    session.get = AsyncMock(side_effect=OSError("boom"))
+    assert await _fetch_reading_average(session, sem, "u", "temperature") is None
+
+    bad_json = _response(200)
+    bad_json.json = AsyncMock(side_effect=ValueError("not json"))
+    session.get = AsyncMock(return_value=bad_json)
+    assert await _fetch_reading_average(session, sem, "u", "temperature") is None
+    bad_json.release.assert_called_once()
+
+    session.get = AsyncMock(return_value=_response(200, {"items": []}))
+    assert await _fetch_reading_average(session, sem, "u", "temperature") is None
+
+
+async def test_aggregated_readings_treat_exceptions_as_none():
+    from custom_components.singapore import weather_coordinator as wc
+
+    async def _avg(_session, _sem, _url, key, *_args):
+        if key == "humidity":
+            raise RuntimeError("unexpected")
+        return 1.0
+
+    with patch.object(wc, "_fetch_reading_average", _avg):
+        readings = await wc._fetch_aggregated_readings(MagicMock(), MagicMock())
+    assert readings.humidity is None
+    assert readings.temperature == 1.0
+
+
+def test_parsers_tolerate_junk():
+    from custom_components.singapore.weather_coordinator import (
+        _area_regions,
+        _parse_iso_datetime,
+        _parse_twenty_four_hour,
+        _to_int,
+    )
+
+    assert _to_int("7") == 7
+    assert _to_int(None) is None
+    assert _to_int("x") is None
+    assert _parse_iso_datetime(None) is None
+    assert _parse_iso_datetime("not a date") is None
+    naive = _parse_iso_datetime("2026-04-05T08:00:00")
+    assert naive.tzinfo is timezone.utc
+    assert _parse_iso_datetime("2026-04-05T00:00:00Z").tzinfo is not None
+
+    assert (
+        _area_regions({"area_metadata": ["junk", {"name": "", "label_location": {}}]})
+        == {}
+    )
+    assert _parse_twenty_four_hour({"data": {"records": ["junk"]}}) == []
+    assert (
+        _parse_twenty_four_hour(
+            {"data": {"records": [{"periods": ["junk", {"timePeriod": {}}]}]}}
+        )
+        == []
+    )
+
+
+def test_parse_four_day_skips_junk_rows():
+    payload = {
+        "data": {
+            "records": [
+                "junk",
+                {"date": "2026-04-06", "forecast": {"text": ""}},
+                {
+                    "date": "2026-04-07",
+                    "forecast": "Thundery Showers",
+                    "temperature": {"low": 25, "high": 33},
+                },
+            ]
+        }
+    }
+    days = _parse_four_day(payload)
+    assert [d.condition_text for d in days] == ["Thundery Showers"]
+
+
+def test_parse_weather_without_valid_period_uses_timestamp_or_now():
+    with_timestamp = _parse_weather(
+        {
+            "items": [
+                {
+                    "timestamp": "2026-04-05T08:00:00+08:00",
+                    "forecasts": [{"area": "Bedok", "forecast": "Fair"}],
+                }
+            ]
+        }
+    )
+    area = with_timestamp.areas["Bedok"]
+    assert area.valid_end - area.valid_start == timedelta(hours=2)
+
+    no_times = _parse_weather(
+        {"items": [{"forecasts": [{"area": "Bedok", "forecast": "Fair"}]}]}
+    )
+    assert no_times.areas["Bedok"].valid_start is not None

@@ -12,9 +12,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import data_gov_headers, scaled_interval
+from .const import SOURCE_LIGHTNING, data_gov_headers, scaled_interval
 from .datagov import data_gov_get
 from .dengue_coordinator import _haversine_km
+from .errors import ERROR_FETCH, ERROR_HTTP, ERROR_PAYLOAD, source_error
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -85,7 +86,9 @@ def _parse_lightning(payload: dict) -> tuple[list[LightningStrike], datetime | N
     data = payload.get("data") if isinstance(payload, dict) else None
     records = data.get("records") if isinstance(data, dict) else None
     if not isinstance(records, list):
-        raise UpdateFailed("Lightning payload has no data.records list")
+        raise source_error(
+            ERROR_PAYLOAD, SOURCE_LIGHTNING, detail="no data.records list"
+        )
 
     strikes: list[LightningStrike] = []
     latest: datetime | None = None
@@ -173,8 +176,8 @@ class LightningCoordinator(DataUpdateCoordinator[LightningData]):
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status != 200:
-                    raise UpdateFailed(
-                        f"data.gov.sg lightning returned HTTP {response.status}"
+                    raise source_error(
+                        ERROR_HTTP, SOURCE_LIGHTNING, status=response.status
                     )
                 payload = await response.json(content_type=None)
         except (aiohttp.ClientError, TimeoutError) as err:
@@ -183,7 +186,7 @@ class LightningCoordinator(DataUpdateCoordinator[LightningData]):
                     "Error fetching lightning (%s); using last known values", err
                 )
                 return self._snapshot(self.data.last_observation)
-            raise UpdateFailed(f"Error fetching lightning: {err}") from err
+            raise source_error(ERROR_FETCH, SOURCE_LIGHTNING, error=err) from err
         except UpdateFailed as err:
             if self.data is not None:
                 _LOGGER.warning(

@@ -14,7 +14,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import scaled_interval
+from .const import SOURCE_TARIFF, scaled_interval
+from .errors import ERROR_FETCH, ERROR_HTTP, ERROR_PAYLOAD, source_error
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -135,7 +136,9 @@ class SPGroupCoordinator(DataUpdateCoordinator[TariffData]):
                 TARIFF_URL, headers=_HEADERS, timeout=aiohttp.ClientTimeout(total=30)
             ) as response:
                 if response.status != 200:
-                    raise UpdateFailed(f"SP Group returned HTTP {response.status}")
+                    raise source_error(
+                        ERROR_HTTP, SOURCE_TARIFF, status=response.status
+                    )
                 html = await response.text()
         except (aiohttp.ClientError, TimeoutError) as err:
             if self.data is not None:
@@ -144,7 +147,7 @@ class SPGroupCoordinator(DataUpdateCoordinator[TariffData]):
                     err,
                 )
                 return self.data
-            raise UpdateFailed(f"Error fetching SP Group tariffs: {err}") from err
+            raise source_error(ERROR_FETCH, SOURCE_TARIFF, error=err) from err
         except UpdateFailed as err:
             if self.data is not None:
                 _LOGGER.warning(
@@ -187,7 +190,11 @@ def _parse_tariff(html: str) -> TariffData:
             full_text, keywords=("total", "residential")
         )
     if electricity_price is None:
-        raise UpdateFailed("Could not find electricity price on SP Group page")
+        raise source_error(
+            ERROR_PAYLOAD,
+            SOURCE_TARIFF,
+            detail="Could not find electricity price on SP Group page",
+        )
 
     network_cost = _extract_by_keywords(full_text, keywords=_NETWORK_KEYWORDS)
     if network_cost is None:

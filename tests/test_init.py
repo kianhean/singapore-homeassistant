@@ -120,3 +120,113 @@ async def test_async_setup_entry_tariff_failure_does_not_block_setup():
     hass.config_entries.async_forward_entry_setups.assert_awaited_once()
     names = [c.args[2] for c in entry.async_create_background_task.call_args_list]
     assert "singapore_sp_group_tariff_initial_refresh" in names
+
+
+async def test_setup_runs_background_refreshes_coe_timer_and_sp_accounts(caplog):
+    """Background first refreshes, the 19:30 COE timer, SP accounts + repricing."""
+    from homeassistant.config_entries import ConfigSubentry
+    from homeassistant.helpers import event
+
+    from custom_components import singapore
+    from custom_components.singapore.sp_account_coordinator import (
+        SUBENTRY_TYPE_SP_ACCOUNT,
+        SpAccountCoordinator,
+    )
+
+    hass = MagicMock()
+    hass.config_entries.async_forward_entry_setups = AsyncMock()
+    tasks = []
+    hass.async_create_task = lambda coro, *a, **k: tasks.append(coro)
+    entry = ConfigEntry()
+    entry.subentries = {
+        "sub1": ConfigSubentry(
+            data={"username": "me@example.com"},
+            subentry_type=SUBENTRY_TYPE_SP_ACCOUNT,
+            title="me",
+            subentry_id="sub1",
+        ),
+        "other": ConfigSubentry(
+            data={}, subentry_type="something_else", title="x", subentry_id="other"
+        ),
+    }
+    background = []
+    entry.async_create_background_task = lambda _hass, coro, name: background.append(
+        (name, coro)
+    )
+    event.async_track_time_change.reset_mock()
+    ok = AsyncMock(return_value=MagicMock())
+    with (
+        patch.object(SingaporeWeatherCoordinator, "_async_update_data", ok),
+        patch.object(PublicHolidayCoordinator, "_async_update_data", ok),
+        patch.object(TrainStatusCoordinator, "_async_update_data", ok),
+        patch.object(
+            CoeCoordinator, "_async_update_data", AsyncMock(side_effect=OSError("x"))
+        ),
+        patch.object(SpAccountCoordinator, "async_tariff_updated", AsyncMock()),
+        patch.object(singapore, "async_remove_stale"),
+    ):
+        assert await async_setup_entry(hass, entry) is True
+        assert list(entry.runtime_data.sp_accounts) == ["sub1"]
+
+        # A failed background refresh logs and carries on.
+        names = dict(background)
+        await names["singapore_coe_initial_refresh"]
+        assert "Initial COE refresh failed" in caplog.text
+        for name, coro in background:
+            if name != "singapore_coe_initial_refresh":
+                coro.close()
+
+        # The COE timer refreshes the COE coordinator.
+        refresh_coe = event.async_track_time_change.call_args.args[1]
+        await refresh_coe(None)
+        kwargs = event.async_track_time_change.call_args.kwargs
+        assert (kwargs["hour"], kwargs["minute"]) == (19, 30)
+
+        # A tariff update re-prices every SP account.
+        entry.runtime_data.tariff.async_update_listeners()
+        assert len(tasks) == 1
+        await tasks[0]
+        SpAccountCoordinator.async_tariff_updated.assert_awaited_once()
+
+
+async def test_unload_stops_sp_imports_and_remove_clears_issues():
+    from homeassistant.helpers import issue_registry as ir
+
+    from custom_components.singapore import (
+        SingaporeData,
+        async_remove_entry,
+        async_unload_entry,
+    )
+
+    hass = MagicMock()
+    hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
+    account = MagicMock()
+    account.async_stop_stats_import = AsyncMock()
+    entry = ConfigEntry()
+    entry.runtime_data = SingaporeData(
+        **dict.fromkeys(
+            (
+                "tariff",
+                "coe",
+                "weather",
+                "holiday",
+                "train",
+                "psi",
+                "flood",
+                "traffic",
+                "dengue",
+                "lightning",
+                "uv",
+                "radar",
+            )
+        ),
+        sp_accounts={"sub1": account},
+    )
+    assert await async_unload_entry(hass, entry) is True
+    account.async_stop_stats_import.assert_awaited_once()
+
+    entry.subentries = {"sub1": MagicMock()}
+    ir.async_delete_issue.reset_mock()
+    await async_remove_entry(hass, entry)
+    deleted = [c.args[2] for c in ir.async_delete_issue.call_args_list]
+    assert "sp_account_auth_failed_sub1" in deleted

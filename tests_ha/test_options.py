@@ -8,6 +8,8 @@ from http import HTTPStatus
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import (
@@ -89,11 +91,72 @@ async def test_turning_sources_off_reloads_without_their_entities(
     # Reduced polling: 2 min → 6 min; the daily tariff scrape is unchanged.
     assert data.flood.update_interval == timedelta(minutes=6)
     assert data.tariff.update_interval == timedelta(hours=24)
-    # Entities of the disabled sources are no longer provided.
-    for entity_id in ("sensor.air_quality_psi", "camera.weather_rain_radar_70_km"):
-        state = hass.states.get(entity_id)
-        assert state is None or state.state == "unavailable"
+    # Entities and devices of the disabled sources are removed, not left
+    # behind as "no longer provided".
+    entity_registry = er.async_get(hass)
+    for entity_id in (
+        "sensor.air_quality_psi",
+        "sensor.air_quality_pm2_5",
+        "camera.weather_rain_radar_70_km",
+        "camera.traffic_cameras_woodlands_causeway",
+    ):
+        assert entity_registry.async_get(entity_id) is None, entity_id
+        assert hass.states.get(entity_id) is None, entity_id
+    devices = _device_keys(hass, entry)
+    assert "air_quality" not in devices
+    assert "traffic_cameras" not in devices
+    # Weather keeps its device (radar shared it) and its own entities.
+    assert "weather" in devices
+    assert entity_registry.async_get("sensor.weather_temperature") is not None
     assert hass.states.get("sensor.coe_category_a").state == "95501"
+
+    # Turned back on, the source's device and entities come back.
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"sources": list(SOURCES), "polling": "normal"}
+    )
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert entity_registry.async_get("sensor.air_quality_psi") is not None
+    assert hass.states.get("sensor.air_quality_psi") is not None
+    assert "air_quality" in _device_keys(hass, entry)
+
+
+def _device_keys(hass: HomeAssistant, entry: MockConfigEntry) -> dict:
+    """The entry's devices, keyed by identifier minus the entry id prefix."""
+    prefix = f"{entry.entry_id}_"
+    return {
+        identifier.removeprefix(prefix): device
+        for device in dr.async_entries_for_config_entry(
+            dr.async_get(hass), entry.entry_id
+        )
+        for _domain, identifier in device.identifiers
+    }
+
+
+async def test_a_device_no_longer_provided_can_be_deleted(
+    hass: HomeAssistant, hass_ws_client, mock_sources
+) -> None:
+    """The UI's "Delete" works on stale devices only."""
+    assert await async_setup_component(hass, "config", {})
+    entry = await _setup(hass)
+    device_registry = dr.async_get(hass)
+    stale = device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id, identifiers={(DOMAIN, "old_device")}
+    )
+    live = _device_keys(hass, entry)["coe"]
+    client = await hass_ws_client(hass)
+    for device, allowed in ((live, False), (stale, True)):
+        await client.send_json_auto_id(
+            {
+                "type": "config/device_registry/remove_config_entry",
+                "config_entry_id": entry.entry_id,
+                "device_id": device.id,
+            }
+        )
+        response = await client.receive_json()
+        assert response["success"] is allowed, response
+    assert device_registry.async_get(stale.id) is None
+    assert device_registry.async_get(live.id) is not None
 
 
 async def test_no_sources_is_rejected(hass: HomeAssistant, mock_sources) -> None:
