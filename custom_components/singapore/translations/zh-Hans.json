@@ -25,6 +25,15 @@
       },
       "sp_account_dates": {
         "name": "账单与抄表"
+      },
+      "school_holidays": {
+        "name": "假期"
+      },
+      "school_terms": {
+        "name": "学期"
+      },
+      "school_exams": {
+        "name": "考试"
       }
     },
     "sensor": {
@@ -381,18 +390,21 @@
         "description": "选择要运行的数据源。关闭的数据源会停止轮询，其实体和设备会被移除（重新开启即可恢复）。保存后集成会重新加载。",
         "data": {
           "sources": "数据源",
+          "school_events": "校历",
           "api_key": "data.gov.sg API 密钥",
           "polling": "轮询频率"
         },
         "data_description": {
           "sources": "关闭 SP Group 电价后，SP 账户的费用统计也将不再计价。",
+          "school_events": "开启教育部校历数据源时要创建哪些校历。",
           "api_key": "可选。data.gov.sg 的免费密钥可提供更高的速率限制（减少 HTTP 429 错误）。留空则使用公共限制。",
           "polling": "“降低”会将快速数据源（淹水警报、雷击、交通摄像头、雷达、列车、天气、PSI、紫外线）的轮询频率降低为三分之一。"
         }
       }
     },
     "error": {
-      "no_sources": "请至少开启一个数据源，或先添加一个 SP 账户。"
+      "no_sources": "请至少开启一个数据源，或先添加一个 SP 账户。",
+      "no_school_events": "请至少选择一个校历，或关闭教育部校历数据源。"
     }
   },
   "selector": {
@@ -402,6 +414,7 @@
         "coe": "拥车证投标结果",
         "weather": "NEA 天气与预报",
         "holiday": "公共假期日历",
+        "school": "教育部校历",
         "train": "地铁/轻轨列车状态",
         "psi": "空气质量（PSI）",
         "flood": "PUB 淹水警报",
@@ -410,6 +423,13 @@
         "lightning": "NEA 雷击",
         "uv": "NEA 紫外线指数",
         "radar": "NEA 降雨雷达"
+      }
+    },
+    "school_events": {
+      "options": {
+        "holidays": "学校假期",
+        "terms": "学期",
+        "exams": "全国考试"
       }
     },
     "polling": {

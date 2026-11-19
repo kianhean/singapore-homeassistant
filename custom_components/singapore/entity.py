@@ -19,6 +19,7 @@ from homeassistant.helpers.update_coordinator import (
 
 from .const import (
     DOMAIN,
+    SCHOOL_EVENT_KINDS,
     SOURCE_COE,
     SOURCE_DENGUE,
     SOURCE_FLOOD,
@@ -26,6 +27,7 @@ from .const import (
     SOURCE_LIGHTNING,
     SOURCE_PSI,
     SOURCE_RADAR,
+    SOURCE_SCHOOL,
     SOURCE_TARIFF,
     SOURCE_TRAFFIC,
     SOURCE_TRAIN,
@@ -39,6 +41,7 @@ DEVICE_ENERGY = "energy"
 DEVICE_COE = "coe"
 DEVICE_WEATHER = "weather"
 DEVICE_HOLIDAY = "holiday"
+DEVICE_SCHOOL = "school"
 DEVICE_TRAIN = "train"
 DEVICE_AIR_QUALITY = "air_quality"
 DEVICE_FLOOD = "flood"
@@ -82,6 +85,12 @@ DEVICES: dict[str, SingaporeDevice] = {
         "MOM Public Holidays",
         (SOURCE_HOLIDAY,),
         "https://www.mom.gov.sg/employment-practices/public-holidays",
+    ),
+    DEVICE_SCHOOL: SingaporeDevice(
+        "School",
+        "MOE School Calendar",
+        (SOURCE_SCHOOL,),
+        "https://www.moe.gov.sg/calendar",
     ),
     DEVICE_TRAIN: SingaporeDevice(
         "MRT/LRT",
@@ -130,6 +139,7 @@ ENTITY_SOURCES: dict[str, str] = {
         SOURCE_WEATHER,
     ),
     "public_holidays": SOURCE_HOLIDAY,
+    **{f"school_{kind}": SOURCE_SCHOOL for kind in SCHOOL_EVENT_KINDS},
     **dict.fromkeys(
         ("train_status", "train_line_status", "train_service_alert"), SOURCE_TRAIN
     ),
@@ -153,6 +163,11 @@ ENTITY_SOURCES: dict[str, str] = {
     **dict.fromkeys(("uv_index", "uv_exposure"), SOURCE_UV),
     **dict.fromkeys(("rain_radar", "rain_radar_animation"), SOURCE_RADAR),
 }
+
+
+def school_translation_key(kind: str) -> str:
+    """The translation key of a MOE school calendar (one per event kind)."""
+    return f"school_{kind}"
 
 
 def entity_source(platform: str, translation_key: str | None) -> str | None:

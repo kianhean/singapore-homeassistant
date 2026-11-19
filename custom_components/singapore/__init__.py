@@ -19,6 +19,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from .coe_coordinator import CoeCoordinator
 from .const import (
     DOMAIN,
+    SCHOOL_EVENT_KINDS,
     SOURCE_COE,
     SOURCE_DENGUE,
     SOURCE_FLOOD,
@@ -26,23 +27,31 @@ from .const import (
     SOURCE_LIGHTNING,
     SOURCE_PSI,
     SOURCE_RADAR,
+    SOURCE_SCHOOL,
     SOURCE_TARIFF,
     SOURCE_TRAFFIC,
     SOURCE_TRAIN,
     SOURCE_UV,
     SOURCE_WEATHER,
     SOURCES,
+    enabled_school_events,
     enabled_sources,
 )
 from .coordinator import SPGroupCoordinator
 from .dengue_coordinator import DengueClusterCoordinator
-from .entity import DEVICES, device_identifier, entity_source
+from .entity import (
+    DEVICES,
+    device_identifier,
+    entity_source,
+    school_translation_key,
+)
 from .flood_coordinator import FloodAlertCoordinator
 from .health import async_clear_source_issues, async_setup_source_health
 from .holiday_coordinator import PublicHolidayCoordinator
 from .lightning_coordinator import LightningCoordinator
 from .psi_coordinator import PsiCoordinator
 from .radar_coordinator import RadarCoordinator
+from .school_coordinator import SchoolCalendarCoordinator
 from .sp_account_coordinator import (
     SUBENTRY_TYPE_SP_ACCOUNT,
     SpAccountCoordinator,
@@ -89,6 +98,7 @@ class SingaporeData:
     lightning: LightningCoordinator | None
     uv: UvCoordinator | None
     radar: RadarCoordinator | None
+    school: SchoolCalendarCoordinator | None
     # One per SP Group e-account subentry, keyed by subentry id.
     sp_accounts: dict[str, SpAccountCoordinator] = field(default_factory=dict)
     # The options this setup used; a change to them reloads the entry.
@@ -119,6 +129,7 @@ _COORDINATORS: dict[str, type[DataUpdateCoordinator]] = {
     SOURCE_LIGHTNING: LightningCoordinator,
     SOURCE_UV: UvCoordinator,
     SOURCE_RADAR: RadarCoordinator,
+    SOURCE_SCHOOL: SchoolCalendarCoordinator,
 }
 
 # Weather, holidays and train status are the core sources: setup waits for
@@ -240,12 +251,20 @@ def async_remove_stale(
     SP account entities belong to subentries, which Home Assistant cleans up
     itself when a subentry is deleted.
     """
+    # MOE school calendars unticked in the options go too, source on or not.
+    school_off = {
+        school_translation_key(kind)
+        for kind in SCHOOL_EVENT_KINDS
+        if kind not in enabled_school_events(entry)
+    }
     entity_registry = er.async_get(hass)
     for reg_entry in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
         if getattr(reg_entry, "config_subentry_id", None) is not None:
             continue
         source = entity_source(reg_entry.domain, reg_entry.translation_key)
-        if source is not None and source not in enabled:
+        if source is None:
+            continue
+        if source not in enabled or reg_entry.translation_key in school_off:
             _LOGGER.debug("Removing %s: its source is turned off", reg_entry.entity_id)
             entity_registry.async_remove(reg_entry.entity_id)
 
@@ -296,6 +315,7 @@ _BACKGROUND_LABELS = {
     SOURCE_LIGHTNING: "lightning",
     SOURCE_UV: "UV index",
     SOURCE_RADAR: "rain radar",
+    SOURCE_SCHOOL: "MOE school calendar",
 }
 
 

@@ -59,6 +59,7 @@ async def test_options_form_serializes_over_http(
     assert body["step_id"] == "init"
     assert [field["name"] for field in body["data_schema"]] == [
         "sources",
+        "school_events",
         "api_key",
         "polling",
     ]
@@ -131,6 +132,41 @@ def _device_keys(hass: HomeAssistant, entry: MockConfigEntry) -> dict:
         )
         for _domain, identifier in device.identifiers
     }
+
+
+async def test_unticked_school_calendars_are_removed(
+    hass: HomeAssistant, mock_sources
+) -> None:
+    entry = await _setup(hass)
+    assert hass.states.get("calendar.school_terms") is not None
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            "sources": list(SOURCES),
+            "school_events": ["holidays", "exams"],
+            "polling": "normal",
+        },
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options["disabled_school_events"] == ["terms"]
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    entity_registry = er.async_get(hass)
+    assert entity_registry.async_get("calendar.school_terms") is None
+    assert hass.states.get("calendar.school_terms") is None
+    assert hass.states.get("calendar.school_holidays") is not None
+    assert "school" in _device_keys(hass, entry)
+
+    # None ticked while the source is on is refused on the form.
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {"sources": list(SOURCES), "school_events": [], "polling": "normal"},
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"school_events": "no_school_events"}
 
 
 async def test_a_device_no_longer_provided_can_be_deleted(

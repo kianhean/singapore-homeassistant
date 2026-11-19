@@ -13,7 +13,9 @@ from .const import (
     CONF_API_KEY,
     CONF_POLLING,
     POLLING_NORMAL,
+    SCHOOL_EVENT_KINDS,
     SOURCES,
+    enabled_school_events,
     enabled_sources,
 )
 from .sp_account.const import CONF_REFRESH_TOKEN
@@ -37,6 +39,11 @@ async def async_get_config_entry_diagnostics(
             "disabled_sources": sorted(
                 source for source in SOURCES if source not in enabled_sources(entry)
             ),
+            "disabled_school_events": [
+                kind
+                for kind in SCHOOL_EVENT_KINDS
+                if kind not in enabled_school_events(entry)
+            ],
             "polling": entry.options.get(CONF_POLLING, POLLING_NORMAL),
             # Never the key itself: diagnostics get pasted into public issues.
             "has_api_key": bool(entry.options.get(CONF_API_KEY)),

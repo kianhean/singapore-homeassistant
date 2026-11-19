@@ -6,6 +6,15 @@
       },
       "sp_account_dates": {
         "default": "mdi:calendar-account"
+      },
+      "school_holidays": {
+        "default": "mdi:beach"
+      },
+      "school_terms": {
+        "default": "mdi:school"
+      },
+      "school_exams": {
+        "default": "mdi:pencil"
       }
     },
     "sensor": {

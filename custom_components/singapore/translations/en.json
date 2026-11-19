@@ -25,6 +25,15 @@
       },
       "sp_account_dates": {
         "name": "Bills and meter readings"
+      },
+      "school_holidays": {
+        "name": "Holidays"
+      },
+      "school_terms": {
+        "name": "Terms"
+      },
+      "school_exams": {
+        "name": "Exams"
       }
     },
     "sensor": {
@@ -381,18 +390,21 @@
         "description": "Choose which data sources run. A source you turn off stops polling, and its entities and devices are removed (turn it back on to get them back). Saving reloads the integration.",
         "data": {
           "sources": "Data sources",
+          "school_events": "School calendars",
           "api_key": "data.gov.sg API key",
           "polling": "Polling"
         },
         "data_description": {
           "sources": "Turning off SP Group tariffs also leaves SP account cost statistics unpriced.",
+          "school_events": "Which MOE school calendars to create when the MOE school calendar source is on.",
           "api_key": "Optional. A free key from data.gov.sg gives higher rate limits (fewer HTTP 429 errors). Leave empty to use the public limits.",
           "polling": "Reduced polls the fast sources (flood alerts, lightning, traffic cameras, radar, trains, weather, PSI, UV) three times less often."
         }
       }
     },
     "error": {
-      "no_sources": "Turn on at least one data source, or add an SP account first."
+      "no_sources": "Turn on at least one data source, or add an SP account first.",
+      "no_school_events": "Choose at least one school calendar, or turn off the MOE school calendar source."
     }
   },
   "selector": {
@@ -402,6 +414,7 @@
         "coe": "COE bidding results",
         "weather": "NEA weather and forecasts",
         "holiday": "Public holidays calendar",
+        "school": "MOE school calendar",
         "train": "MRT/LRT train status",
         "psi": "Air quality (PSI)",
         "flood": "PUB flood alerts",
@@ -410,6 +423,13 @@
         "lightning": "NEA lightning",
         "uv": "NEA UV index",
         "radar": "NEA rain radar"
+      }
+    },
+    "school_events": {
+      "options": {
+        "holidays": "School holidays",
+        "terms": "School terms",
+        "exams": "National exams"
       }
     },
     "polling": {
