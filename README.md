@@ -1183,7 +1183,9 @@ What the integration can't do, mostly because of what the sources publish:
 - **Public holidays** are read from MOM's web page and cover the current year onwards.
 - **The MOE school calendar** is read from moe.gov.sg/calendar, which shows the current year
   only; next year's dates appear when MOE publishes them (by the end of August, the page says).
-  There's no per-level filter yet, so the calendars hold every level's dates.
+  There's no per-level filter yet, so the calendars hold every level's dates. MOE sometimes
+  answers cloud and datacenter addresses with a "verify you're not a bot" page; the calendars
+  then keep their last dates and retry the next day (a home connection normally gets the page).
 - **Hourly forecasts** have a condition only, in NEA's ~6-hour periods for five regions; NEA
   gives no hourly temperature. The daily (4-day) outlook is Singapore-wide, so it's the same
   for every area.

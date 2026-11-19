@@ -75,6 +75,13 @@ class SchoolCalendarCoordinator(DataUpdateCoordinator[list[SchoolEvent]]):
                         ERROR_HTTP, SOURCE_SCHOOL, status=response.status
                     )
                 html = await response.text()
+            if is_bot_check(html):
+                # Seen from datacenter IPs (GitHub Actions): a JavaScript bot
+                # check instead of the calendar. Transient as far as we can
+                # tell, so it's handled like a failed request.
+                raise source_error(
+                    ERROR_FETCH, SOURCE_SCHOOL, error="MOE answered with a bot check"
+                )
         except (aiohttp.ClientError, TimeoutError) as err:
             if self.data is not None:
                 _LOGGER.warning(
@@ -92,6 +99,14 @@ class SchoolCalendarCoordinator(DataUpdateCoordinator[list[SchoolEvent]]):
 
         # BeautifulSoup on a ~450 KB page is blocking: parse in the executor.
         return await self.hass.async_add_executor_job(_parse_school_calendar, html)
+
+
+def is_bot_check(html: str) -> bool:
+    """True when MOE served its JavaScript bot check instead of the calendar."""
+    if "fc-list-item" in html:
+        return False
+    text = html.lower()
+    return "enable javascript" in text and "bot" in text
 
 
 def _parse_date(value: str | None) -> date | None:

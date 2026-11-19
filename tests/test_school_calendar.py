@@ -32,6 +32,7 @@ from custom_components.singapore.school_coordinator import (
     SchoolCalendarCoordinator,
     SchoolEvent,
     _parse_school_calendar,
+    is_bot_check,
 )
 
 FIXTURE = (Path(__file__).parent / "fixtures" / "moe_calendar.html").read_text()
@@ -133,6 +134,34 @@ async def test_coordinator_errors_keep_last_known_data(session):
     coordinator = await _refresh(session, data=last)
     assert coordinator.last_update_success is True
     assert coordinator.data == last
+
+
+# The page MOE served to GitHub Actions (2026-11-19), shortened.
+BOT_CHECK = """<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"></head>
+<body><p>Please wait while we verify you are not a bot.</p>
+<noscript>This requires JavaScript. Enable JavaScript and then reload the page.
+</noscript></body></html>"""
+
+
+def test_is_bot_check():
+    assert is_bot_check(BOT_CHECK)
+    assert not is_bot_check(FIXTURE)
+    assert not is_bot_check("<html><body>Maintenance</body></html>")
+
+
+async def test_bot_check_keeps_last_known_data():
+    last = [SchoolEvent("Term 1", "terms", date(2026, 1, 2), date(2026, 3, 13))]
+    coordinator = await _refresh(_session(text=BOT_CHECK), data=last)
+    assert coordinator.last_update_success is True
+    assert coordinator.data == last
+
+
+async def test_bot_check_without_data_fails_as_a_fetch_error():
+    coordinator = await _refresh(_session(text=BOT_CHECK))
+    assert coordinator.last_update_success is False
+    kwargs = coordinator.last_exception.translation_kwargs
+    assert kwargs["translation_key"] == "fetch_failed"
+    assert "bot check" in kwargs["translation_placeholders"]["error"]
 
 
 async def test_changed_markup_fails_the_update():

@@ -243,9 +243,15 @@ def test_e2e_moe_school_calendar_fetch_and_parse():
     from custom_components.singapore.school_coordinator import (
         SCHOOL_CALENDAR_URL,
         _parse_school_calendar,
+        is_bot_check,
     )
 
-    events = _parse_school_calendar(_fetch_url_html(SCHOOL_CALENDAR_URL))
+    html = _fetch_url_html(SCHOOL_CALENDAR_URL)
+    if is_bot_check(html):
+        # moe.gov.sg serves a JavaScript bot check to some datacenter IPs
+        # (GitHub Actions among them); the integration treats it as transient.
+        pytest.skip("moe.gov.sg answered with its bot check from this network")
+    events = _parse_school_calendar(html)
     kinds = {event.kind for event in events}
     assert kinds == {"holidays", "terms", "exams"}, kinds
     assert all(event.name and event.end >= event.start for event in events)

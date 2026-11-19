@@ -717,6 +717,9 @@ in the background) and parses it in the executor. The page is server-rendered: e
 `.event-l-title` and an `.event-l-type`. `MOE_EVENT_TYPES` keeps *School holidays*, *School
 terms* and *National exams*; *Public holidays* (MOM has them) and *GIRO deductions* are skipped.
 No rows at all raises `UpdateFailed` (markup changed). The page shows the current year only.
+From datacenter IPs (GitHub Actions) MOE can serve a JavaScript "not a bot" page instead:
+`is_bot_check()` spots it and the coordinator treats it as a failed request (last-known data,
+`fetch_failed`), and the e2e test skips on it rather than failing CI.
 `SingaporeSchoolCalendar` (one per chosen kind, device *School*, unique id
 `{entry_id}_school_<kind>`, so `calendar.school_holidays` / `_terms` / `_exams`) turns MOE's
 inclusive end date into HA's exclusive one. Titles carry the level ("MK, Primary & Secondary",
