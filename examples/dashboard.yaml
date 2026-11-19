@@ -8,9 +8,10 @@
 # sensor.singapore_* IDs instead (see the README). Swap weather.weather_bedok for
 # your own forecast area.
 #
-# The Carparks & taxis view needs the two opt-in sources: tick "HDB carpark
-# availability" and "Taxi availability" under Settings → Devices & services →
-# Singapore → Configure, and swap the carpark numbers (B8B, B8, B6) for yours.
+# The Carparks & taxis view needs the three opt-in sources: tick "HDB carpark
+# availability", "Taxi availability" and "CapitaLand mall carparks" under
+# Settings → Devices & services → Singapore → Configure, and swap the carpark
+# numbers (B8B, B8, B6) and malls for yours.
 title: Singapore
 views:
   - title: Singapore
@@ -196,7 +197,7 @@ views:
   - title: Carparks & taxis
     path: carparks-taxis
     type: sections
-    max_columns: 2
+    max_columns: 3
     sections:
       - type: grid
         cards:
@@ -230,6 +231,39 @@ views:
                 entity: sensor.hdb_carparks_b6
                 attribute: car_lots_total
                 name: Blk 204/209 New Upper Changi Road
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: CapitaLand malls
+            icon: mdi:shopping
+          - type: tile
+            entity: sensor.capitaland_carparks_bedok_mall
+            name: Bedok Mall
+            color: purple
+          - type: tile
+            entity: sensor.capitaland_carparks_tampines_mall
+            name: Tampines Mall
+            color: purple
+          - type: tile
+            entity: sensor.capitaland_carparks_plaza_singapura
+            name: Plaza Singapura
+            color: purple
+          - type: entities
+            title: Total car lots
+            entities:
+              - type: attribute
+                entity: sensor.capitaland_carparks_bedok_mall
+                attribute: total_lots
+                name: Bedok Mall
+              - type: attribute
+                entity: sensor.capitaland_carparks_tampines_mall
+                attribute: total_lots
+                name: Tampines Mall
+              - type: attribute
+                entity: sensor.capitaland_carparks_plaza_singapura
+                attribute: total_lots
+                name: Plaza Singapura
 
       - type: grid
         cards:

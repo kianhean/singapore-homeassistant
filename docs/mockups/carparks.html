@@ -1,10 +1,11 @@
 <!doctype html>
 <!-- Mirrors the "Carparks & taxis" view of examples/dashboard.yaml: only built-in Home
-     Assistant cards, with the states they display (live values, 2026-11-19 19:45, Bedok).
+     Assistant cards, with the states they display (live values, 2026-11-19 19:45, Bedok;
+     CapitaLand malls 21:06).
      Keep the two in sync. -->
 <html><head><meta charset="utf-8"><link rel="stylesheet" href="ha.css">
 <style>
-  .view { grid-template-columns: repeat(2, 1fr); }
+  .view { grid-template-columns: repeat(3, 1fr); }
 </style></head>
 <body><div class="app">
   <nav class="sidebar">
@@ -26,6 +27,18 @@
           <div class="row"><span class="ic"><i m="mdiParking"></i></span><span class="label">Blk 222 Bedok North Drive</span><span class="val">229</span></div>
           <div class="row"><span class="ic"><i m="mdiParking"></i></span><span class="label">Blk 201/203 Bedok North Street 1</span><span class="val">113</span></div>
           <div class="row"><span class="ic"><i m="mdiParking"></i></span><span class="label">Blk 204/209 New Upper Changi Road</span><span class="val">521</span></div>
+        </div></div>
+      </div>
+
+      <div class="section">
+        <div class="heading"><i m="mdiShopping"></i>CapitaLand malls</div>
+        <div class="card tile"><span class="bubble" style="--c:var(--purple)"><i m="mdiParking"></i></span><div><div class="name">Bedok Mall</div><div class="state">111 lots</div></div></div>
+        <div class="card tile"><span class="bubble" style="--c:var(--purple)"><i m="mdiParking"></i></span><div><div class="name">Tampines Mall</div><div class="state">336 lots</div></div></div>
+        <div class="card tile"><span class="bubble" style="--c:var(--purple)"><i m="mdiParking"></i></span><div><div class="name">Plaza Singapura</div><div class="state">415 lots</div></div></div>
+        <div class="card"><div class="card-title">Total car lots</div><div class="rows">
+          <div class="row"><span class="ic"><i m="mdiParking"></i></span><span class="label">Bedok Mall</span><span class="val">264</span></div>
+          <div class="row"><span class="ic"><i m="mdiParking"></i></span><span class="label">Tampines Mall</span><span class="val">637</span></div>
+          <div class="row"><span class="ic"><i m="mdiParking"></i></span><span class="label">Plaza Singapura</span><span class="val">650</span></div>
         </div></div>
       </div>
 

@@ -383,7 +383,10 @@ async def test_example_dashboard_matches_a_real_install(
         domain=DOMAIN,
         title="Singapore",
         data={"name": "Singapore"},
-        options={"enabled_sources": ["carpark", "taxi"], "carparks": "B8B, B8, B6"},
+        options={
+            "enabled_sources": ["carpark", "taxi", "capitaland"],
+            "carparks": "B8B, B8, B6",
+        },
     )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)

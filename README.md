@@ -469,13 +469,14 @@ actions:
 **Copy the whole dashboard:** [`examples/dashboard.yaml`](examples/dashboard.yaml) builds the dashboard
 at the top of this page. Paste it into a new dashboard's raw configuration editor.
 
-**Carparks and taxis:** the same YAML has a second view, *Carparks & taxis*, for the two
-opt-in sources: a tile per HDB carpark with its free lots, the total lots per carpark, and
-free taxis near home. Tick **HDB carpark availability** and **Taxi availability** under
-Configure first, and swap the example carpark numbers (`B8B`, `B8`, `B6`) for yours.
+**Carparks and taxis:** the same YAML has a second view, *Carparks & taxis*, for the three
+opt-in sources: a tile per HDB carpark and per CapitaLand mall with its free lots, the total
+lots of each, and free taxis near home. Tick **HDB carpark availability**, **Taxi
+availability** and **CapitaLand mall carparks** under Configure first, and swap the example
+carpark numbers (`B8B`, `B8`, `B6`) and malls for yours.
 
 <p align="center">
-  <img src="images/carparks-taxis.png" alt="Carparks and taxis dashboard view: three HDB carparks in Bedok with 82, 31 and 230 free car lots and their total lots, 30 free taxis within 1 km, 4,105 island-wide, 4 within 500 m, 110 within 2 km and the nearest 0.312 km away" width="640">
+  <img src="images/carparks-taxis.png" alt="Carparks and taxis dashboard view: three HDB carparks in Bedok with 82, 31 and 230 free car lots and their total lots, Bedok Mall, Tampines Mall and Plaza Singapura with 111, 336 and 415 free lots of 264, 637 and 650, 30 free taxis within 1 km, 4,105 island-wide, 4 within 500 m, 110 within 2 km and the nearest 0.312 km away" width="800">
 </p>
 
 **PSI by region:** the hero dashboard lists the 24-hour PSI for each region. Each regional sensor

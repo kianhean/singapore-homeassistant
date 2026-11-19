@@ -109,7 +109,7 @@ tests_ha/                        # Runs against a REAL Home Assistant (no module
 blueprints/automation/singapore/  # Importable automation blueprints (README "Import" buttons)
 tests_ha/test_blueprints.py      # Runs every blueprint in real HA (one test per blueprint, required)
 examples/dashboard.yaml          # Built-in-cards dashboard: view 1 = images/hero.jpg (hero.html),
-                                 # view 2 "Carparks & taxis" (opt-in sources) = images/carparks-taxis.png
+                                 # view 2 "Carparks & taxis" (HDB, CapitaLand malls, taxis; opt-in) = images/carparks-taxis.png
                                  # (carparks.html); tests_ha checks every entity/attribute in it exists
 examples/sp_account_dashboard.yaml # SP account dashboard (built-in cards); tests_ha checks every
                                  # entity/statistic in it exists (test_sp_account_statistics.py)
