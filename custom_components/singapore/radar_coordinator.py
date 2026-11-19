@@ -13,8 +13,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import data_gov_headers, scaled_interval
+from .const import SOURCE_RADAR, data_gov_headers, scaled_interval
 from .datagov import data_gov_get
+from .errors import ERROR_FETCH, ERROR_HTTP, ERROR_PAYLOAD, source_error
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -157,11 +158,15 @@ def _parse_radar(
     source = payload if records else earlier
     primary = records or earlier_records
     if not primary:
-        raise UpdateFailed(f"Radar {radar_range} payload has no records")
+        raise source_error(
+            ERROR_PAYLOAD, SOURCE_RADAR, detail=f"{radar_range}: no records"
+        )
     record = primary[0]
     url = _record_url(record)
     if url is None:
-        raise UpdateFailed(f"Radar {radar_range} payload has no image URL")
+        raise source_error(
+            ERROR_PAYLOAD, SOURCE_RADAR, detail=f"{radar_range}: no image URL"
+        )
     image = record["image"]
     timestamp = _parse_datetime(record.get("timestamp"))
 
@@ -216,8 +221,10 @@ class RadarCoordinator(DataUpdateCoordinator[RadarData]):
             timeout=aiohttp.ClientTimeout(total=30),
         ) as response:
             if response.status != 200:
-                raise UpdateFailed(
-                    f"data.gov.sg radar {radar_range} returned HTTP {response.status}"
+                raise source_error(
+                    ERROR_HTTP,
+                    SOURCE_RADAR,
+                    status=f"{response.status} ({radar_range})",
                 )
             return await response.json(content_type=None)
 
@@ -257,7 +264,7 @@ class RadarCoordinator(DataUpdateCoordinator[RadarData]):
 
         if errors:
             if not images:
-                raise UpdateFailed(f"Error fetching radar images: {'; '.join(errors)}")
+                raise source_error(ERROR_FETCH, SOURCE_RADAR, error="; ".join(errors))
             _LOGGER.warning(
                 "Error fetching radar images (%s); using last known values",
                 "; ".join(errors),

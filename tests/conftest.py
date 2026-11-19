@@ -476,6 +476,14 @@ _HA_MODULES: dict[str, ModuleType] = {
         "homeassistant.helpers.device_registry",
         DeviceInfo=DeviceInfo,
         DeviceEntryType=DeviceEntryType,
+        DeviceEntry=MagicMock,
+        async_get=MagicMock(),
+        async_entries_for_config_entry=MagicMock(return_value=[]),
+    ),
+    "homeassistant.helpers.entity_registry": _mod(
+        "homeassistant.helpers.entity_registry",
+        async_get=MagicMock(),
+        async_entries_for_config_entry=MagicMock(return_value=[]),
     ),
     "homeassistant.util": _mod("homeassistant.util"),
     "homeassistant.util.dt": _mod(

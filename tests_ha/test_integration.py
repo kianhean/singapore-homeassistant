@@ -56,6 +56,17 @@ async def test_setup_creates_entities_and_unloads(
 
     assert hass.states.get("calendar.public_holidays") is not None
 
+    # MOE school calendars: one per kind, on the School device.
+    for entity_id in (
+        "calendar.school_holidays",
+        "calendar.school_terms",
+        "calendar.school_exams",
+    ):
+        state = hass.states.get(entity_id)
+        assert state is not None, entity_id
+        assert state.attributes["source"] == "MOE"
+    assert hass.states.get("calendar.school_exams").attributes["events"] == 1
+
     psi = hass.states.get("sensor.air_quality_psi")
     assert psi is not None
     assert float(psi.state) == 52

@@ -12,9 +12,12 @@ custom_components/singapore/
 │                           #   scaled_interval); imported by config_flow without pulling in coordinators
 ├── datagov.py              # Shared per-host data.gov.sg limiter (pacing + host-wide 429 pause/retry)
 ├── health.py               # SourceHealthMonitor: hourly check, "source_failing_<source>" repair issues
+├── entity.py               # SingaporeEntity base, DEVICES (device per source group), ENTITY_SOURCES
+├── errors.py               # source_error(): translated UpdateFailed (http_error/fetch_failed/bad_payload)
 ├── coordinator.py          # SPGroupCoordinator: fetches + parses SP Group tariff page
 ├── coe_coordinator.py      # CoeCoordinator: fetches COE results from data.gov.sg API
 ├── holiday_coordinator.py  # PublicHolidayCoordinator: fetches + parses MOM holidays
+├── school_coordinator.py   # SchoolCalendarCoordinator: MOE school holidays/terms/exams (moe.gov.sg/calendar)
 ├── weather_coordinator.py  # SingaporeWeatherCoordinator: 2-hour forecasts + collection 1459 readings
 ├── train_coordinator.py    # TrainStatusCoordinator: scrapes mytransport.sg MRT/LRT status
 ├── psi_coordinator.py      # PsiCoordinator: NEA PSI + pollutant readings per region
@@ -35,7 +38,7 @@ custom_components/singapore/
 │   ├── const.py / models.py / mapper.py / history.py  # constants, dataclasses, specs, statistics
 │   └── LICENSE             # Upstream MIT licence: must ship with the vendored code
 ├── camera.py               # Camera entities (checkpoint traffic cameras + rain radar still/animated)
-├── calendar.py             # Calendar entity (Singapore public holidays)
+├── calendar.py             # Calendar entities (public holidays; MOE school holidays/terms/exams)
 ├── event.py                # Event entities: COE new results, MRT/LRT service alerts
 ├── weather.py              # Weather entities (one per Singapore forecast area)
 ├── config_flow.py          # UI config flow (name; single instance), options flow, SP account subentry flow
@@ -69,11 +72,16 @@ tests/
 ├── sp_account/                  # Vendored upstream client/mapper/history tests + recorded fixtures
 ├── test_radar.py                # Radar parser, per-range fallback, radar camera entity + cache
 ├── test_calendar.py             # Calendar event and range query tests
+├── test_school_calendar.py      # MOE parser (tests/fixtures/moe_calendar.html), calendars, school options
 ├── test_sensor.py               # Sensor value, unit, attributes, unique_id, None-safety
 ├── test_weather.py              # Weather entity condition mapping + forecast tests
 ├── test_diagnostics.py          # Diagnostics serialization
 ├── test_datagov.py              # Limiter pacing vs the measured limit, 429 pause/retry, API key scoping
 ├── test_options.py              # Option helpers, sources off, health monitor, event entities
+├── test_entity.py               # Entity→source/device mapping, stale entity/device cleanup, device delete
+├── test_errors.py               # Translated update errors match strings.json
+├── test_sp_account_flow.py      # SP subentry flow (sign-in, MFA, reconfigure) + entry user step
+├── test_sp_account_statistics.py # SP statistics import against a fake recorder
 ├── test_translations.py         # Every translations/*.json mirrors strings.json keys + placeholders
 └── test_e2e.py                  # Live scrape tests (run with -m e2e, skipped in CI by default)
 
@@ -121,6 +129,7 @@ class SingaporeData:
     lightning: LightningCoordinator | None
     uv: UvCoordinator | None
     radar: RadarCoordinator | None
+    school: SchoolCalendarCoordinator | None
     sp_accounts: dict[str, SpAccountCoordinator]  # keyed by subentry id
     options: dict  # the options this setup used; a change reloads the entry
     def coordinators(self) -> dict[str, DataUpdateCoordinator]: ...  # enabled ones
@@ -138,12 +147,17 @@ Platforms read it via `entry.runtime_data.<coordinator>` (see `sensor.py`, `weat
 
 ## Options flow
 
-`SingaporeOptionsFlow` (Configure button) has three fields; all serializable selectors:
+`SingaporeOptionsFlow` (Configure button) has four fields; all serializable selectors:
 
 - `sources` — multi-select of `SOURCES` (labels under `selector.sources` in strings.json).
   Stored inverted as `options["disabled_sources"]`, so a source added in a later release is
   on for existing users. `enabled_sources(entry)` reads it. Empty with no SP subentries is
   rejected (`no_sources`).
+- `school_events` — multi-select of `SCHOOL_EVENT_KINDS` (`holidays` / `terms` / `exams`, labels
+  under `selector.school_events`), stored inverted as `options["disabled_school_events"]` (only
+  when non-empty); `enabled_school_events(entry)` reads it. Each kind is one calendar
+  (`school_<kind>`); unticked ones are removed by `async_remove_stale`. Empty while the school
+  source is on is rejected (`no_school_events`).
 - `api_key` — optional data.gov.sg key, sent as `x-api-key` by `data_gov_headers(entry)` on
   every data.gov.sg request (COE, weather, PSI, flood, traffic, dengue, lightning, UV, radar);
   **never** to SP Group, MOM or mytransport.sg. data.gov.sg answers 200 even for a bogus key,
@@ -155,7 +169,17 @@ Platforms read it via `entry.runtime_data.<coordinator>` (see `sensor.py`, `weat
 Saving options fires the update listener; `_async_entry_updated` reloads when
 `entry.options != runtime_data.options` (before the SP-subentry check). A new data source
 must be added to `SOURCES`, `SOURCE_NAMES`, `_COORDINATORS` in `__init__.py`, a
-`SingaporeData` field, `selector.sources.options` in strings.json, and use both helpers.
+`SingaporeData` field, `selector.sources.options` in strings.json, a `DEVICES` entry (or an
+existing device's `sources`) and `ENTITY_SOURCES` keys in `entity.py`, and use both helpers.
+
+Turning a source off removes its entities and devices on the reload: `async_remove_stale`
+(`__init__.py`) maps each registry entry to a source with `entity.entity_source(platform,
+translation_key)` and drops a service device once every source in `DEVICES[key].sources` is off
+(Weather is shared by weather + radar; NEA by dengue + lightning + UV). Devices are looked up
+with `dr.async_entries_for_config_entry`: `async_get_device(identifiers=...)` is deprecated in
+2026.10 and its replacement doesn't exist in 2025.4. `async_remove_config_entry_device` lets
+the user delete any device that is no longer provided. **A new entity's translation key must be
+added to `ENTITY_SOURCES`** (`tests/test_entity.py` fails otherwise).
 
 Weather, holidays and trains are the blocking first refreshes (`_BLOCKING_SOURCES`); every
 other source loads in the background.
@@ -302,11 +326,11 @@ pytest tests/test_e2e.py -v -s -m e2e
 Real Home Assistant compatibility tests (`tests_ha/`). These catch HA API changes the
 stubbed unit tests cannot. Each `pytest-homeassistant-custom-component` release pins an
 exact HA version; CI runs the minimum (`0.13.232` → HA 2025.4.0, Python 3.13), current
-stable (`0.13.367` → HA 2026.9.4, Python 3.14) and newest (non-blocking) harness:
+stable (`0.13.375` → HA 2026.10.4, Python 3.14) and newest (non-blocking) harness:
 
 ```bash
 uv venv --python 3.14 .venv-ha
-uv pip install --python .venv-ha/bin/python pytest-homeassistant-custom-component==0.13.367 "beautifulsoup4>=4.12.3" PyTurboJPEG
+uv pip install --python .venv-ha/bin/python pytest-homeassistant-custom-component==0.13.375 "beautifulsoup4>=4.12.3" PyTurboJPEG
 .venv-ha/bin/python -m pytest tests_ha -v
 ```
 
@@ -685,6 +709,23 @@ HA's `camera` component imports `turbojpeg`, which a real HA install provides bu
 `pytest-homeassistant-custom-component` harness does not, so `tests_ha` installs
 `PyTurboJPEG` explicitly (CI workflow + the local command above).
 
+### MOE School Calendar
+
+`school_coordinator.py` GETs `https://www.moe.gov.sg/calendar` every **24 hours** (first refresh
+in the background) and parses it in the executor. The page is server-rendered: each event is a
+`tr.fc-list-item` row with ISO `data-start` / `data-end` (no `data-end` = one day), an
+`.event-l-title` and an `.event-l-type`. `MOE_EVENT_TYPES` keeps *School holidays*, *School
+terms* and *National exams*; *Public holidays* (MOM has them) and *GIRO deductions* are skipped.
+No rows at all raises `UpdateFailed` (markup changed). The page shows the current year only.
+From datacenter IPs (GitHub Actions) MOE can serve a JavaScript "not a bot" page instead:
+`is_bot_check()` spots it and the coordinator treats it as a failed request (last-known data,
+`fetch_failed`), and the e2e test skips on it rather than failing CI.
+`SingaporeSchoolCalendar` (one per chosen kind, device *School*, unique id
+`{entry_id}_school_<kind>`, so `calendar.school_holidays` / `_terms` / `_exams`) turns MOE's
+inclusive end date into HA's exclusive one. Titles carry the level ("MK, Primary & Secondary",
+"Post-secondary"), so events overlap. `tests/fixtures/moe_calendar.html` holds real rows and
+feeds both the unit tests and `tests_ha`.
+
 ### Calendar Entity
 
 | Entity ID | Name | Description |
@@ -748,6 +789,12 @@ Both commands must exit cleanly — CI will fail otherwise.
   (`data_gov_get` / `limiter_for`), which paces api-open.data.gov.sg and handles HTTP 429
   for all coordinators at once
 - Entity unique IDs must be stable: `{entry_id}_{suffix}`
+- Public-source entities subclass `entity.SingaporeEntity[Coordinator]`, set `_device` (a
+  `DEVICES` key) and pass the unique-id suffix to `super().__init__(coordinator, entry_id,
+  suffix)`; don't build `DeviceInfo` by hand. (SP account entities keep their own per-premise
+  device.)
+- Raise update errors with `errors.source_error(ERROR_HTTP | ERROR_FETCH | ERROR_PAYLOAD,
+  SOURCE_X, ...)`, not a bare `UpdateFailed("...")`, so they are translated.
 - Entities use `_attr_attribution` for data credit, and icons come from `icons.json`
   (icon translations) keyed by translation key — do not set `_attr_icon`
 - Platforms use `AddConfigEntryEntitiesCallback` (not the legacy `AddEntitiesCallback`)

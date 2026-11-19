@@ -15,7 +15,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .const import scaled_interval
+from .const import SOURCE_HOLIDAY, scaled_interval
+from .errors import ERROR_FETCH, ERROR_HTTP, ERROR_PAYLOAD, source_error
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -68,7 +69,9 @@ class PublicHolidayCoordinator(DataUpdateCoordinator[list[PublicHoliday]]):
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status != 200:
-                    raise UpdateFailed(f"MOM returned HTTP {response.status}")
+                    raise source_error(
+                        ERROR_HTTP, SOURCE_HOLIDAY, status=response.status
+                    )
                 html = await response.text()
         except (aiohttp.ClientError, TimeoutError) as err:
             if self.data is not None:
@@ -77,7 +80,7 @@ class PublicHolidayCoordinator(DataUpdateCoordinator[list[PublicHoliday]]):
                     err,
                 )
                 return self.data
-            raise UpdateFailed(f"Error fetching MOM public holidays: {err}") from err
+            raise source_error(ERROR_FETCH, SOURCE_HOLIDAY, error=err) from err
         except UpdateFailed as err:
             if self.data is not None:
                 _LOGGER.warning(
@@ -161,7 +164,11 @@ def _parse_public_holidays(html: str) -> list[PublicHoliday]:
 
     holidays.sort(key=lambda h: (h.day, h.name))
     if not holidays:
-        raise UpdateFailed("Could not find public holiday rows on MOM page")
+        raise source_error(
+            ERROR_PAYLOAD,
+            SOURCE_HOLIDAY,
+            detail="Could not find public holiday rows on MOM page",
+        )
     return holidays
 
 

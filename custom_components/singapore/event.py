@@ -10,13 +10,11 @@ from typing import Any
 
 from homeassistant.components.event import EventEntity
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SingaporeConfigEntry
 from .coe_coordinator import CoeCoordinator, CoeData
-from .const import DOMAIN
+from .entity import DEVICE_COE, DEVICE_TRAIN, SingaporeEntity
 from .train_coordinator import TrainStatusCoordinator
 
 # Coordinator-driven: entities never poll on their own.
@@ -50,7 +48,7 @@ def coe_exercise(data: CoeData) -> str:
     return f"{data.month} #{data.bidding_no}"
 
 
-class SingaporeCoeResultsEvent(CoordinatorEntity[CoeCoordinator], EventEntity):
+class SingaporeCoeResultsEvent(SingaporeEntity[CoeCoordinator], EventEntity):
     """Fires once per bidding exercise, when LTA publishes its results.
 
     The last exercise seen is restored from the entity's last event across
@@ -59,26 +57,14 @@ class SingaporeCoeResultsEvent(CoordinatorEntity[CoeCoordinator], EventEntity):
     exercise and fires from the next one.
     """
 
-    _attr_has_entity_name = True
+    _device = DEVICE_COE
     _attr_translation_key = "coe_results"
     _attr_attribution = "Data provided by LTA via data.gov.sg"
     _attr_event_types = [EVENT_NEW_RESULTS]
 
     def __init__(self, coordinator: CoeCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator)
-        self._entry_id = entry_id
-        self._attr_unique_id = f"{entry_id}_coe_results_event"
+        super().__init__(coordinator, entry_id, "coe_results_event")
         self._last_exercise: str | None = None
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._entry_id}_coe")},
-            name="COE",
-            manufacturer="Singapore",
-            model="LTA COE Results",
-            entry_type=DeviceEntryType.SERVICE,
-        )
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -142,7 +128,7 @@ def train_transitions(
 
 
 class SingaporeTrainServiceAlertEvent(
-    CoordinatorEntity[TrainStatusCoordinator], EventEntity
+    SingaporeEntity[TrainStatusCoordinator], EventEntity
 ):
     """Fires when an MRT/LRT line is disrupted, has a planned notice, or recovers.
 
@@ -151,26 +137,14 @@ class SingaporeTrainServiceAlertEvent(
     ``disruption`` but fires no event).
     """
 
-    _attr_has_entity_name = True
+    _device = DEVICE_TRAIN
     _attr_translation_key = "train_service_alert"
     _attr_attribution = "Data provided by LTA via mytransport.sg"
     _attr_event_types = [EVENT_DISRUPTION, EVENT_PLANNED, EVENT_RESOLVED]
 
     def __init__(self, coordinator: TrainStatusCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator)
-        self._entry_id = entry_id
-        self._attr_unique_id = f"{entry_id}_train_service_alert"
+        super().__init__(coordinator, entry_id, "train_service_alert")
         self._previous: dict[str, str] | None = None
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._entry_id}_train")},
-            name="MRT/LRT",
-            manufacturer="Singapore",
-            model="MyTransport Train Status",
-            entry_type=DeviceEntryType.SERVICE,
-        )
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()

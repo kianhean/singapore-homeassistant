@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import io
 from collections.abc import Iterator
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -29,6 +30,7 @@ from custom_components.singapore.lightning_coordinator import LIGHTNING_URL
 from custom_components.singapore.psi_coordinator import PSI_URL
 from custom_components.singapore.radar_coordinator import RADAR_URL
 from custom_components.singapore.radar_image import BASEMAPS
+from custom_components.singapore.school_coordinator import SCHOOL_CALENDAR_URL
 from custom_components.singapore.sp_account import client as client_module
 from custom_components.singapore.sp_account.client import SpGroupClient
 from custom_components.singapore.traffic_coordinator import TRAFFIC_IMAGES_URL
@@ -310,6 +312,12 @@ def _lightning_payload() -> dict:
     }
 
 
+# Real event rows from moe.gov.sg/calendar, shared with the unit tests.
+_MOE_CALENDAR_HTML = (
+    Path(__file__).parents[1] / "tests" / "fixtures" / "moe_calendar.html"
+).read_text()
+
+
 def _holiday_html() -> str:
     year = dt_util.now().year
     return f"""
@@ -377,6 +385,7 @@ def mock_sources(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
             url, json={"items": [{"readings": [{"value": 30}, {"value": 32}]}]}
         )
     aioclient_mock.get(PUBLIC_HOLIDAYS_URL, text=_holiday_html())
+    aioclient_mock.get(SCHOOL_CALENDAR_URL, text=_MOE_CALENDAR_HTML)
     aioclient_mock.post(TRAIN_STATUS_URL, json=_TRAIN_PAYLOAD)
     aioclient_mock.get(PSI_URL, json=_PSI_PAYLOAD)
     aioclient_mock.get(FLOOD_ALERTS_URL, json=_flood_payload())

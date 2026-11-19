@@ -9,12 +9,11 @@ from homeassistant.components.weather import (
 )
 from homeassistant.const import UnitOfSpeed, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from . import SingaporeConfigEntry
-from .const import DOMAIN
+from .entity import DEVICE_WEATHER, SingaporeEntity
 from .weather_coordinator import SingaporeWeatherCoordinator, _wind_direction_to_degrees
 
 PARALLEL_UPDATES = 0
@@ -61,7 +60,8 @@ async def async_setup_entry(
 
 
 class SingaporeAreaWeatherEntity(
-    SingleCoordinatorWeatherEntity[SingaporeWeatherCoordinator]
+    SingaporeEntity[SingaporeWeatherCoordinator],
+    SingleCoordinatorWeatherEntity[SingaporeWeatherCoordinator],
 ):
     """One weather entity per Singapore forecast area.
 
@@ -70,7 +70,7 @@ class SingaporeAreaWeatherEntity(
     async_update_listeners call is needed.
     """
 
-    _attr_has_entity_name = True
+    _device = DEVICE_WEATHER
     _attr_attribution = "Data provided by NEA via data.gov.sg"
     _attr_supported_features = (
         WeatherEntityFeature.FORECAST_DAILY | WeatherEntityFeature.FORECAST_HOURLY
@@ -81,11 +81,9 @@ class SingaporeAreaWeatherEntity(
     def __init__(
         self, coordinator: SingaporeWeatherCoordinator, entry_id: str, area: str
     ) -> None:
-        super().__init__(coordinator)
-        self._entry_id = entry_id
-        self._area = area
         slug = area.lower().replace(" ", "_")
-        self._attr_unique_id = f"{entry_id}_weather_{slug}"
+        super().__init__(coordinator, entry_id, f"weather_{slug}")
+        self._area = area
         # Area names are dynamic Singapore place names, not translatable
         # strings, so this uses a raw name rather than a translation_key.
         self._attr_name = area
@@ -202,17 +200,6 @@ class SingaporeAreaWeatherEntity(
                 )
             )
         return result or None
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._entry_id}_weather")},
-            name="Weather",
-            manufacturer="Singapore",
-            model="NEA Weather",
-            entry_type=DeviceEntryType.SERVICE,
-            configuration_url="https://www.nea.gov.sg",
-        )
 
 
 def _map_condition(text: str) -> str:

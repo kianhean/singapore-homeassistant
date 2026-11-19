@@ -23,9 +23,7 @@ from homeassistant.const import (
     UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SingaporeConfigEntry
 from .coe_coordinator import (
@@ -34,9 +32,18 @@ from .coe_coordinator import (
     UNIT_COE,
     CoeCoordinator,
 )
-from .const import DOMAIN
 from .coordinator import UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER, SPGroupCoordinator
 from .dengue_coordinator import DengueClusterCoordinator, nearest_cluster
+from .entity import (
+    DEVICE_AIR_QUALITY,
+    DEVICE_COE,
+    DEVICE_ENERGY,
+    DEVICE_FLOOD,
+    DEVICE_NEA,
+    DEVICE_TRAIN,
+    DEVICE_WEATHER,
+    SingaporeEntity,
+)
 from .flood_coordinator import FloodAlertCoordinator
 from .lightning_coordinator import (
     LightningCoordinator,
@@ -63,8 +70,6 @@ UNIT_WIND_BEARING = DEGREE
 UNIT_RAINFALL = UnitOfPrecipitationDepth.MILLIMETERS
 
 TRAIN_STATUS_OPTIONS = ["normal", "planned", "disruption"]
-
-PSI_DATASET_URL = "https://data.gov.sg/datasets/d_fe37906a0182569d891506e815e819b7/view"
 
 # (reading key, translation key, device class, unit) for pollutant sensors.
 PSI_POLLUTANT_SENSORS: tuple[tuple[str, str, str | None, str], ...] = (
@@ -180,7 +185,7 @@ async def async_setup_entry(
         entry.async_on_unload(unsub)
 
 
-class _BaseTariffSensor(CoordinatorEntity[SPGroupCoordinator], SensorEntity):
+class _BaseTariffSensor(SingaporeEntity[SPGroupCoordinator], SensorEntity):
     """Shared base for SP Group tariff sensors.
 
     Tariff sensors report price-per-unit values (e.g. ¢/kWh, SGD/m³).
@@ -189,15 +194,11 @@ class _BaseTariffSensor(CoordinatorEntity[SPGroupCoordinator], SensorEntity):
     homeassistant/components/sensor/__init__.py.
     """
 
-    _attr_has_entity_name = True
+    _device = DEVICE_ENERGY
     _attr_attribution = "Data provided by SP Group"
     _attr_device_class = None  # custom price-rate units; no HA device class applies
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 2
-
-    def __init__(self, coordinator: SPGroupCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator)
-        self._entry_id = entry_id
 
     def _common_attrs(self) -> dict:
         if self.coordinator.data is None:
@@ -211,19 +212,6 @@ class _BaseTariffSensor(CoordinatorEntity[SPGroupCoordinator], SensorEntity):
             attrs["last_updated"] = self.coordinator.last_updated.isoformat()
         return attrs
 
-    @property
-    def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._entry_id}_energy")},
-            name="Energy",
-            manufacturer="Singapore",
-            model="SP Group Tariffs",
-            entry_type=DeviceEntryType.SERVICE,
-            configuration_url=(
-                "https://www.spgroup.com.sg/our-services/utilities/tariff-information"
-            ),
-        )
-
 
 class SingaporeElectricityTariffSensor(_BaseTariffSensor):
     """Total residential electricity tariff (¢/kWh)."""
@@ -232,8 +220,7 @@ class SingaporeElectricityTariffSensor(_BaseTariffSensor):
     _attr_native_unit_of_measurement = UNIT_ELECTRICITY
 
     def __init__(self, coordinator: SPGroupCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator, entry_id)
-        self._attr_unique_id = f"{entry_id}_electricity_tariff"
+        super().__init__(coordinator, entry_id, "electricity_tariff")
 
     @property
     def native_value(self) -> float | None:
@@ -253,8 +240,7 @@ class SingaporeSolarExportPriceSensor(_BaseTariffSensor):
     _attr_native_unit_of_measurement = UNIT_ELECTRICITY
 
     def __init__(self, coordinator: SPGroupCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator, entry_id)
-        self._attr_unique_id = f"{entry_id}_solar_export_price"
+        super().__init__(coordinator, entry_id, "solar_export_price")
 
     @property
     def native_value(self) -> float | None:
@@ -278,8 +264,7 @@ class SingaporeGasTariffSensor(_BaseTariffSensor):
     _attr_native_unit_of_measurement = UNIT_GAS
 
     def __init__(self, coordinator: SPGroupCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator, entry_id)
-        self._attr_unique_id = f"{entry_id}_gas_tariff"
+        super().__init__(coordinator, entry_id, "gas_tariff")
 
     @property
     def native_value(self) -> float | None:
@@ -297,8 +282,7 @@ class SingaporeWaterTariffSensor(_BaseTariffSensor):
     _attr_native_unit_of_measurement = UNIT_WATER
 
     def __init__(self, coordinator: SPGroupCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator, entry_id)
-        self._attr_unique_id = f"{entry_id}_water_tariff"
+        super().__init__(coordinator, entry_id, "water_tariff")
 
     @property
     def native_value(self) -> float | None:
@@ -309,10 +293,10 @@ class SingaporeWaterTariffSensor(_BaseTariffSensor):
         return self._common_attrs()
 
 
-class SingaporeCoeResultSensor(CoordinatorEntity[CoeCoordinator], SensorEntity):
+class SingaporeCoeResultSensor(SingaporeEntity[CoeCoordinator], SensorEntity):
     """COE bidding result (premium in SGD) for a single vehicle category."""
 
-    _attr_has_entity_name = True
+    _device = DEVICE_COE
     _attr_translation_key = "coe_category"
     _attr_attribution = "Data provided by LTA via data.gov.sg"
     _attr_device_class = None
@@ -322,10 +306,8 @@ class SingaporeCoeResultSensor(CoordinatorEntity[CoeCoordinator], SensorEntity):
     def __init__(
         self, coordinator: CoeCoordinator, entry_id: str, category: str
     ) -> None:
-        super().__init__(coordinator)
-        self._entry_id = entry_id
+        super().__init__(coordinator, entry_id, f"coe_cat_{category.lower()}")
         self._category = category
-        self._attr_unique_id = f"{entry_id}_coe_cat_{category.lower()}"
         self._attr_translation_placeholders = {"category": category}
 
     @property
@@ -349,51 +331,20 @@ class SingaporeCoeResultSensor(CoordinatorEntity[CoeCoordinator], SensorEntity):
             attrs["last_updated"] = self.coordinator.last_updated.isoformat()
         return attrs
 
-    @property
-    def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._entry_id}_coe")},
-            name="COE",
-            manufacturer="Singapore",
-            model="LTA COE Results",
-            entry_type=DeviceEntryType.SERVICE,
-            configuration_url=(
-                "https://data.gov.sg/datasets/d_69b3380ad7e51aff3a7dcc84eba52b8a/view"
-            ),
-        )
-
 
 class _BaseWeatherReadingSensor(
-    CoordinatorEntity[SingaporeWeatherCoordinator], SensorEntity
+    SingaporeEntity[SingaporeWeatherCoordinator], SensorEntity
 ):
     """Base class for realtime weather reading sensors from data.gov.sg collection 1459."""
 
-    _attr_has_entity_name = True
+    _device = DEVICE_WEATHER
     _attr_attribution = "Data provided by NEA via data.gov.sg"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 1
 
-    def __init__(
-        self, coordinator: SingaporeWeatherCoordinator, entry_id: str, suffix: str
-    ) -> None:
-        super().__init__(coordinator)
-        self._entry_id = entry_id
-        self._attr_unique_id = f"{entry_id}_{suffix}"
-
     @property
     def extra_state_attributes(self) -> dict:
         return {"source": "data.gov.sg / NEA (collection 1459)"}
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._entry_id}_weather")},
-            name="Weather",
-            manufacturer="Singapore",
-            model="NEA Weather",
-            entry_type=DeviceEntryType.SERVICE,
-            configuration_url="https://www.nea.gov.sg",
-        )
 
 
 class SingaporeTemperatureSensor(_BaseWeatherReadingSensor):
@@ -474,21 +425,17 @@ class SingaporeRainfallSensor(_BaseWeatherReadingSensor):
         return self.coordinator.data.readings.precipitation
 
 
-class SingaporeTrainStatusSensor(
-    CoordinatorEntity[TrainStatusCoordinator], SensorEntity
-):
+class SingaporeTrainStatusSensor(SingaporeEntity[TrainStatusCoordinator], SensorEntity):
     """Overall MRT/LRT network status from mytransport.sg."""
 
-    _attr_has_entity_name = True
+    _device = DEVICE_TRAIN
     _attr_translation_key = "train_status"
     _attr_attribution = "Data provided by LTA via mytransport.sg"
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = TRAIN_STATUS_OPTIONS
 
     def __init__(self, coordinator: TrainStatusCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator)
-        self._entry_id = entry_id
-        self._attr_unique_id = f"{entry_id}_train_status"
+        super().__init__(coordinator, entry_id, "train_status")
 
     @property
     def native_value(self) -> str | None:
@@ -507,24 +454,13 @@ class SingaporeTrainStatusSensor(
             "url": "https://www.mytransport.sg/trainstatus#",
         }
 
-    @property
-    def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._entry_id}_train")},
-            name="MRT/LRT",
-            manufacturer="Singapore",
-            model="MyTransport Train Status",
-            entry_type=DeviceEntryType.SERVICE,
-            configuration_url="https://www.mytransport.sg/trainstatus#",
-        )
-
 
 class SingaporeTrainLineStatusSensor(
-    CoordinatorEntity[TrainStatusCoordinator], SensorEntity
+    SingaporeEntity[TrainStatusCoordinator], SensorEntity
 ):
     """Status sensor for a single MRT/LRT line."""
 
-    _attr_has_entity_name = True
+    _device = DEVICE_TRAIN
     _attr_translation_key = "train_line_status"
     _attr_attribution = "Data provided by LTA via mytransport.sg"
     _attr_device_class = SensorDeviceClass.ENUM
@@ -533,11 +469,9 @@ class SingaporeTrainLineStatusSensor(
     def __init__(
         self, coordinator: TrainStatusCoordinator, entry_id: str, line_name: str
     ) -> None:
-        super().__init__(coordinator)
-        self._entry_id = entry_id
-        self._line_name = line_name
         slug = re.sub(r"[^a-z0-9]+", "_", line_name.lower()).strip("_")
-        self._attr_unique_id = f"{entry_id}_train_{slug}_status"
+        super().__init__(coordinator, entry_id, f"train_{slug}_status")
+        self._line_name = line_name
         self._attr_translation_placeholders = {"line": line_name}
 
     @property
@@ -554,47 +488,20 @@ class SingaporeTrainLineStatusSensor(
             "url": "https://www.mytransport.sg/trainstatus#",
         }
 
-    @property
-    def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._entry_id}_train")},
-            name="MRT/LRT",
-            manufacturer="Singapore",
-            model="MyTransport Train Status",
-            entry_type=DeviceEntryType.SERVICE,
-            configuration_url="https://www.mytransport.sg/trainstatus#",
-        )
 
-
-class _BasePsiSensor(CoordinatorEntity[PsiCoordinator], SensorEntity):
+class _BasePsiSensor(SingaporeEntity[PsiCoordinator], SensorEntity):
     """Shared base for NEA PSI / air quality sensors."""
 
-    _attr_has_entity_name = True
+    _device = DEVICE_AIR_QUALITY
     _attr_attribution = "Data provided by NEA via data.gov.sg"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 0
-
-    def __init__(self, coordinator: PsiCoordinator, entry_id: str, suffix: str) -> None:
-        super().__init__(coordinator)
-        self._entry_id = entry_id
-        self._attr_unique_id = f"{entry_id}_{suffix}"
 
     def _common_attrs(self) -> dict:
         attrs: dict = {"source": "data.gov.sg / NEA"}
         if self.coordinator.data and self.coordinator.data.timestamp is not None:
             attrs["reading_time"] = self.coordinator.data.timestamp.isoformat()
         return attrs
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._entry_id}_air_quality")},
-            name="Air Quality",
-            manufacturer="Singapore",
-            model="NEA PSI",
-            entry_type=DeviceEntryType.SERVICE,
-            configuration_url=PSI_DATASET_URL,
-        )
 
 
 class SingaporePsiSensor(_BasePsiSensor):
@@ -703,21 +610,17 @@ class SingaporePollutantSensor(_BasePsiSensor):
         return attrs
 
 
-class SingaporeFloodAlertsSensor(
-    CoordinatorEntity[FloodAlertCoordinator], SensorEntity
-):
+class SingaporeFloodAlertsSensor(SingaporeEntity[FloodAlertCoordinator], SensorEntity):
     """Number of active PUB flash-flood alerts, with alert details as attributes."""
 
-    _attr_has_entity_name = True
+    _device = DEVICE_FLOOD
     _attr_translation_key = "flood_alerts"
     _attr_attribution = "Data provided by PUB via data.gov.sg"
     _attr_device_class = None
     _attr_state_class = None
 
     def __init__(self, coordinator: FloodAlertCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator)
-        self._entry_id = entry_id
-        self._attr_unique_id = f"{entry_id}_flood_alerts"
+        super().__init__(coordinator, entry_id, "flood_alerts")
 
     @property
     def native_value(self) -> int | None:
@@ -739,45 +642,12 @@ class SingaporeFloodAlertsSensor(
             "source": "PUB via data.gov.sg",
         }
 
-    @property
-    def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._entry_id}_flood")},
-            name="PUB",
-            manufacturer="Singapore",
-            model="PUB Flood Alerts",
-            entry_type=DeviceEntryType.SERVICE,
-            configuration_url=(
-                "https://data.gov.sg/datasets/d_f1404e08587ce555b9ea3f565e2eb9a3/view"
-            ),
-        )
 
+class _BaseDengueSensor(SingaporeEntity[DengueClusterCoordinator], SensorEntity):
+    """Shared base for NEA dengue cluster sensors."""
 
-def _nea_device_info(entry_id: str) -> DeviceInfo:
-    """Device shared by the NEA dengue, lightning and UV sensors."""
-    return DeviceInfo(
-        identifiers={(DOMAIN, f"{entry_id}_nea")},
-        name="NEA",
-        manufacturer="Singapore",
-        model="NEA via data.gov.sg",
-        entry_type=DeviceEntryType.SERVICE,
-        configuration_url="https://www.nea.gov.sg",
-    )
-
-
-class _BaseDengueSensor(CoordinatorEntity[DengueClusterCoordinator], SensorEntity):
-    """Shared device info for NEA dengue cluster sensors."""
-
-    _attr_has_entity_name = True
+    _device = DEVICE_NEA
     _attr_attribution = "Data provided by NEA via data.gov.sg"
-
-    def __init__(self, coordinator: DengueClusterCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator)
-        self._entry_id = entry_id
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return _nea_device_info(self._entry_id)
 
 
 class SingaporeDengueClustersSensor(_BaseDengueSensor):
@@ -788,8 +658,7 @@ class SingaporeDengueClustersSensor(_BaseDengueSensor):
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator: DengueClusterCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator, entry_id)
-        self._attr_unique_id = f"{entry_id}_dengue_clusters"
+        super().__init__(coordinator, entry_id, "dengue_clusters")
 
     @property
     def native_value(self) -> int | None:
@@ -823,8 +692,7 @@ class SingaporeNearestDengueClusterSensor(_BaseDengueSensor):
     _attr_suggested_display_precision = 2
 
     def __init__(self, coordinator: DengueClusterCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator, entry_id)
-        self._attr_unique_id = f"{entry_id}_nearest_dengue_cluster"
+        super().__init__(coordinator, entry_id, "nearest_dengue_cluster")
 
     def _nearest(self):
         if self.coordinator.data is None:
@@ -862,19 +730,11 @@ class SingaporeNearestDengueClusterSensor(_BaseDengueSensor):
 LIGHTNING_NEARBY_KM = 10.0
 
 
-class _BaseLightningSensor(CoordinatorEntity[LightningCoordinator], SensorEntity):
-    """Shared device info for NEA lightning sensors."""
+class _BaseLightningSensor(SingaporeEntity[LightningCoordinator], SensorEntity):
+    """Shared base for NEA lightning sensors."""
 
-    _attr_has_entity_name = True
+    _device = DEVICE_NEA
     _attr_attribution = "Data provided by NEA (MSS) via data.gov.sg"
-
-    def __init__(self, coordinator: LightningCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator)
-        self._entry_id = entry_id
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return _nea_device_info(self._entry_id)
 
 
 class SingaporeLightningStrikesSensor(_BaseLightningSensor):
@@ -885,8 +745,7 @@ class SingaporeLightningStrikesSensor(_BaseLightningSensor):
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator: LightningCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator, entry_id)
-        self._attr_unique_id = f"{entry_id}_lightning_strikes"
+        super().__init__(coordinator, entry_id, "lightning_strikes")
 
     @property
     def native_value(self) -> int | None:
@@ -925,8 +784,7 @@ class SingaporeNearestLightningSensor(_BaseLightningSensor):
     _attr_suggested_display_precision = 1
 
     def __init__(self, coordinator: LightningCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator, entry_id)
-        self._attr_unique_id = f"{entry_id}_nearest_lightning"
+        super().__init__(coordinator, entry_id, "nearest_lightning")
 
     def _home(self) -> tuple[float, float]:
         return self.hass.config.latitude, self.hass.config.longitude
@@ -964,19 +822,11 @@ class SingaporeNearestLightningSensor(_BaseLightningSensor):
         return attrs
 
 
-class _BaseUvSensor(CoordinatorEntity[UvCoordinator], SensorEntity):
-    """Shared device info for NEA UV index sensors."""
+class _BaseUvSensor(SingaporeEntity[UvCoordinator], SensorEntity):
+    """Shared base for NEA UV index sensors."""
 
-    _attr_has_entity_name = True
+    _device = DEVICE_NEA
     _attr_attribution = "Data provided by NEA via data.gov.sg"
-
-    def __init__(self, coordinator: UvCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator)
-        self._entry_id = entry_id
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return _nea_device_info(self._entry_id)
 
 
 class SingaporeUvIndexSensor(_BaseUvSensor):
@@ -987,8 +837,7 @@ class SingaporeUvIndexSensor(_BaseUvSensor):
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator: UvCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator, entry_id)
-        self._attr_unique_id = f"{entry_id}_uv_index"
+        super().__init__(coordinator, entry_id, "uv_index")
 
     @property
     def native_value(self) -> int | None:
@@ -1021,8 +870,7 @@ class SingaporeUvExposureSensor(_BaseUvSensor):
     _attr_options = UV_EXPOSURE_OPTIONS
 
     def __init__(self, coordinator: UvCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator, entry_id)
-        self._attr_unique_id = f"{entry_id}_uv_exposure"
+        super().__init__(coordinator, entry_id, "uv_exposure")
 
     @property
     def native_value(self) -> str | None:

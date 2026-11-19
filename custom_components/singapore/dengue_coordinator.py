@@ -13,8 +13,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import data_gov_headers
+from .const import SOURCE_DENGUE, data_gov_headers
 from .datagov import data_gov_get
+from .errors import ERROR_FETCH, ERROR_HTTP, ERROR_PAYLOAD, source_error
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -191,7 +192,9 @@ def _parse_dengue_geojson(payload: dict) -> DengueData:
     isn't a FeatureCollection. Zero features is valid (no active clusters).
     """
     if not isinstance(payload, dict) or not isinstance(payload.get("features"), list):
-        raise UpdateFailed("Dengue clusters payload is not a GeoJSON FeatureCollection")
+        raise source_error(
+            ERROR_PAYLOAD, SOURCE_DENGUE, detail="not a GeoJSON FeatureCollection"
+        )
 
     clusters: list[DengueCluster] = []
     for feature in payload["features"]:
@@ -251,7 +254,7 @@ class DengueClusterCoordinator(DataUpdateCoordinator[DengueData]):
             # poll-download / initiate-download answer 201 Created on success.
             if 200 <= response.status < 300:
                 return await response.json(content_type=None)
-            raise UpdateFailed(f"{url} returned HTTP {response.status}")
+            raise source_error(ERROR_HTTP, SOURCE_DENGUE, status=response.status)
 
     async def _download_url(self, session: aiohttp.ClientSession) -> str:
         """Get a signed S3 URL for the dataset file (initiating a download if needed)."""
@@ -263,7 +266,7 @@ class DengueClusterCoordinator(DataUpdateCoordinator[DengueData]):
         url = ((init or {}).get("data") or {}).get("url")
         if url:
             return url
-        raise UpdateFailed("data.gov.sg did not return a dengue clusters download URL")
+        raise source_error(ERROR_PAYLOAD, SOURCE_DENGUE, detail="no download URL")
 
     async def _async_update_data(self) -> DengueData:
         try:
@@ -287,7 +290,7 @@ class DengueClusterCoordinator(DataUpdateCoordinator[DengueData]):
                     "Error fetching dengue clusters (%s); using last known values", err
                 )
                 return self.data
-            raise UpdateFailed(f"Error fetching dengue clusters: {err}") from err
+            raise source_error(ERROR_FETCH, SOURCE_DENGUE, error=err) from err
         except UpdateFailed as err:
             if self.data is not None:
                 _LOGGER.warning(

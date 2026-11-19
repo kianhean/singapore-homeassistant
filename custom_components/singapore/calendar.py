@@ -1,4 +1,4 @@
-"""Calendar platform: Singapore public holidays, plus SP e-account dates."""
+"""Calendar platform: public holidays, MOE school calendars, SP e-account dates."""
 
 from __future__ import annotations
 
@@ -6,14 +6,19 @@ from datetime import datetime, timedelta
 
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from . import SingaporeConfigEntry
-from .const import DOMAIN
+from .const import SCHOOL_EVENT_KINDS, enabled_school_events
+from .entity import (
+    DEVICE_HOLIDAY,
+    DEVICE_SCHOOL,
+    SingaporeEntity,
+    school_translation_key,
+)
 from .holiday_coordinator import PublicHoliday, PublicHolidayCoordinator
+from .school_coordinator import SchoolCalendarCoordinator, SchoolEvent
 from .sp_account_calendar import async_setup_sp_account_calendars
 
 PARALLEL_UPDATES = 0
@@ -24,12 +29,20 @@ async def async_setup_entry(
     entry: SingaporeConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up the public holiday calendar and each SP account's calendar."""
+    """Set up the public holiday and school calendars, and each SP account's."""
+    entities: list[CalendarEntity] = []
     coordinator = entry.runtime_data.holiday
     if coordinator is not None:  # None: public holidays turned off in the options.
-        async_add_entities(
-            [SingaporePublicHolidayCalendar(coordinator, entry.entry_id)]
-        )
+        entities.append(SingaporePublicHolidayCalendar(coordinator, entry.entry_id))
+    if (school := entry.runtime_data.school) is not None:
+        # One calendar per kind the user kept ticked in the options.
+        chosen = enabled_school_events(entry)
+        entities += [
+            SingaporeSchoolCalendar(school, entry.entry_id, kind)
+            for kind in SCHOOL_EVENT_KINDS
+            if kind in chosen
+        ]
+    async_add_entities(entities)
     for unsub in async_setup_sp_account_calendars(
         entry.entry_id, entry.runtime_data.sp_accounts, async_add_entities
     ):
@@ -37,19 +50,17 @@ async def async_setup_entry(
 
 
 class SingaporePublicHolidayCalendar(
-    CoordinatorEntity[PublicHolidayCoordinator], CalendarEntity
+    SingaporeEntity[PublicHolidayCoordinator], CalendarEntity
 ):
     """Single calendar containing Singapore public holidays."""
 
-    _attr_has_entity_name = True
+    _device = DEVICE_HOLIDAY
     _attr_name = None
     _attr_translation_key = "public_holidays"
     _attr_attribution = "Data provided by the Ministry of Manpower"
 
     def __init__(self, coordinator: PublicHolidayCoordinator, entry_id: str) -> None:
-        super().__init__(coordinator)
-        self._entry_id = entry_id
-        self._attr_unique_id = f"{entry_id}_public_holidays"
+        super().__init__(coordinator, entry_id, "public_holidays")
 
     @property
     def event(self) -> CalendarEvent | None:
@@ -92,17 +103,6 @@ class SingaporePublicHolidayCalendar(
             "url": "https://www.mom.gov.sg/employment-practices/public-holidays",
         }
 
-    @property
-    def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._entry_id}_holiday")},
-            name="Public Holidays",
-            manufacturer="Singapore",
-            model="MOM Public Holidays",
-            entry_type=DeviceEntryType.SERVICE,
-            configuration_url="https://www.mom.gov.sg/employment-practices/public-holidays",
-        )
-
 
 def _to_event(holiday: PublicHoliday) -> CalendarEvent:
     return CalendarEvent(
@@ -110,4 +110,71 @@ def _to_event(holiday: PublicHoliday) -> CalendarEvent:
         start=holiday.day,
         end=holiday.day + timedelta(days=1),
         description="Singapore public holiday",
+    )
+
+
+class SingaporeSchoolCalendar(
+    SingaporeEntity[SchoolCalendarCoordinator], CalendarEntity
+):
+    """MOE school holidays, terms or national exams (one calendar per kind).
+
+    MOE lists most dates per level ("MK, Primary & Secondary", "Post-secondary"),
+    so events can overlap; the level is part of each event's title.
+    """
+
+    _device = DEVICE_SCHOOL
+    _attr_attribution = "Data provided by the Ministry of Education"
+
+    def __init__(
+        self, coordinator: SchoolCalendarCoordinator, entry_id: str, kind: str
+    ) -> None:
+        key = school_translation_key(kind)
+        super().__init__(coordinator, entry_id, key)
+        self._kind = kind
+        self._attr_translation_key = key
+
+    def _events(self) -> list[SchoolEvent]:
+        if self.coordinator.data is None:
+            return []
+        return [e for e in self.coordinator.data if e.kind == self._kind]
+
+    @property
+    def event(self) -> CalendarEvent | None:
+        """The event in progress today, else the next one."""
+        today = dt_util.now().date()
+        for event in self._events():  # sorted by start date
+            if event.end >= today:
+                return _school_event(event)
+        return None
+
+    async def async_get_events(
+        self,
+        hass: HomeAssistant,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> list[CalendarEvent]:
+        """Events overlapping [start, end)."""
+        start, end = start_date.date(), end_date.date()
+        return [
+            _school_event(event)
+            for event in self._events()
+            if event.start < end and event.end >= start
+        ]
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {
+            "source": "MOE",
+            "events": len(self._events()),
+            "url": "https://www.moe.gov.sg/calendar",
+        }
+
+
+def _school_event(event: SchoolEvent) -> CalendarEvent:
+    # All-day events: HA's end date is exclusive, MOE's is the last day.
+    return CalendarEvent(
+        summary=event.name,
+        start=event.start,
+        end=event.end + timedelta(days=1),
+        description="MOE school calendar",
     )

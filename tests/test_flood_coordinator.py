@@ -232,3 +232,50 @@ async def test_coordinator_http_error_uses_last_known_data():
         await coordinator.async_refresh()
     assert coordinator.last_update_success is True
     assert coordinator.data.alerts == []
+
+
+def test_parse_skips_junk_and_handles_odd_alerts():
+    from custom_components.singapore.flood_coordinator import _parse_datetime
+
+    assert _parse_datetime(None) is None
+    assert _parse_datetime("not a date") is None
+    # Naive timestamps are Singapore time.
+    assert _parse_datetime("2026-04-05T08:00:00").utcoffset() == timedelta(hours=8)
+
+    payload = {
+        "data": {
+            "records": [
+                "junk",
+                {"datetime": "garbage", "item": {}},
+                {
+                    # No identifier and a bad circle: still an alert, with a
+                    # synthesised id and no coordinates.
+                    "datetime": "2026-04-05T08:00:00+08:00",
+                    "item": {
+                        "msgType": "Alert",
+                        "readings": [
+                            {
+                                "description": "Jalan Bahar",
+                                "area": {"circle": ["x", "y", 1]},
+                            }
+                        ],
+                    },
+                },
+            ]
+        }
+    }
+    messages, latest = _parse_flood_messages(payload)
+    assert latest is not None
+    assert len(messages) == 1
+    message = messages[0]
+    assert message.identifier == "2026-04-05T08:00:00+08:00|Jalan Bahar"
+    alert = message.alerts[0]
+    assert (alert.latitude, alert.longitude) == (None, None)
+    assert alert.headline == "Flash Flood Alert"
+
+
+def test_parse_payload_without_records_list_raises():
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+
+    with pytest.raises(UpdateFailed, match="no records list"):
+        _parse_flood_messages({"data": {"records": None}})

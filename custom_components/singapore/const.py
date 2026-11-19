@@ -17,6 +17,15 @@ CONF_DISABLED_SOURCES: Final = "disabled_sources"
 CONF_SOURCES: Final = "sources"
 CONF_API_KEY: Final = "api_key"
 CONF_POLLING: Final = "polling"
+# Which MOE school calendars to create; stored inverted like the sources.
+CONF_SCHOOL_EVENTS: Final = "school_events"
+CONF_DISABLED_SCHOOL_EVENTS: Final = "disabled_school_events"
+
+SCHOOL_HOLIDAYS: Final = "holidays"
+SCHOOL_TERMS: Final = "terms"
+SCHOOL_EXAMS: Final = "exams"
+# One calendar each (translation key "school_<kind>"). Order = form order.
+SCHOOL_EVENT_KINDS: Final = (SCHOOL_HOLIDAYS, SCHOOL_TERMS, SCHOOL_EXAMS)
 
 POLLING_NORMAL: Final = "normal"
 POLLING_REDUCED: Final = "reduced"
@@ -31,6 +40,7 @@ SOURCE_TARIFF: Final = "tariff"
 SOURCE_COE: Final = "coe"
 SOURCE_WEATHER: Final = "weather"
 SOURCE_HOLIDAY: Final = "holiday"
+SOURCE_SCHOOL: Final = "school"
 SOURCE_TRAIN: Final = "train"
 SOURCE_PSI: Final = "psi"
 SOURCE_FLOOD: Final = "flood"
@@ -45,6 +55,7 @@ SOURCES: Final = (
     SOURCE_COE,
     SOURCE_WEATHER,
     SOURCE_HOLIDAY,
+    SOURCE_SCHOOL,
     SOURCE_TRAIN,
     SOURCE_PSI,
     SOURCE_FLOOD,
@@ -62,6 +73,7 @@ SOURCE_NAMES: Final = {
     SOURCE_COE: "COE bidding results",
     SOURCE_WEATHER: "NEA weather",
     SOURCE_HOLIDAY: "Public holidays (MOM)",
+    SOURCE_SCHOOL: "MOE school calendar",
     SOURCE_TRAIN: "MRT/LRT status",
     SOURCE_PSI: "Air quality (PSI)",
     SOURCE_FLOOD: "PUB flood alerts",
@@ -89,6 +101,12 @@ def enabled_sources(entry: Any) -> set[str]:
     """The data sources turned on for this entry (all of them by default)."""
     disabled = set(_options(entry).get(CONF_DISABLED_SOURCES) or ())
     return {source for source in SOURCES if source not in disabled}
+
+
+def enabled_school_events(entry: Any) -> set[str]:
+    """The MOE school calendars turned on for this entry (all by default)."""
+    disabled = set(_options(entry).get(CONF_DISABLED_SCHOOL_EVENTS) or ())
+    return {kind for kind in SCHOOL_EVENT_KINDS if kind not in disabled}
 
 
 def data_gov_headers(entry: Any) -> dict[str, str]:

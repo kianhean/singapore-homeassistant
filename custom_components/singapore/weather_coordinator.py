@@ -14,8 +14,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import data_gov_headers, scaled_interval
+from .const import SOURCE_WEATHER, data_gov_headers, scaled_interval
 from .datagov import MAX_RETRIES, HostLimiter, limiter_for, retry_seconds
+from .errors import ERROR_FETCH, ERROR_HTTP, ERROR_PAYLOAD, source_error
 from .psi_coordinator import DEFAULT_REGION_LOCATIONS
 
 _LOGGER = logging.getLogger(__name__)
@@ -163,12 +164,14 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
                 )
             )
             if two_hr_resp.status != 200:
-                raise UpdateFailed(
-                    f"data.gov.sg weather endpoint returned HTTP {two_hr_resp.status}"
+                raise source_error(
+                    ERROR_HTTP, SOURCE_WEATHER, status=two_hr_resp.status
                 )
             parsed = _parse_weather(await two_hr_resp.json())
             if not parsed.areas:
-                raise UpdateFailed("No area forecasts found in weather payload")
+                raise source_error(
+                    ERROR_PAYLOAD, SOURCE_WEATHER, detail="No area forecasts found"
+                )
             if four_day_resp.status == 200:
                 parsed.four_day_forecast = _parse_four_day(await four_day_resp.json())
             else:
@@ -198,7 +201,7 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
                     "Error fetching weather data (%s); using last known values", err
                 )
                 return self.data
-            raise UpdateFailed(f"Error fetching weather data: {err}") from err
+            raise source_error(ERROR_FETCH, SOURCE_WEATHER, error=err) from err
         except UpdateFailed as err:
             if self.data is not None:
                 _LOGGER.warning(

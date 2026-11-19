@@ -60,9 +60,9 @@ jobs:
             python-version: "3.13"
             phcc: "pytest-homeassistant-custom-component==0.13.232"
             experimental: false
-          - name: "2026.9.4 (stable)"
+          - name: "2026.10.4 (stable)"
             python-version: "3.14"
-            phcc: "pytest-homeassistant-custom-component==0.13.367"
+            phcc: "pytest-homeassistant-custom-component==0.13.375"
             experimental: false
           # Newest release of the test harness, often an HA beta: an early
           # warning for upcoming breakage that does not block merges.

@@ -84,7 +84,7 @@ minute; everything else works without it. Questions about it? See the [FAQ](#faq
 | 🌦️ **Weather**<br>A weather entity for every NEA forecast area, with hourly and 4-day forecasts, live temperature, humidity, wind and rain, plus NEA rain radar images and animated loops | 😷 **Air quality**<br>PSI and six pollutants, overall and per region, ready for a Map card | ☀️ **UV index**<br>NEA's hourly UV index and exposure level (low to extreme), with today's peak |
 | 🚇 **MRT/LRT**<br>Network and per-line status (normal, planned works, disruption) with LTA's message | 🛂 **Checkpoints**<br>Woodlands and Tuas traffic camera stills as camera entities | 🚗 **COE**<br>Category A–E premiums, refreshed after each bidding exercise |
 | ⚡ **Lightning**<br>Live strikes and the distance to the nearest one from your home | 🦟 **Dengue**<br>Active NEA clusters and how far the nearest is from your home | 🌊 **Flash floods**<br>PUB flood alerts as they're issued and cancelled |
-| 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🎉 **Public holidays**<br>MOM's holiday list as a calendar | 🧩 **Blueprints**<br>[One-click automations](#one-click-blueprints) for lightning, MRT disruptions, floods, haze, COE, rain, UV, dengue, holidays and SP bills |
+| 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🎉 **Holidays and school terms**<br>MOM's public holidays, plus MOE school holidays, terms and national exams, as calendars | 🧩 **Blueprints**<br>[One-click automations](#one-click-blueprints) for lightning, MRT disruptions, floods, haze, COE, rain, UV, dengue, holidays and SP bills |
 
 The public data needs no API keys and no account: one config entry, and a diagnostics download when
 something looks off. You choose which data sources run ([Options](#options)). Linking your SP Group e-account is optional ([how](#optional-link-your-sp-group-e-account));
@@ -93,6 +93,9 @@ that part is built on [maci0/home-assistant-sp](https://github.com/maci0/home-as
 
 ## What's new
 
+- **v0.15** [MOE school holidays, terms and exams](#moe-school-calendar) as calendars; turning a
+  data source off now removes its entities and devices; translated update errors; a
+  [Known limitations](#known-limitations) section.
 - **v0.13** Animated rain radar loops (the last hour, over NEA's base map) and HACS installs
   from a release zip.
 - **v0.12** Choose your data sources, an optional data.gov.sg API key and reduced polling
@@ -117,7 +120,7 @@ page. Upgrading from before v0.3.0? Your entity IDs are kept; see the
 - [Dashboard ideas](#dashboard-ideas): [your SP account](#your-sp-account) and the
   [Energy dashboard](#energy-dashboard-electricity-and-water)
 - [Entity reference](#entity-reference): every sensor, camera, weather, calendar and event entity
-- [FAQ](#faq) and [Troubleshooting](#troubleshooting)
+- [FAQ](#faq), [Troubleshooting](#troubleshooting) and [Known limitations](#known-limitations)
 - [Data sources](#data-sources), [Development](#development), [Contributing](#contributing),
   [Credits](#credits)
 
@@ -148,9 +151,11 @@ The lightning and dengue distances are measured from the home location in
 Open **Settings → Devices & Services → Singapore → Configure** to change:
 
 - **Data sources:** untick any you don't need (for example lightning, radar or checkpoint
-  cameras). A source you turn off stops polling data.gov.sg and its entities are no longer
-  provided; delete them from the entity list if you don't want them back. Everything is on
-  by default, and sources added in later releases start out on.
+  cameras). A source you turn off stops polling data.gov.sg, and its entities and devices
+  are removed; turn it back on and they come back. Everything is on by default, and sources
+  added in later releases start out on.
+- **School calendars:** which [MOE calendars](#moe-school-calendar) to create (school holidays,
+  school terms, national exams). All three are on by default.
 - **data.gov.sg API key** (optional): a free key from
   [data.gov.sg](https://data.gov.sg) raises the rate limits, which means fewer HTTP 429
   errors. It's sent only to data.gov.sg.
@@ -970,6 +975,33 @@ Shows up as a Home Assistant calendar with all-day events from the current year 
 
 </details>
 
+### MOE school calendar
+
+Updated every 24 hours from [MOE](https://www.moe.gov.sg/calendar). Three calendars with all-day
+events, on a *School* device: school holidays, school terms and national exams (PSLE, GCE
+N/O/A-Levels, results days). Untick the ones you don't need under **Configure → School
+calendars**; turning one off removes its calendar.
+
+MOE lists most dates per level, so the level is part of each event's name, for example
+*Term 4 school holidays (MK, Primary & Secondary)* and *Term 4 school holidays (Post-secondary
+Years 1, 2)*. A calendar is *on* while one of its events is under way, so
+`calendar.school_holidays` turning on is a trigger for "the school holidays have started". The
+[Public holiday tomorrow](#one-click-blueprints) blueprint also works with it: pick
+`calendar.school_holidays` as its calendar.
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Name | Events |
+|-----------|------|--------|
+| `calendar.school_holidays` | School Holidays | Term breaks, the year-end holidays and one-day school holidays (e.g. Youth Day, Children's Day) |
+| `calendar.school_terms` | School Terms | Terms 1–4, per level |
+| `calendar.school_exams` | School Exams | PSLE and GCE exam periods, marking and results release |
+
+Attributes: `events` (number of events in the calendar), `source` and `url`.
+
+</details>
+
 ## Example sensor states
 
 <details>
@@ -1134,10 +1166,53 @@ account uses the unofficial APIs behind the SP app, which SP can change without 
 - **SP Group tariffs unavailable for days:** the tariff is scraped from spgroup.com.sg, which
   sometimes refuses connections (TLS errors) from some networks. The rest of the integration
   is unaffected; if you don't need tariffs, turn the source off.
-- **Entities left over after turning a source off:** they show as *no longer provided*. Select
-  them under **Settings → Devices & services → Entities** and delete them.
+- **Entities left over after turning a source off:** since v0.15 they are removed on the
+  reload that follows. A device the integration no longer provides can also be deleted from its
+  device page (**⋮ → Delete**); devices still in use refuse, as they would come straight back.
 - **Language:** entity names, states and the setup forms are translated into English and
   Simplified Chinese (简体中文). Entity IDs are always generated from the English names.
+
+## Known limitations
+
+What the integration can't do, mostly because of what the sources publish:
+
+- **COE results** are fetched once a day at 19:30, after LTA usually publishes them. Results
+  that appear earlier show up at 19:30 (or when you reload the integration).
+- **SP Group tariffs** are read from the tariff page on spgroup.com.sg, so a redesign of that
+  page can break them until a fix is released. Some networks get TLS errors from the site.
+- **Public holidays** are read from MOM's web page and cover the current year onwards.
+- **The MOE school calendar** is read from moe.gov.sg/calendar, which shows the current year
+  only; next year's dates appear when MOE publishes them (by the end of August, the page says).
+  There's no per-level filter yet, so the calendars hold every level's dates. MOE sometimes
+  answers cloud and datacenter addresses with a "verify you're not a bot" page; the calendars
+  then keep their last dates and retry the next day (a home connection normally gets the page).
+- **Hourly forecasts** have a condition only, in NEA's ~6-hour periods for five regions; NEA
+  gives no hourly temperature. The daily (4-day) outlook is Singapore-wide, so it's the same
+  for every area.
+- **MRT/LRT status** comes from the endpoint behind mytransport.sg, which isn't a documented
+  API. Planned works are read from LTA's notice text.
+- **Flood alerts:** data.gov.sg only returns the last ~50 minutes of messages, so the alert list
+  is built up across polls. An alert whose *Cancel* was missed (for example while Home
+  Assistant was off) is dropped after 3 hours.
+- **Checkpoint cameras** are the four Woodlands and Tuas cameras only. LTA's feed sometimes
+  leaves a camera out (camera 2702 was missing on 7 November 2026), and that camera is
+  unavailable until it's back.
+- **Rain radar:** NEA has no base map for the 480 km image, so that camera shows bare rain blobs
+  and is disabled by default, with no animation. The base maps are loaded from NEA's website
+  at runtime.
+- **UV index** is published hourly from 7 am to 7 pm only. **Lightning** keeps a 30-minute
+  window and includes strikes beyond Singapore (Batam, Johor). **Dengue clusters** update every
+  6 hours. Distances are measured from your Home Assistant home location.
+- **PSI and pollutant headline values** are the highest of the five regions (as NEA headlines
+  them); use the regional sensors for your area.
+- **data.gov.sg rate limits:** without an API key, about 6 requests per 10 seconds per network,
+  shared with anything else you run against data.gov.sg (see
+  [Troubleshooting](#troubleshooting)).
+- **SP accounts** use the unofficial APIs behind the SP app, which SP can change without notice.
+  They're polled every 30 minutes; smart-meter readings arrive a few hours late, homes without a
+  smart meter get one reading per billed month, and water is monthly for everyone. Energy
+  dashboard costs are estimated at SP Group's regulated tariff, not your retailer's rate.
+- **Entity IDs** are always generated from the English names, whatever your language.
 
 ## Data sources
 
@@ -1155,6 +1230,7 @@ account uses the unofficial APIs behind the SP app, which SP can change without 
 | [data.gov.sg / NEA](https://api-open.data.gov.sg/v2/real-time/api/uv) | Hourly UV index | Every 15 min |
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_418e9ac3414fd927b7405631e0a7bc82/view) | Rain radar images (70 / 240 / 480 km) | Every 5 min |
 | [MOM](https://www.mom.gov.sg/employment-practices/public-holidays) | Public holidays | Every 24 h |
+| [MOE](https://www.moe.gov.sg/calendar) | School holidays, terms and national exams | Every 24 h |
 | [mytransport.sg](https://www.mytransport.sg/trainstatus) | MRT/LRT train status | Every 5 min |
 | SP Group app APIs (optional, your e-account) | Your usage, bills, meters, Green Goals | Every 30 min |
 

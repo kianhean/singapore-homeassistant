@@ -14,8 +14,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import data_gov_headers
+from .const import SOURCE_COE, data_gov_headers
 from .datagov import data_gov_get
+from .errors import ERROR_FETCH, ERROR_HTTP, ERROR_PAYLOAD, source_error
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -88,14 +89,14 @@ class CoeCoordinator(DataUpdateCoordinator[CoeData]):
                     timeout=aiohttp.ClientTimeout(total=30),
                 ) as response:
                     if response.status != 200:
-                        raise UpdateFailed(
-                            f"data.gov.sg returned HTTP {response.status}"
+                        raise source_error(
+                            ERROR_HTTP, SOURCE_COE, status=response.status
                         )
                     payload = await response.json()
             except UpdateFailed as err:
                 last_error = err
             except (aiohttp.ClientError, TimeoutError) as err:
-                last_error = UpdateFailed(f"Error fetching COE results: {err}")
+                last_error = source_error(ERROR_FETCH, SOURCE_COE, error=err)
             else:
                 # Parse failures (API shape changed) are not transient: let
                 # them propagate rather than retrying or serving stale data.
@@ -124,8 +125,10 @@ class CoeCoordinator(DataUpdateCoordinator[CoeData]):
             )
             return self.data
 
-        raise UpdateFailed(
-            f"Failed to fetch COE results after {_MAX_FETCH_ATTEMPTS} attempts: {last_error}"
+        raise source_error(
+            ERROR_FETCH,
+            SOURCE_COE,
+            error=f"{last_error} (after {_MAX_FETCH_ATTEMPTS} attempts)",
         )
 
 
@@ -140,10 +143,10 @@ def _parse_coe(payload: dict) -> CoeData:
     try:
         records = payload["result"]["records"]
     except (KeyError, TypeError) as err:
-        raise UpdateFailed(f"Unexpected COE API response structure: {err}") from err
+        raise source_error(ERROR_PAYLOAD, SOURCE_COE, detail=repr(err)) from err
 
     if not records:
-        raise UpdateFailed("COE API returned no records")
+        raise source_error(ERROR_PAYLOAD, SOURCE_COE, detail="no records")
 
     # Records are sorted month desc, bidding_no desc — the first record gives
     # the most recent bidding exercise.
@@ -164,7 +167,7 @@ def _parse_coe(payload: dict) -> CoeData:
                 _LOGGER.warning("Could not parse premium for COE category %s", cat)
 
     if not premiums:
-        raise UpdateFailed("Could not parse any COE premiums from API response")
+        raise source_error(ERROR_PAYLOAD, SOURCE_COE, detail="no COE premiums found")
 
     return CoeData(
         premiums=premiums,

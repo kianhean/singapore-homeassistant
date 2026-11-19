@@ -10,6 +10,8 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -17,6 +19,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from .coe_coordinator import CoeCoordinator
 from .const import (
     DOMAIN,
+    SCHOOL_EVENT_KINDS,
     SOURCE_COE,
     SOURCE_DENGUE,
     SOURCE_FLOOD,
@@ -24,22 +27,31 @@ from .const import (
     SOURCE_LIGHTNING,
     SOURCE_PSI,
     SOURCE_RADAR,
+    SOURCE_SCHOOL,
     SOURCE_TARIFF,
     SOURCE_TRAFFIC,
     SOURCE_TRAIN,
     SOURCE_UV,
     SOURCE_WEATHER,
     SOURCES,
+    enabled_school_events,
     enabled_sources,
 )
 from .coordinator import SPGroupCoordinator
 from .dengue_coordinator import DengueClusterCoordinator
+from .entity import (
+    DEVICES,
+    device_identifier,
+    entity_source,
+    school_translation_key,
+)
 from .flood_coordinator import FloodAlertCoordinator
 from .health import async_clear_source_issues, async_setup_source_health
 from .holiday_coordinator import PublicHolidayCoordinator
 from .lightning_coordinator import LightningCoordinator
 from .psi_coordinator import PsiCoordinator
 from .radar_coordinator import RadarCoordinator
+from .school_coordinator import SchoolCalendarCoordinator
 from .sp_account_coordinator import (
     SUBENTRY_TYPE_SP_ACCOUNT,
     SpAccountCoordinator,
@@ -86,6 +98,7 @@ class SingaporeData:
     lightning: LightningCoordinator | None
     uv: UvCoordinator | None
     radar: RadarCoordinator | None
+    school: SchoolCalendarCoordinator | None
     # One per SP Group e-account subentry, keyed by subentry id.
     sp_accounts: dict[str, SpAccountCoordinator] = field(default_factory=dict)
     # The options this setup used; a change to them reloads the entry.
@@ -116,6 +129,7 @@ _COORDINATORS: dict[str, type[DataUpdateCoordinator]] = {
     SOURCE_LIGHTNING: LightningCoordinator,
     SOURCE_UV: UvCoordinator,
     SOURCE_RADAR: RadarCoordinator,
+    SOURCE_SCHOOL: SchoolCalendarCoordinator,
 }
 
 # Weather, holidays and train status are the core sources: setup waits for
@@ -218,10 +232,77 @@ async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) ->
         options=dict(entry.options),
     )
     async_setup_source_health(hass, entry, coordinators)
+    async_remove_stale(hass, entry, enabled)
     entry.async_on_unload(entry.add_update_listener(_async_entry_updated))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+@callback
+def async_remove_stale(
+    hass: HomeAssistant, entry: SingaporeConfigEntry, enabled: set[str]
+) -> None:
+    """Remove the entities and devices of data sources turned off in the options.
+
+    Without this they would linger as "no longer provided by the integration"
+    until deleted by hand. A device shared by several sources (Weather, NEA)
+    stays while any of them is on; only the turned-off source's entities go.
+    SP account entities belong to subentries, which Home Assistant cleans up
+    itself when a subentry is deleted.
+    """
+    # MOE school calendars unticked in the options go too, source on or not.
+    school_off = {
+        school_translation_key(kind)
+        for kind in SCHOOL_EVENT_KINDS
+        if kind not in enabled_school_events(entry)
+    }
+    entity_registry = er.async_get(hass)
+    for reg_entry in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
+        if getattr(reg_entry, "config_subentry_id", None) is not None:
+            continue
+        source = entity_source(reg_entry.domain, reg_entry.translation_key)
+        if source is None:
+            continue
+        if source not in enabled or reg_entry.translation_key in school_off:
+            _LOGGER.debug("Removing %s: its source is turned off", reg_entry.entity_id)
+            entity_registry.async_remove(reg_entry.entity_id)
+
+    # Looked up through the entry's devices: async_get_device(identifiers=...)
+    # is deprecated in 2026.10 and its replacement does not exist in 2025.4.
+    stale_devices = {
+        device_identifier(entry.entry_id, key)
+        for key, device in DEVICES.items()
+        if not any(source in enabled for source in device.sources)
+    }
+    device_registry = dr.async_get(hass)
+    for device_entry in dr.async_entries_for_config_entry(
+        device_registry, entry.entry_id
+    ):
+        if device_entry.identifiers & stale_devices:
+            device_registry.async_update_device(
+                device_entry.id, remove_config_entry_id=entry.entry_id
+            )
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, entry: SingaporeConfigEntry, device_entry: dr.DeviceEntry
+) -> bool:
+    """Let the user delete a device this integration no longer provides.
+
+    The service devices of enabled sources and the SP accounts' premises are
+    refused (they would come straight back); anything else may go.
+    """
+    enabled = enabled_sources(entry)
+    provided = {
+        device_identifier(entry.entry_id, key)
+        for key, device in DEVICES.items()
+        if any(source in enabled for source in device.sources)
+    }
+    for account in entry.runtime_data.sp_accounts.values():
+        if (usage := account.data) is not None:
+            provided.add((DOMAIN, f"{entry.entry_id}_sp_{usage.premise_id}"))
+    return not (device_entry.identifiers & provided)
 
 
 _BACKGROUND_LABELS = {
@@ -234,6 +315,7 @@ _BACKGROUND_LABELS = {
     SOURCE_LIGHTNING: "lightning",
     SOURCE_UV: "UV index",
     SOURCE_RADAR: "rain radar",
+    SOURCE_SCHOOL: "MOE school calendar",
 }
 
 

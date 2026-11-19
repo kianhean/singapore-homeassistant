@@ -29,13 +29,18 @@ from homeassistant.helpers.selector import (
 
 from .const import (
     CONF_API_KEY,
+    CONF_DISABLED_SCHOOL_EVENTS,
     CONF_DISABLED_SOURCES,
     CONF_POLLING,
+    CONF_SCHOOL_EVENTS,
     CONF_SOURCES,
     DOMAIN,
     POLLING_NORMAL,
     POLLING_OPTIONS,
+    SCHOOL_EVENT_KINDS,
+    SOURCE_SCHOOL,
     SOURCES,
+    enabled_school_events,
     enabled_sources,
 )
 from .sp_account.client import (
@@ -182,6 +187,19 @@ def options_schema(options: dict[str, Any]) -> vol.Schema:
                 )
             ),
             vol.Optional(
+                CONF_SCHOOL_EVENTS,
+                default=[
+                    k for k in SCHOOL_EVENT_KINDS if k in enabled_school_events(options)
+                ],
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=list(SCHOOL_EVENT_KINDS),
+                    multiple=True,
+                    mode=SelectSelectorMode.LIST,
+                    translation_key=CONF_SCHOOL_EVENTS,
+                )
+            ),
+            vol.Optional(
                 CONF_API_KEY, description={"suggested_value": api_key}
             ): _PASSWORD_SELECTOR_PLAIN,
             vol.Required(
@@ -210,6 +228,12 @@ def options_from_input(user_input: dict[str, Any]) -> dict[str, Any]:
     }
     if api_key := (user_input.get(CONF_API_KEY) or "").strip():
         options[CONF_API_KEY] = api_key
+    # Absent from the form (an older frontend) means "keep them all".
+    school = user_input.get(CONF_SCHOOL_EVENTS)
+    if school is not None and (
+        off := [k for k in SCHOOL_EVENT_KINDS if k not in set(school)]
+    ):
+        options[CONF_DISABLED_SCHOOL_EVENTS] = off
     return options
 
 
@@ -223,6 +247,11 @@ class SingaporeOptionsFlow(OptionsFlow):
         if user_input is not None:
             if not user_input.get(CONF_SOURCES) and not self.config_entry.subentries:
                 errors[CONF_SOURCES] = "no_sources"
+            elif SOURCE_SCHOOL in user_input.get(CONF_SOURCES, ()) and not (
+                user_input.get(CONF_SCHOOL_EVENTS, SCHOOL_EVENT_KINDS)
+            ):
+                # The school calendar is on but would have no calendars.
+                errors[CONF_SCHOOL_EVENTS] = "no_school_events"
             else:
                 # Saving the options reloads the entry (see _async_entry_updated).
                 return self.async_create_entry(data=options_from_input(user_input))

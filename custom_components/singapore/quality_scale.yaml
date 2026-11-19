@@ -10,10 +10,10 @@ rules:
   appropriate-polling: done
   brands: done
   common-modules:
-    status: todo
+    status: done
     comment: >-
-      One coordinator module per data source is deliberate, but the entities
-      have no shared base class in entity.py yet (device info is repeated).
+      One coordinator module per data source; entities share SingaporeEntity
+      and the DEVICES table in entity.py.
   config-flow: done
   config-flow-test-coverage: done
   dependency-transparency: done
@@ -61,8 +61,10 @@ rules:
       opens a repair issue and the subentry's reconfigure flow signs in again;
       a config-entry reauth would take every public data source down too.
   test-coverage:
-    status: todo
-    comment: Unit tests cover about 90% of the integration (95% is the target).
+    status: done
+    comment: >-
+      Unit tests (tests/) cover 95% of the integration on their own; tests_ha
+      adds the real-HA paths on top.
 
   # Gold
   devices: done
@@ -75,11 +77,7 @@ rules:
     comment: A cloud service; there is nothing on the network to discover.
   docs-data-update: done
   docs-examples: done
-  docs-known-limitations:
-    status: todo
-    comment: >-
-      Limitations are spread over the entity reference and troubleshooting;
-      there is no single section yet.
+  docs-known-limitations: done
   docs-supported-devices:
     status: exempt
     comment: A service integration with no physical devices.
@@ -92,10 +90,10 @@ rules:
   entity-disabled-by-default: done
   entity-translations: done
   exception-translations:
-    status: todo
+    status: done
     comment: >-
-      SP account errors are translated; the public sources' UpdateFailed
-      messages are still plain English.
+      Public sources raise errors.source_error (http_error / fetch_failed /
+      bad_payload); SP account errors have their own keys.
   icon-translations: done
   reconfiguration-flow:
     status: done
@@ -104,10 +102,12 @@ rules:
       in the options flow (the entry itself has only a name).
   repair-issues: done
   stale-devices:
-    status: todo
+    status: done
     comment: >-
-      Turning a data source off leaves its device and entities in the
-      registries as "no longer provided" until the user deletes them.
+      Turning a source off removes its entities and devices on the reload
+      (async_remove_stale); async_remove_config_entry_device lets the user
+      delete any device that is no longer provided. HA removes a deleted SP
+      subentry's devices itself.
 
   # Platinum
   async-dependency:

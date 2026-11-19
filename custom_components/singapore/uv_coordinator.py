@@ -12,8 +12,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import data_gov_headers, scaled_interval
+from .const import SOURCE_UV, data_gov_headers, scaled_interval
 from .datagov import data_gov_get
+from .errors import ERROR_FETCH, ERROR_HTTP, ERROR_PAYLOAD, source_error
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -97,11 +98,11 @@ def _parse_uv(payload: dict) -> UvData:
         if records is None:
             records = payload.get("items")
     if not isinstance(records, list) or not records:
-        raise UpdateFailed("UV payload has no records")
+        raise source_error(ERROR_PAYLOAD, SOURCE_UV, detail="no records")
     record = records[0] if isinstance(records[0], dict) else {}
     index = record.get("index")
     if not isinstance(index, list):
-        raise UpdateFailed("UV payload has no index list")
+        raise source_error(ERROR_PAYLOAD, SOURCE_UV, detail="no index list")
 
     readings: dict[datetime, UvReading] = {}
     for row in index:
@@ -144,9 +145,7 @@ class UvCoordinator(DataUpdateCoordinator[UvData]):
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status != 200:
-                    raise UpdateFailed(
-                        f"data.gov.sg UV index returned HTTP {response.status}"
-                    )
+                    raise source_error(ERROR_HTTP, SOURCE_UV, status=response.status)
                 payload = await response.json(content_type=None)
         except (aiohttp.ClientError, TimeoutError) as err:
             if self.data is not None:
@@ -154,7 +153,7 @@ class UvCoordinator(DataUpdateCoordinator[UvData]):
                     "Error fetching UV index (%s); using last known values", err
                 )
                 return self.data
-            raise UpdateFailed(f"Error fetching UV index: {err}") from err
+            raise source_error(ERROR_FETCH, SOURCE_UV, error=err) from err
         except UpdateFailed as err:
             if self.data is not None:
                 _LOGGER.warning(
