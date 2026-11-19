@@ -20,6 +20,7 @@ from homeassistant.helpers.update_coordinator import (
 from .const import (
     DOMAIN,
     SCHOOL_EVENT_KINDS,
+    SOURCE_CAPITALAND,
     SOURCE_CARPARK,
     SOURCE_COE,
     SOURCE_DENGUE,
@@ -54,6 +55,7 @@ DEVICE_NEA = "nea"
 DEVICE_HAWKER = "hawker"
 DEVICE_CARPARK = "carparks"
 DEVICE_TAXI = "taxis"
+DEVICE_CAPITALAND = "capitaland_carparks"
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,6 +149,12 @@ DEVICES: dict[str, SingaporeDevice] = {
         (SOURCE_TAXI,),
         "https://data.gov.sg/datasets/d_e25662f1a062dd046453926aa284ba64/view",
     ),
+    DEVICE_CAPITALAND: SingaporeDevice(
+        "CapitaLand Carparks",
+        "CapitaLand JustPark Lot Availability",
+        (SOURCE_CAPITALAND,),
+        "https://justpark.capitaland.com/Lot-Availability",
+    ),
 }
 
 # Translation key -> data source, for every public-source entity. The weather
@@ -192,6 +200,7 @@ ENTITY_SOURCES: dict[str, str] = {
     "hawker_closures": SOURCE_HAWKER,
     "carpark": SOURCE_CARPARK,
     **dict.fromkeys(("taxis_available", "taxis_nearby"), SOURCE_TAXI),
+    "capitaland_carpark": SOURCE_CAPITALAND,
 }
 
 

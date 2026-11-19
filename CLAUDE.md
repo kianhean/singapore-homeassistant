@@ -30,6 +30,7 @@ custom_components/singapore/
 ├── hawker_coordinator.py   # HawkerClosureCoordinator: NEA hawker centre cleaning/works dates
 ├── carpark_coordinator.py  # CarparkCoordinator: HDB lot availability + carpark info (SVY21→WGS84)
 ├── taxi_coordinator.py     # TaxiAvailabilityCoordinator: free taxis island-wide, counted near home
+├── capitaland_coordinator.py # CapitaLandCarparkCoordinator: CapitaLand JustPark mall lots (opt-in)
 ├── radar_coordinator.py    # RadarCoordinator: NEA rain radar PNGs (70/240/480 km)
 ├── radar_image.py          # Pure-Pillow compositing of radar onto NEA base maps (BASEMAPS) + GIF loops
 ├── sp_account_coordinator.py # SpAccountCoordinator: one per SP e-account subentry (usage, bills, stats)
@@ -45,6 +46,7 @@ custom_components/singapore/
 ├── calendar.py             # Calendar entities (public holidays; MOE school holidays/terms/exams;
 │                           #   hawker centre closures)
 ├── event.py                # Event entities: COE new results, MRT/LRT service alerts
+├── geo_location.py         # Free taxis within 1 km as geo_location entities (Map card markers)
 ├── weather.py              # Weather entities (one per Singapore forecast area)
 ├── config_flow.py          # UI config flow (name; single instance), options flow, SP account subentry flow
 ├── quality_scale.yaml      # Self-assessed HA quality scale rules (hassfest skips it for custom integrations)
@@ -77,6 +79,7 @@ tests/
 ├── test_hawker_coordinator.py   # Hawker closure parser (d/m/yyyy, TBC), nearest centres, calendar
 ├── test_carpark_coordinator.py  # SVY21 conversion, availability/info parsers, nearest/chosen, sensors
 ├── test_taxi_coordinator.py     # Taxi GeoJSON parser, counts around home, sensors
+├── test_capitaland_coordinator.py # JustPark parser (tests/fixtures/capitaland_lots.json), token reuse, sensors
 ├── test_sp_account.py           # SP account coordinator, sensors, flow helpers, reload listener
 ├── test_sp_account_insights.py  # Derived SP sensors, account calendar, peer (similar homes) statistics
 ├── sp_account/                  # Vendored upstream client/mapper/history tests + recorded fixtures
@@ -107,7 +110,7 @@ tests_ha/                        # Runs against a REAL Home Assistant (no module
 blueprints/automation/singapore/  # Importable automation blueprints (README "Import" buttons)
 tests_ha/test_blueprints.py      # Runs every blueprint in real HA (one test per blueprint, required)
 examples/dashboard.yaml          # Built-in-cards dashboard: view 1 = images/hero.jpg (hero.html),
-                                 # view 2 "Carparks & taxis" (opt-in sources) = images/carparks-taxis.png
+                                 # view 2 "Carparks & taxis" (HDB, CapitaLand malls, taxis; opt-in) = images/carparks-taxis.png
                                  # (carparks.html); tests_ha checks every entity/attribute in it exists
 examples/sp_account_dashboard.yaml # SP account dashboard (built-in cards); tests_ha checks every
                                  # entity/statistic in it exists (test_sp_account_statistics.py)
@@ -146,6 +149,7 @@ class SingaporeData:
     hawker: HawkerClosureCoordinator | None
     carpark: CarparkCoordinator | None   # opt-in (off by default)
     taxi: TaxiAvailabilityCoordinator | None  # opt-in (off by default)
+    capitaland: CapitaLandCarparkCoordinator | None  # opt-in (off by default)
     sp_accounts: dict[str, SpAccountCoordinator]  # keyed by subentry id
     options: dict  # the options this setup used; a change reloads the entry
     def coordinators(self) -> dict[str, DataUpdateCoordinator]: ...  # enabled ones
@@ -168,7 +172,8 @@ Platforms read it via `entry.runtime_data.<coordinator>` (see `sensor.py`, `weat
 - `sources` — multi-select of `SOURCES` (labels under `selector.sources` in strings.json).
   Stored inverted as `options["disabled_sources"]`, so a source added in a later release is
   on for existing users. **Except `OPT_IN_SOURCES`** (`carpark`, `taxi`: each poll downloads an
-  island-wide payload of ~300 KB / ~80 KB for a few local numbers): those are off by default
+  island-wide payload of ~300 KB / ~80 KB for a few local numbers; `capitaland`: scraped from a
+  mall operator's website, not open data): those are off by default
   and stored the other way round, as `options["enabled_sources"]` (only when non-empty), never
   in `disabled_sources`. `enabled_sources(entry)` reads both. Empty with no SP subentries is
   rejected (`no_sources`).
@@ -737,6 +742,38 @@ sensors. State = car lots available (`lots`); `latitude`/`longitude` attributes 
 1 km / 2 km of `hass.config` home and the nearest distance (`TaxiData`, flat fields so
 diagnostics stay small and JSON-safe). `sensor.taxis_available` (total) and
 `sensor.taxis_nearby` (within `NEARBY_KM`), device *Taxis*.
+
+The taxis within `NEARBY_KM` also keep their position (`TaxiData.nearby_taxis`, nearest first,
+at most `MAX_TAXI_MARKERS` = 50) for `geo_location.py`: one `GeolocationEvent` per taxi
+(`source: singapore`, translation key `taxi`, name "Free taxi {number}", state = distance in
+km) for a Map card with `geo_location_sources: [singapore]`. LTA gives taxis no id, so the
+entities are slots (1 = nearest) that move each poll; surplus slots are removed, new ones added.
+Like HA's feed-based geo location entities they have **no unique id**, so they are not in the
+entity registry, need no `ENTITY_SOURCES` entry and are not in `tests/test_entity.py`'s platform
+sweep. `nearby_taxis` is declared with `metadata={"diagnostics": False}`, which
+`diagnostics._serialize` drops: positions around home would reveal it in a public issue.
+The map card isn't in `examples/dashboard.yaml` / the README image: CARTO (the tiles HA's map
+uses) serves "API KEY REQUIRED" tiles to scripts, so a real map can't be rendered for the mockup.
+
+## How the CapitaLand Mall Carpark Coordinator Works (opt-in)
+
+`capitaland_coordinator.py` polls https://justpark.capitaland.com/Lot-Availability every
+**5 minutes**. The page is a Vue app; its lots come from a form POST to
+`https://justpark.capitaland.com/AjaxNoAuth/OnHttpPost` with `JData={"DisplayType":"LotAvail",
+"LotType":null}` and the headers `X-APIAction: SelectSiteNoAuth/OnSelectSite`, `x-ModID:
+FELotAvail` and `__RequestVerificationToken` (the page's hidden input), plus the
+`__RequestVerificationToken` cookie the page sets. Without the token/cookie the endpoint answers
+an HTML error page. The coordinator loads the page once, keeps the token and cookies (passed as an
+explicit `Cookie` header, not via HA's shared cookie jar), and reloads the page once when the POST
+stops answering JSON. Answer: `{"HasError": false, "Result": "<JSON string>"}`; each site has
+`SiteCode`, `SiteDesc`, `BusinessUnit` (`Retail` = malls; `Commercial` and business parks are
+skipped), `LotBalance` / `LotTotal` (strings, `"NA"` / null when not reported) and `IsFull`.
+HTTP errors / network errors keep last-known data; a non-JSON answer from a fresh token, a missing
+token or `HasError` raise `UpdateFailed`. Sensors (`translation_key="capitaland_carpark"`, name
+`{mall}`, unique id `{entry_id}_capitaland_{code.lower()}` → `sensor.capitaland_carparks_bedok_mall`)
+are added by `async_setup_capitaland_sensors` as malls with a lot count appear. Not a data.gov.sg
+host, so it doesn't go through `datagov.py`. `tests/fixtures/capitaland_lots.json` is a real
+answer trimmed to a few sites (unit tests + `tests_ha`).
 
 ## How the Rain Radar Coordinator Works
 

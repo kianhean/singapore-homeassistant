@@ -16,11 +16,13 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
+from .capitaland_coordinator import CapitaLandCarparkCoordinator
 from .carpark_coordinator import CarparkCoordinator
 from .coe_coordinator import CoeCoordinator
 from .const import (
     DOMAIN,
     SCHOOL_EVENT_KINDS,
+    SOURCE_CAPITALAND,
     SOURCE_CARPARK,
     SOURCE_COE,
     SOURCE_DENGUE,
@@ -81,6 +83,7 @@ PLATFORMS = [
     Platform.CALENDAR,
     Platform.CAMERA,
     Platform.EVENT,
+    Platform.GEO_LOCATION,
 ]
 
 # COE results are published after each bidding exercise; refresh daily at 19:30.
@@ -112,6 +115,7 @@ class SingaporeData:
     hawker: HawkerClosureCoordinator | None
     carpark: CarparkCoordinator | None
     taxi: TaxiAvailabilityCoordinator | None
+    capitaland: CapitaLandCarparkCoordinator | None
     # One per SP Group e-account subentry, keyed by subentry id.
     sp_accounts: dict[str, SpAccountCoordinator] = field(default_factory=dict)
     # The options this setup used; a change to them reloads the entry.
@@ -147,6 +151,7 @@ _COORDINATORS: dict[str, type[DataUpdateCoordinator]] = {
     SOURCE_HAWKER: HawkerClosureCoordinator,
     SOURCE_CARPARK: CarparkCoordinator,
     SOURCE_TAXI: TaxiAvailabilityCoordinator,
+    SOURCE_CAPITALAND: CapitaLandCarparkCoordinator,
 }
 
 # Weather, holidays and train status are the core sources: setup waits for
@@ -351,6 +356,7 @@ _BACKGROUND_LABELS = {
     SOURCE_HAWKER: "hawker closure",
     SOURCE_CARPARK: "carpark availability",
     SOURCE_TAXI: "taxi availability",
+    SOURCE_CAPITALAND: "CapitaLand carpark",
 }
 
 

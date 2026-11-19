@@ -58,6 +58,7 @@ SOURCE_WBGT: Final = "wbgt"
 SOURCE_HAWKER: Final = "hawker"
 SOURCE_CARPARK: Final = "carpark"
 SOURCE_TAXI: Final = "taxi"
+SOURCE_CAPITALAND: Final = "capitaland"
 
 SOURCES: Final = (
     SOURCE_TARIFF,
@@ -77,11 +78,13 @@ SOURCES: Final = (
     SOURCE_HAWKER,
     SOURCE_CARPARK,
     SOURCE_TAXI,
+    SOURCE_CAPITALAND,
 )
 
-# Off until ticked in the options (stored in CONF_ENABLED_SOURCES): both poll
-# a large island-wide payload every few minutes for a few local numbers.
-OPT_IN_SOURCES: Final = (SOURCE_CARPARK, SOURCE_TAXI)
+# Off until ticked in the options (stored in CONF_ENABLED_SOURCES): carparks and
+# taxis poll a large island-wide payload every few minutes for a few local
+# numbers; CapitaLand's carparks come from a mall operator's website.
+OPT_IN_SOURCES: Final = (SOURCE_CARPARK, SOURCE_TAXI, SOURCE_CAPITALAND)
 
 # English names for log lines and repair placeholders (UI labels for the
 # options form are translated under selector.sources in strings.json).
@@ -103,6 +106,7 @@ SOURCE_NAMES: Final = {
     SOURCE_HAWKER: "Hawker centre closures",
     SOURCE_CARPARK: "HDB carpark availability",
     SOURCE_TAXI: "Taxi availability",
+    SOURCE_CAPITALAND: "CapitaLand mall carparks",
 }
 
 # data.gov.sg reads an optional API key from this header (higher rate limits).

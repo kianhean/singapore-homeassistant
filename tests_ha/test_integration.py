@@ -214,6 +214,7 @@ async def test_setup_creates_entities_and_unloads(
     # Carparks and taxis are opt-in: off on a fresh install.
     assert entry.runtime_data.carpark is None
     assert entry.runtime_data.taxi is None
+    assert entry.runtime_data.capitaland is None
     assert hass.states.get("sensor.taxis_available") is None
 
     # Every entity must use a stable, entry-scoped unique ID.
@@ -332,10 +333,50 @@ async def test_opt_in_carparks_and_taxis(
     assert nearby is not None and nearby.state == "1"
     assert nearby.attributes["within_500_m"] == 1
 
+    # One map marker per free taxi within 1 km (the canned feed has one).
+    marker = hass.states.get("geo_location.free_taxi_1")
+    assert marker is not None
+    assert marker.attributes["source"] == "singapore"
+    assert marker.attributes["friendly_name"] == "Free taxi 1"
+    assert marker.attributes["unit_of_measurement"] == "km"
+    assert float(marker.state) < 1
+    assert "latitude" in marker.attributes and "longitude" in marker.attributes
+    assert hass.states.get("geo_location.free_taxi_2") is None
+    # Feed entities: not in the entity registry.
+    assert er.async_get(hass).async_get("geo_location.free_taxi_1") is None
+
     diagnostics = await get_diagnostics_for_config_entry(hass, hass_client, entry)
     coordinators = diagnostics["coordinators"]
     assert coordinators["carpark"]["data"]["tracked"] == ["ACB"]
     assert coordinators["taxi"]["data"]["total"] == 2
+
+
+async def test_opt_in_capitaland_carparks(
+    hass: HomeAssistant, hass_client, mock_sources
+) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Singapore",
+        data={"name": "Singapore"},
+        options={"enabled_sources": ["capitaland"]},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    bedok = hass.states.get("sensor.capitaland_carparks_bedok_mall")
+    assert bedok is not None
+    assert bedok.state == "39"
+    assert bedok.attributes["total_lots"] == 264
+    assert bedok.attributes["site_code"] == "BM"
+    assert bedok.attributes["unit_of_measurement"] == "lots"
+    assert hass.states.get("sensor.capitaland_carparks_plaza_singapura") is not None
+    # Offices aren't malls.
+    assert hass.states.get("sensor.capitaland_carparks_capital_tower") is None
+
+    diagnostics = await get_diagnostics_for_config_entry(hass, hass_client, entry)
+    sites = diagnostics["coordinators"]["capitaland"]["data"]["sites"]
+    assert sites["BM"]["available"] == 39
 
 
 async def test_example_dashboard_matches_a_real_install(
@@ -354,7 +395,10 @@ async def test_example_dashboard_matches_a_real_install(
         domain=DOMAIN,
         title="Singapore",
         data={"name": "Singapore"},
-        options={"enabled_sources": ["carpark", "taxi"], "carparks": "B8B, B8, B6"},
+        options={
+            "enabled_sources": ["carpark", "taxi", "capitaland"],
+            "carparks": "B8B, B8, B6",
+        },
     )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)

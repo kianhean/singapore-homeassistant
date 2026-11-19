@@ -21,6 +21,10 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 )
 
 from custom_components.singapore import datagov
+from custom_components.singapore.capitaland_coordinator import (
+    CAPITALAND_API_URL,
+    CAPITALAND_PAGE_URL,
+)
 from custom_components.singapore.carpark_coordinator import (
     CARPARK_AVAILABILITY_URL,
     CARPARK_INFO_URL,
@@ -321,6 +325,11 @@ _CARPARK_AVAILABILITY_PAYLOAD = {
     ]
 }
 
+# A real JustPark answer (2026-11-19), trimmed to a few sites.
+_CAPITALAND_LOTS = (
+    Path(__file__).parents[1] / "tests" / "fixtures" / "capitaland_lots.json"
+).read_text()
+
 _TAXI_PAYLOAD = {
     "type": "FeatureCollection",
     "features": [
@@ -552,6 +561,12 @@ def mock_sources(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
     aioclient_mock.get(CARPARK_INFO_URL, json=_CARPARK_INFO_PAYLOAD)
     aioclient_mock.get(CARPARK_AVAILABILITY_URL, json=_CARPARK_AVAILABILITY_PAYLOAD)
     aioclient_mock.get(TAXI_AVAILABILITY_URL, json=_TAXI_PAYLOAD)
+    aioclient_mock.get(
+        CAPITALAND_PAGE_URL,
+        text=('<input name="__RequestVerificationToken" type="hidden" value="tok" />'),
+        cookies={"__RequestVerificationToken": "cookie"},
+    )
+    aioclient_mock.post(CAPITALAND_API_URL, text=_CAPITALAND_LOTS)
     aioclient_mock.get(FLOOD_ALERTS_URL, json=_flood_payload())
     aioclient_mock.get(TRAFFIC_IMAGES_URL, json=_TRAFFIC_PAYLOAD)
     aioclient_mock.get(

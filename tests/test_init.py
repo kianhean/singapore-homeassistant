@@ -26,6 +26,7 @@ def test_platforms_include_weather():
 
 def test_platforms_include_calendar():
     assert "calendar" in PLATFORMS
+    assert "geo_location" in PLATFORMS
 
 
 @pytest.mark.asyncio
@@ -223,6 +224,7 @@ async def test_unload_stops_sp_imports_and_remove_clears_issues():
                 "hawker",
                 "carpark",
                 "taxi",
+                "capitaland",
             )
         ),
         sp_accounts={"sub1": account},

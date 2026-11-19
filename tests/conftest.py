@@ -151,6 +151,7 @@ class Platform:
     CALENDAR = "calendar"
     CAMERA = "camera"
     EVENT = "event"
+    GEO_LOCATION = "geo_location"
 
 
 class HomeAssistant:
@@ -222,6 +223,29 @@ class OptionsFlow:
 
     def add_suggested_values_to_schema(self, schema, suggested_values):
         return schema
+
+
+class GeolocationEvent:
+    """Mirrors HA's GeolocationEvent: the state is the distance, rounded."""
+
+    hass = None
+
+    @property
+    def state(self):
+        distance = self.distance
+        return None if distance is None else round(distance, 1)
+
+    @property
+    def state_attributes(self):
+        attrs = {"source": self.source}
+        if self.latitude is not None:
+            attrs["latitude"] = round(self.latitude, 5)
+        if self.longitude is not None:
+            attrs["longitude"] = round(self.longitude, 5)
+        return attrs
+
+    async def async_remove(self):
+        self.removed = True
 
 
 class EventEntity:
@@ -502,6 +526,9 @@ _HA_MODULES: dict[str, ModuleType] = {
         "homeassistant.components.calendar",
         CalendarEntity=CalendarEntity,
         CalendarEvent=CalendarEvent,
+    ),
+    "homeassistant.components.geo_location": _mod(
+        "homeassistant.components.geo_location", GeolocationEvent=GeolocationEvent
     ),
     "homeassistant.components.event": _mod(
         "homeassistant.components.event", EventEntity=EventEntity

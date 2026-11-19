@@ -17,6 +17,10 @@ from custom_components.singapore.calendar import (
     async_setup_entry as calendar_setup_entry,
 )
 from custom_components.singapore.camera import async_setup_entry as camera_setup_entry
+from custom_components.singapore.capitaland_coordinator import (
+    CapitaLandData,
+    CapitaLandSite,
+)
 from custom_components.singapore.const import (
     CONF_DISABLED_SOURCES,
     DOMAIN,
@@ -65,6 +69,10 @@ def _runtime_data(enabled: set[str]) -> SingaporeData:
             coordinator.data.areas = {"Bedok": "Fair", "Changi": "Cloudy"}
         if source == "carpark":
             coordinator.data.tracked = ["BJ55"]
+        if source == "capitaland":
+            coordinator.data = CapitaLandData(
+                {"BM": CapitaLandSite("BM", "Bedok Mall", "Retail", 39, 264, False)}
+            )
         coordinators[source] = coordinator
     return SingaporeData(**coordinators, sp_accounts={}, options={})
 

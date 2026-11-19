@@ -1,5 +1,5 @@
 """Sensor platform: tariffs, COE, weather, PSI, trains, floods, dengue, lightning,
-UV, heat stress, HDB carparks and taxis."""
+UV, heat stress, HDB carparks, taxis and CapitaLand mall carparks."""
 
 from __future__ import annotations
 
@@ -27,6 +27,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import SingaporeConfigEntry
+from .capitaland_coordinator import CapitaLandCarparkCoordinator
 from .carpark_coordinator import (
     LOT_CAR,
     LOT_TYPE_NAMES,
@@ -42,6 +43,7 @@ from .coordinator import UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER, SPGroupCoordina
 from .dengue_coordinator import DengueClusterCoordinator, nearest_cluster
 from .entity import (
     DEVICE_AIR_QUALITY,
+    DEVICE_CAPITALAND,
     DEVICE_CARPARK,
     DEVICE_COE,
     DEVICE_ENERGY,
@@ -210,6 +212,10 @@ async def async_setup_entry(
     if (carpark := data.carpark) is not None:
         entry.async_on_unload(
             async_setup_carpark_sensors(carpark, eid, async_add_entities)
+        )
+    if (capitaland := data.capitaland) is not None:
+        entry.async_on_unload(
+            async_setup_capitaland_sensors(capitaland, eid, async_add_entities)
         )
 
     for unsub in async_setup_sp_account_sensors(
@@ -1137,4 +1143,79 @@ class SingaporeCarparkSensor(SingaporeEntity[CarparkCoordinator], SensorEntity):
             ):
                 if (value := getattr(info, key)) is not None:
                     attrs[key] = value
+        return attrs
+
+
+@callback
+def async_setup_capitaland_sensors(
+    coordinator: CapitaLandCarparkCoordinator,
+    entry_id: str,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+):
+    """Add a sensor per CapitaLand mall as it reports lots; return the unsub.
+
+    The first refresh runs in the background, and CapitaLand adds or drops
+    malls without notice, so sensors come from the coordinator's data.
+    """
+    known: set[str] = set()
+
+    @callback
+    def _add_new() -> None:
+        data = coordinator.data
+        if data is None:
+            return
+        fresh = [site for site in data.malls() if site.code not in known]
+        if not fresh:
+            return
+        known.update(site.code for site in fresh)
+        async_add_entities(
+            [
+                SingaporeCapitaLandCarparkSensor(
+                    coordinator, entry_id, site.code, site.name
+                )
+                for site in fresh
+            ]
+        )
+
+    _add_new()
+    return coordinator.async_add_listener(_add_new)
+
+
+class SingaporeCapitaLandCarparkSensor(
+    SingaporeEntity[CapitaLandCarparkCoordinator], SensorEntity
+):
+    """Car lots available at one CapitaLand mall."""
+
+    _device = DEVICE_CAPITALAND
+    _attr_translation_key = "capitaland_carpark"
+    _attr_attribution = "Data provided by CapitaLand JustPark"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = "lots"
+
+    def __init__(
+        self,
+        coordinator: CapitaLandCarparkCoordinator,
+        entry_id: str,
+        code: str,
+        name: str,
+    ) -> None:
+        super().__init__(coordinator, entry_id, f"capitaland_{code.lower()}")
+        self._code = code
+        self._attr_translation_placeholders = {"mall": name}
+
+    def _site(self):
+        data = self.coordinator.data
+        return None if data is None else data.sites.get(self._code)
+
+    @property
+    def native_value(self) -> int | None:
+        site = self._site()
+        return None if site is None else site.available
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs: dict = {"site_code": self._code}
+        if (site := self._site()) is not None:
+            attrs["total_lots"] = site.total
+            attrs["full"] = site.full
         return attrs

@@ -247,6 +247,9 @@
           "open": "mdi:pencil-box-outline",
           "closed": "mdi:check-circle-outline"
         }
+      },
+      "capitaland_carpark": {
+        "default": "mdi:parking"
       }
     },
     "camera": {
@@ -275,6 +278,11 @@
             }
           }
         }
+      }
+    },
+    "geo_location": {
+      "taxi": {
+        "default": "mdi:taxi"
       }
     }
   }
