@@ -26,7 +26,7 @@ from custom_components.singapore.lightning_coordinator import LightningData
 from custom_components.singapore.psi_coordinator import PsiData
 from custom_components.singapore.radar_coordinator import RadarData
 from custom_components.singapore.school_coordinator import SchoolEvent
-from custom_components.singapore.taxi_coordinator import TaxiData
+from custom_components.singapore.taxi_coordinator import TaxiData, TaxiPosition
 from custom_components.singapore.traffic_coordinator import TrafficImagesData
 from custom_components.singapore.train_coordinator import TrainStatusData
 from custom_components.singapore.uv_coordinator import UvData
@@ -71,7 +71,9 @@ async def test_diagnostics_serializes_all_coordinators():
                 },
             )
         ),
-        taxi=_coordinator(TaxiData(3000, 1, 4, 12, 0.3, None)),
+        taxi=_coordinator(
+            TaxiData(3000, 1, 4, 12, 0.3, None, (TaxiPosition(1.3, 103.8, 0.3),))
+        ),
         capitaland=_coordinator(
             CapitaLandData(
                 {"BM": CapitaLandSite("BM", "Bedok Mall", "Retail", 39, 264, False)}
@@ -119,5 +121,7 @@ async def test_diagnostics_serializes_all_coordinators():
         "C": {"available": 10, "total": 100}
     }
     assert coordinators["taxi"]["data"]["within_1_km"] == 4
+    # Taxi positions near home would reveal it: never in diagnostics.
+    assert "nearby_taxis" not in coordinators["taxi"]["data"]
     assert coordinators["capitaland"]["data"]["sites"]["BM"]["available"] == 39
     assert result["options"]["disabled_school_events"] == []

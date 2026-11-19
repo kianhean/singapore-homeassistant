@@ -26,6 +26,7 @@ def test_platforms_include_weather():
 
 def test_platforms_include_calendar():
     assert "calendar" in PLATFORMS
+    assert "geo_location" in PLATFORMS
 
 
 @pytest.mark.asyncio

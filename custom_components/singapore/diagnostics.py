@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, is_dataclass
+from dataclasses import asdict, fields, is_dataclass
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -123,7 +123,13 @@ def _coordinator_diagnostics(coordinator: DataUpdateCoordinator) -> dict[str, An
 
 def _serialize(value: Any) -> Any:
     if is_dataclass(value) and not isinstance(value, type):
-        return asdict(value)
+        # Fields marked metadata={"diagnostics": False} stay out (e.g. taxi
+        # positions around home: downloads get pasted into public issues).
+        result = asdict(value)
+        for item in fields(value):
+            if item.metadata.get("diagnostics") is False:
+                result.pop(item.name, None)
+        return result
     if isinstance(value, list):
         return [_serialize(item) for item in value]
     return value

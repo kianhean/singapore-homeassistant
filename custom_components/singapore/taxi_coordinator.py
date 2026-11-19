@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 import aiohttp
@@ -26,6 +26,18 @@ UPDATE_INTERVAL = timedelta(minutes=5)
 # Free taxis within this distance of home are the "taxis nearby" state; the
 # 500 m and 2 km counts are attributes.
 NEARBY_KM = 1.0
+# Map markers (geo_location entities) for the nearest free taxis within
+# NEARBY_KM; capped so a busy area doesn't make hundreds of entities.
+MAX_TAXI_MARKERS = 50
+
+
+@dataclass(frozen=True, slots=True)
+class TaxiPosition:
+    """A free taxi near home."""
+
+    latitude: float
+    longitude: float
+    distance_km: float
 
 
 @dataclass(frozen=True)
@@ -33,7 +45,9 @@ class TaxiData:
     """Free taxis island-wide and around the Home Assistant home location.
 
     Positions are reduced to counts here (there are thousands), so the state
-    machine and diagnostics stay small.
+    machine and diagnostics stay small. Only the taxis within ``NEARBY_KM``
+    (nearest first, at most ``MAX_TAXI_MARKERS``) keep their position, for the
+    map markers; diagnostics leave them out, as they would reveal home.
     """
 
     total: int
@@ -42,6 +56,9 @@ class TaxiData:
     within_2_km: int
     nearest_km: float | None
     timestamp: datetime | None
+    nearby_taxis: tuple[TaxiPosition, ...] = field(
+        default=(), metadata={"diagnostics": False}
+    )
 
     @property
     def nearby(self) -> int:
@@ -76,6 +93,7 @@ def _parse_taxis(payload: dict, home_lat: float, home_lon: float) -> TaxiData:
     within = [0, 0, 0]  # 500 m, 1 km, 2 km
     nearest: float | None = None
     count = 0
+    nearby: list[TaxiPosition] = []
     for point in coords:
         try:
             lon, lat = float(point[0]), float(point[1])
@@ -88,6 +106,9 @@ def _parse_taxis(payload: dict, home_lat: float, home_lon: float) -> TaxiData:
         for i, radius in enumerate((0.5, NEARBY_KM, 2.0)):
             if dist <= radius:
                 within[i] += 1
+        if dist <= NEARBY_KM:
+            nearby.append(TaxiPosition(lat, lon, round(dist, 3)))
+    nearby.sort(key=lambda taxi: taxi.distance_km)
     total = props.get("taxi_count")
     return TaxiData(
         total=total if isinstance(total, int) else count,
@@ -96,6 +117,7 @@ def _parse_taxis(payload: dict, home_lat: float, home_lon: float) -> TaxiData:
         within_2_km=within[2],
         nearest_km=None if nearest is None else round(nearest, 3),
         timestamp=_parse_time(props.get("timestamp")),
+        nearby_taxis=tuple(nearby[:MAX_TAXI_MARKERS]),
     )
 
 

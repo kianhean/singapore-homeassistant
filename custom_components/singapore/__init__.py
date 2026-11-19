@@ -83,6 +83,7 @@ PLATFORMS = [
     Platform.CALENDAR,
     Platform.CAMERA,
     Platform.EVENT,
+    Platform.GEO_LOCATION,
 ]
 
 # COE results are published after each bidding exercise; refresh daily at 19:30.

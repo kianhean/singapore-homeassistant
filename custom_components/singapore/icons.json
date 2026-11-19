@@ -279,6 +279,11 @@
           }
         }
       }
+    },
+    "geo_location": {
+      "taxi": {
+        "default": "mdi:taxi"
+      }
     }
   }
 }

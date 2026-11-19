@@ -334,6 +334,11 @@
           }
         }
       }
+    },
+    "geo_location": {
+      "taxi": {
+        "name": "Free taxi {number}"
+      }
     }
   },
   "config_subentries": {

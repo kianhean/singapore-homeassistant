@@ -95,7 +95,8 @@ that part is built on [maci0/home-assistant-sp](https://github.com/maci0/home-as
 ## What's new
 
 - **v0.17** [CapitaLand mall carparks](#capitaland-mall-carparks) (opt-in): free lots at
-  Plaza Singapura, Tampines Mall, IMM, Westgate and the other CapitaLand malls.
+  Plaza Singapura, Tampines Mall, IMM, Westgate and the other CapitaLand malls. Free taxis
+  within 1 km of home now show [on a Map card](#taxi-availability).
 - **v0.16** [Heat stress (WBGT)](#heat-stress-wbgt), [hourly PM2.5](#air-quality-psi),
   [hawker centre closures](#hawker-centre-closures) as a calendar, and two opt-in sources:
   [HDB carpark availability](#hdb-carpark-availability) and [taxis nearby](#taxi-availability).
@@ -1044,8 +1045,29 @@ behind after you move your home location can be deleted from the entity's settin
 
 *Opt-in: tick **Taxi availability** under Configure.* Updated every **5 minutes** from
 [LTA's taxi availability via data.gov.sg](https://data.gov.sg/datasets/d_e25662f1a062dd046453926aa284ba64/view),
-the position of every free taxi island-wide (positions are counted, not stored). On a
-*Taxis* device.
+the position of every free taxi island-wide. On a *Taxis* device. The taxis within 1 km of your
+home location also appear on a Map card: each is a `geo_location` entity (*Free taxi 1* is the
+nearest, up to 50), with `source: singapore`:
+
+```yaml
+type: map
+geo_location_sources:
+  - singapore
+entities:
+  - zone.home
+```
+
+The map card groups nearby markers into numbered clusters; its grouping button (or
+`cluster: false`) shows every taxi. Positions are kept only for these markers and are never in
+the diagnostics download. The markers' states (distance from home) change on every poll; to
+keep them out of the history database, add this to `configuration.yaml`:
+
+```yaml
+recorder:
+  exclude:
+    entity_globs:
+      - geo_location.free_taxi_*
+```
 
 <details>
 <summary>Entities and attributes</summary>
@@ -1054,6 +1076,7 @@ the position of every free taxi island-wide (positions are counted, not stored).
 |-----------|------|------|-------------|
 | `sensor.taxis_available` | Taxis Available | taxis | Free taxis island-wide; `reading_time` attribute |
 | `sensor.taxis_nearby` | Taxis Nearby | taxis | Free taxis within 1 km of your home location; attributes `within_500_m`, `within_2_km` and `nearest_km` |
+| `geo_location.free_taxi_<n>` | Free taxi 1, 2, … | km | One per free taxi within 1 km, nearest first (at most 50); state = distance from home, `latitude` / `longitude`, `source: singapore` (Map card) |
 
 </details>
 

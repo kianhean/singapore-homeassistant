@@ -334,6 +334,11 @@
           }
         }
       }
+    },
+    "geo_location": {
+      "taxi": {
+        "name": "空车德士 {number}"
+      }
     }
   },
   "config_subentries": {

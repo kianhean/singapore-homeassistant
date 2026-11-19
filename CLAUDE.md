@@ -46,6 +46,7 @@ custom_components/singapore/
 ├── calendar.py             # Calendar entities (public holidays; MOE school holidays/terms/exams;
 │                           #   hawker centre closures)
 ├── event.py                # Event entities: COE new results, MRT/LRT service alerts
+├── geo_location.py         # Free taxis within 1 km as geo_location entities (Map card markers)
 ├── weather.py              # Weather entities (one per Singapore forecast area)
 ├── config_flow.py          # UI config flow (name; single instance), options flow, SP account subentry flow
 ├── quality_scale.yaml      # Self-assessed HA quality scale rules (hassfest skips it for custom integrations)
@@ -741,6 +742,18 @@ sensors. State = car lots available (`lots`); `latitude`/`longitude` attributes 
 1 km / 2 km of `hass.config` home and the nearest distance (`TaxiData`, flat fields so
 diagnostics stay small and JSON-safe). `sensor.taxis_available` (total) and
 `sensor.taxis_nearby` (within `NEARBY_KM`), device *Taxis*.
+
+The taxis within `NEARBY_KM` also keep their position (`TaxiData.nearby_taxis`, nearest first,
+at most `MAX_TAXI_MARKERS` = 50) for `geo_location.py`: one `GeolocationEvent` per taxi
+(`source: singapore`, translation key `taxi`, name "Free taxi {number}", state = distance in
+km) for a Map card with `geo_location_sources: [singapore]`. LTA gives taxis no id, so the
+entities are slots (1 = nearest) that move each poll; surplus slots are removed, new ones added.
+Like HA's feed-based geo location entities they have **no unique id**, so they are not in the
+entity registry, need no `ENTITY_SOURCES` entry and are not in `tests/test_entity.py`'s platform
+sweep. `nearby_taxis` is declared with `metadata={"diagnostics": False}`, which
+`diagnostics._serialize` drops: positions around home would reveal it in a public issue.
+The map card isn't in `examples/dashboard.yaml` / the README image: CARTO (the tiles HA's map
+uses) serves "API KEY REQUIRED" tiles to scripts, so a real map can't be rendered for the mockup.
 
 ## How the CapitaLand Mall Carpark Coordinator Works (opt-in)
 

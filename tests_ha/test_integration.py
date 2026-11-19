@@ -333,6 +333,18 @@ async def test_opt_in_carparks_and_taxis(
     assert nearby is not None and nearby.state == "1"
     assert nearby.attributes["within_500_m"] == 1
 
+    # One map marker per free taxi within 1 km (the canned feed has one).
+    marker = hass.states.get("geo_location.free_taxi_1")
+    assert marker is not None
+    assert marker.attributes["source"] == "singapore"
+    assert marker.attributes["friendly_name"] == "Free taxi 1"
+    assert marker.attributes["unit_of_measurement"] == "km"
+    assert float(marker.state) < 1
+    assert "latitude" in marker.attributes and "longitude" in marker.attributes
+    assert hass.states.get("geo_location.free_taxi_2") is None
+    # Feed entities: not in the entity registry.
+    assert er.async_get(hass).async_get("geo_location.free_taxi_1") is None
+
     diagnostics = await get_diagnostics_for_config_entry(hass, hass_client, entry)
     coordinators = diagnostics["coordinators"]
     assert coordinators["carpark"]["data"]["tracked"] == ["ACB"]
