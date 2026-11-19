@@ -1,4 +1,5 @@
-"""Calendar platform: public holidays, MOE school calendars, SP e-account dates."""
+"""Calendar platform: public holidays, MOE school calendars, hawker centre closures,
+SP e-account dates."""
 
 from __future__ import annotations
 
@@ -12,10 +13,18 @@ from homeassistant.util import dt as dt_util
 from . import SingaporeConfigEntry
 from .const import SCHOOL_EVENT_KINDS, enabled_school_events
 from .entity import (
+    DEVICE_HAWKER,
     DEVICE_HOLIDAY,
     DEVICE_SCHOOL,
     SingaporeEntity,
     school_translation_key,
+)
+from .hawker_coordinator import (
+    CLOSURE_CLEANING,
+    NEAREST_CENTRES,
+    HawkerCentre,
+    HawkerClosure,
+    HawkerClosureCoordinator,
 )
 from .holiday_coordinator import PublicHoliday, PublicHolidayCoordinator
 from .school_coordinator import SchoolCalendarCoordinator, SchoolEvent
@@ -42,6 +51,8 @@ async def async_setup_entry(
             for kind in SCHOOL_EVENT_KINDS
             if kind in chosen
         ]
+    if (hawker := entry.runtime_data.hawker) is not None:
+        entities.append(SingaporeHawkerClosureCalendar(hawker, entry.entry_id))
     async_add_entities(entities)
     for unsub in async_setup_sp_account_calendars(
         entry.entry_id, entry.runtime_data.sp_accounts, async_add_entities
@@ -177,4 +188,82 @@ def _school_event(event: SchoolEvent) -> CalendarEvent:
         start=event.start,
         end=event.end + timedelta(days=1),
         description="MOE school calendar",
+    )
+
+
+class SingaporeHawkerClosureCalendar(
+    SingaporeEntity[HawkerClosureCoordinator], CalendarEntity
+):
+    """Closures (quarterly cleaning, other works) of the hawker centres nearest home."""
+
+    _device = DEVICE_HAWKER
+    _attr_translation_key = "hawker_closures"
+    _attr_attribution = "Data provided by NEA via data.gov.sg"
+
+    def __init__(self, coordinator: HawkerClosureCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "hawker_closures")
+
+    def _centres(self) -> list[HawkerCentre]:
+        if self.coordinator.data is None:
+            return []
+        return self.coordinator.data.nearest(
+            self.hass.config.latitude, self.hass.config.longitude, NEAREST_CENTRES
+        )
+
+    def _closures(self) -> list[tuple[HawkerCentre, HawkerClosure]]:
+        pairs = [(c, closure) for c in self._centres() for closure in c.closures]
+        pairs.sort(key=lambda pair: (pair[1].start, pair[1].end, pair[0].name))
+        return pairs
+
+    @property
+    def event(self) -> CalendarEvent | None:
+        """The closure in progress today, else the next one."""
+        today = dt_util.now().date()
+        for centre, closure in self._closures():
+            if closure.end >= today:
+                return _hawker_event(centre, closure)
+        return None
+
+    async def async_get_events(
+        self,
+        hass: HomeAssistant,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> list[CalendarEvent]:
+        """Closures overlapping [start, end)."""
+        start, end = start_date.date(), end_date.date()
+        return [
+            _hawker_event(centre, closure)
+            for centre, closure in self._closures()
+            if closure.start < end and closure.end >= start
+        ]
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        lat, lon = self.hass.config.latitude, self.hass.config.longitude
+        return {
+            "source": "NEA via data.gov.sg",
+            "centres": [
+                {
+                    "name": centre.name,
+                    "address": centre.address,
+                    "distance_km": round(centre.distance_km(lat, lon) or 0.0, 2),
+                }
+                for centre in self._centres()
+            ],
+        }
+
+
+def _hawker_event(centre: HawkerCentre, closure: HawkerClosure) -> CalendarEvent:
+    reason = "cleaning" if closure.kind == CLOSURE_CLEANING else "other works"
+    description = f"Closed for {reason}."
+    if closure.remarks:
+        description += f" {closure.remarks}"
+    # All-day events: HA's end date is exclusive, NEA's is the last closed day.
+    return CalendarEvent(
+        summary=f"{centre.name} closed ({reason})",
+        start=closure.start,
+        end=closure.end + timedelta(days=1),
+        description=description,
+        location=centre.address,
     )

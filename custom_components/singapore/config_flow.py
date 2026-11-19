@@ -29,17 +29,21 @@ from homeassistant.helpers.selector import (
 
 from .const import (
     CONF_API_KEY,
+    CONF_CARPARKS,
     CONF_DISABLED_SCHOOL_EVENTS,
     CONF_DISABLED_SOURCES,
+    CONF_ENABLED_SOURCES,
     CONF_POLLING,
     CONF_SCHOOL_EVENTS,
     CONF_SOURCES,
     DOMAIN,
+    OPT_IN_SOURCES,
     POLLING_NORMAL,
     POLLING_OPTIONS,
     SCHOOL_EVENT_KINDS,
     SOURCE_SCHOOL,
     SOURCES,
+    carpark_numbers,
     enabled_school_events,
     enabled_sources,
 )
@@ -202,6 +206,10 @@ def options_schema(options: dict[str, Any]) -> vol.Schema:
             vol.Optional(
                 CONF_API_KEY, description={"suggested_value": api_key}
             ): _PASSWORD_SELECTOR_PLAIN,
+            vol.Optional(
+                CONF_CARPARKS,
+                description={"suggested_value": options.get(CONF_CARPARKS) or ""},
+            ): TextSelector(),
             vol.Required(
                 CONF_POLLING, default=options.get(CONF_POLLING, POLLING_NORMAL)
             ): SelectSelector(
@@ -223,11 +231,18 @@ def options_from_input(user_input: dict[str, Any]) -> dict[str, Any]:
     """
     enabled = set(user_input.get(CONF_SOURCES) or ())
     options: dict[str, Any] = {
-        CONF_DISABLED_SOURCES: [s for s in SOURCES if s not in enabled],
+        CONF_DISABLED_SOURCES: [
+            s for s in SOURCES if s not in enabled and s not in OPT_IN_SOURCES
+        ],
         CONF_POLLING: user_input.get(CONF_POLLING, POLLING_NORMAL),
     }
+    # Opt-in sources are stored as the ones turned on (off by default).
+    if opted_in := [s for s in OPT_IN_SOURCES if s in enabled]:
+        options[CONF_ENABLED_SOURCES] = opted_in
     if api_key := (user_input.get(CONF_API_KEY) or "").strip():
         options[CONF_API_KEY] = api_key
+    if carparks := carpark_numbers(user_input):
+        options[CONF_CARPARKS] = ", ".join(carparks)
     # Absent from the form (an older frontend) means "keep them all".
     school = user_input.get(CONF_SCHOOL_EVENTS)
     if school is not None and (

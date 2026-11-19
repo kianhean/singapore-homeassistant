@@ -63,6 +63,8 @@ def _runtime_data(enabled: set[str]) -> SingaporeData:
         coordinator.source = source
         if source == "weather":
             coordinator.data.areas = {"Bedok": "Fair", "Changi": "Cloudy"}
+        if source == "carpark":
+            coordinator.data.tracked = ["BJ55"]
         coordinators[source] = coordinator
     return SingaporeData(**coordinators, sp_accounts={}, options={})
 
@@ -130,19 +132,24 @@ def test_entity_source_unknown_keys():
 # -- stale cleanup -----------------------------------------------------------
 
 
-def _reg_entry(entity_id: str, translation_key: str | None, subentry=None):
+def _reg_entry(
+    entity_id: str, translation_key: str | None, subentry=None, unique_id=None
+):
     return SimpleNamespace(
         entity_id=entity_id,
         domain=entity_id.split(".")[0],
         translation_key=translation_key,
         config_subentry_id=subentry,
+        unique_id=unique_id,
     )
 
 
-def _run_cleanup(enabled, entries, devices):
+def _run_cleanup(enabled, entries, devices, options=None):
     entity_registry = MagicMock()
     device_registry = MagicMock()
     entry = _entry()
+    if options:
+        entry.options = options
     with (
         patch("custom_components.singapore.er.async_get", return_value=entity_registry),
         patch(
@@ -200,9 +207,25 @@ def test_cleanup_removes_turned_off_sources_only():
 
 def test_cleanup_removes_shared_device_when_all_its_sources_are_off():
     devices = [_device("nea"), _device("weather")]
-    enabled = set(SOURCES) - {"dengue", "lightning", "uv", "weather", "radar"}
+    enabled = set(SOURCES) - {"dengue", "lightning", "uv", "wbgt", "weather", "radar"}
     _removed, removed_devices = _run_cleanup(enabled, [], devices)
     assert sorted(removed_devices) == ["dev_nea", "dev_weather"]
+
+
+def test_cleanup_removes_carparks_dropped_from_the_options():
+    entries = [
+        _reg_entry(
+            "sensor.hdb_carparks_bj55", "carpark", unique_id="entry1_carpark_bj55"
+        ),
+        _reg_entry(
+            "sensor.hdb_carparks_acb", "carpark", unique_id="entry1_carpark_acb"
+        ),
+    ]
+    removed, _ = _run_cleanup(set(SOURCES), entries, [], {"carparks": "BJ55"})
+    assert removed == ["sensor.hdb_carparks_acb"]
+    # "Nearest home" mode (no list): the set isn't known yet, nothing goes.
+    removed, _ = _run_cleanup(set(SOURCES), entries, [])
+    assert removed == []
 
 
 def test_cleanup_with_everything_on_removes_nothing():
@@ -230,9 +253,9 @@ def test_cleanup_leaves_other_devices_alone():
     [
         ("entry1_air_quality", [], False),
         ("entry1_air_quality", ["psi"], True),
-        # NEA stays while any of dengue/lightning/UV is on.
-        ("entry1_nea", ["uv", "lightning"], False),
-        ("entry1_nea", ["uv", "lightning", "dengue"], True),
+        # NEA stays while any of dengue/lightning/UV/WBGT is on.
+        ("entry1_nea", ["uv", "lightning", "dengue"], False),
+        ("entry1_nea", ["uv", "lightning", "dengue", "wbgt"], True),
         ("entry1_sp_P1", [], False),
         ("entry1_sp_GONE", [], True),
         ("entry1_something_old", [], True),

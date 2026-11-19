@@ -34,6 +34,9 @@
       },
       "school_exams": {
         "name": "Exams"
+      },
+      "hawker_closures": {
+        "name": "Closures"
       }
     },
     "sensor": {
@@ -92,6 +95,9 @@
       "pm25": {
         "name": "PM2.5"
       },
+      "pm25_one_hour": {
+        "name": "PM2.5 (1-hour)"
+      },
       "pm10": {
         "name": "PM10"
       },
@@ -134,6 +140,26 @@
           "very_high": "Very high",
           "extreme": "Extreme"
         }
+      },
+      "wbgt": {
+        "name": "Heat stress WBGT"
+      },
+      "heat_stress": {
+        "name": "Heat stress",
+        "state": {
+          "low": "Low",
+          "moderate": "Moderate",
+          "high": "High"
+        }
+      },
+      "carpark": {
+        "name": "{number}"
+      },
+      "taxis_available": {
+        "name": "Available"
+      },
+      "taxis_nearby": {
+        "name": "Nearby"
       },
       "sp_electricity": {
         "name": "Electricity cumulative"
@@ -392,13 +418,15 @@
           "sources": "Data sources",
           "school_events": "School calendars",
           "api_key": "data.gov.sg API key",
+          "carparks": "HDB carparks",
           "polling": "Polling"
         },
         "data_description": {
-          "sources": "Turning off SP Group tariffs also leaves SP account cost statistics unpriced.",
+          "sources": "Turning off SP Group tariffs also leaves SP account cost statistics unpriced. HDB carpark availability and taxi availability are off until you tick them: each poll downloads island-wide data.",
           "school_events": "Which MOE school calendars to create when the MOE school calendar source is on.",
           "api_key": "Optional. A free key from data.gov.sg gives higher rate limits (fewer HTTP 429 errors). Leave empty to use the public limits.",
-          "polling": "Reduced polls the fast sources (flood alerts, lightning, traffic cameras, radar, trains, weather, PSI, UV) three times less often."
+          "carparks": "Carpark numbers to track when HDB carpark availability is on, separated by commas (e.g. BJ55, TM24; shown on HDB's and data.gov.sg's carpark lists). Leave empty for the 3 carparks nearest your home location.",
+          "polling": "Reduced polls the fast sources (flood alerts, lightning, traffic cameras, radar, trains, weather, PSI, UV, heat stress, carparks, taxis) three times less often."
         }
       }
     },
@@ -422,7 +450,11 @@
         "dengue": "NEA dengue clusters",
         "lightning": "NEA lightning",
         "uv": "NEA UV index",
-        "radar": "NEA rain radar"
+        "radar": "NEA rain radar",
+        "wbgt": "NEA heat stress (WBGT)",
+        "hawker": "Hawker centre closures",
+        "carpark": "HDB carpark availability",
+        "taxi": "Taxi availability"
       }
     },
     "school_events": {

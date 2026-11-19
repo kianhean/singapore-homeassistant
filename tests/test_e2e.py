@@ -421,6 +421,97 @@ def test_e2e_lightning_fetch_and_parse():
         assert 0 < strike.latitude < 3 and 102 < strike.longitude < 106, strike
 
 
+def _live_json(url: str) -> dict:
+    try:
+        return asyncio.run(_async_get_json(url))
+    except Exception as err:
+        pytest.skip(f"Skipping e2e due to network error: {err}")
+
+
+def test_e2e_hourly_pm25_fetch_and_parse():
+    """Fetch live 1-hour PM2.5 and assert every region still has a reading."""
+    from custom_components.singapore.psi_coordinator import (
+        PM25_ONE_HOUR_KEY,
+        PM25_URL,
+        PSI_REGIONS,
+        _parse_psi,
+    )
+
+    data = _parse_psi(_live_json(PM25_URL))
+    assert set(data.readings[PM25_ONE_HOUR_KEY]) == set(PSI_REGIONS)
+    assert 0 <= data.national[PM25_ONE_HOUR_KEY] < 1000
+
+
+def test_e2e_wbgt_fetch_and_parse():
+    """Fetch live NEA WBGT readings and assert stations still parse."""
+    from custom_components.singapore.wbgt_coordinator import (
+        HEAT_STRESS_OPTIONS,
+        WBGT_URL,
+        _parse_wbgt,
+    )
+
+    data = _parse_wbgt(_live_json(WBGT_URL))
+    assert data.readings, "No WBGT stations"
+    for reading in data.readings:
+        assert 15 < reading.wbgt < 40, reading
+        assert reading.heat_stress in HEAT_STRESS_OPTIONS
+        assert 1.1 < reading.latitude < 1.5, reading
+
+
+def test_e2e_hawker_closures_fetch_and_parse():
+    """Fetch NEA's hawker centre closure dates and assert dates still parse."""
+    from custom_components.singapore.hawker_coordinator import (
+        HAWKER_URL,
+        _parse_hawker,
+    )
+
+    data = _parse_hawker(_live_json(HAWKER_URL))
+    assert len(data.centres) > 100, len(data.centres)
+    located = [c for c in data.centres if c.latitude is not None]
+    assert len(located) > 100
+    # Most centres have at least one dated quarterly cleaning.
+    assert sum(1 for c in data.centres if c.closures) > len(data.centres) / 2
+
+
+def test_e2e_carpark_availability_and_info():
+    """Fetch HDB carpark availability + information and join them."""
+    from custom_components.singapore.carpark_coordinator import (
+        CARPARK_AVAILABILITY_URL,
+        CARPARK_INFO_URL,
+        LOT_CAR,
+        _parse_availability,
+        _parse_info,
+        nearest_carparks,
+    )
+
+    availability, _ = _parse_availability(_live_json(CARPARK_AVAILABILITY_URL))
+    info = _parse_info(_live_json(CARPARK_INFO_URL))
+    assert len(availability) > 1000, len(availability)
+    assert len(info) > 1500, len(info)
+    assert sum(1 for c in availability.values() if LOT_CAR in c.lots) > 1000
+    # Converted locations land in Singapore, and most live carparks have one.
+    for carpark in info.values():
+        if carpark.latitude is not None:
+            assert 1.2 < carpark.latitude < 1.5, carpark
+            assert 103.6 < carpark.longitude < 104.1, carpark
+    joined = set(availability) & set(info)
+    assert len(joined) > 0.8 * len(availability)
+    # Albert Centre's own basement carpark is the nearest to it.
+    assert nearest_carparks(info, 1.30106, 103.85412, 1, set(availability)) == ["ACB"]
+
+
+def test_e2e_taxi_availability_fetch_and_parse():
+    """Fetch live taxi positions and assert some are near Raffles Place."""
+    from custom_components.singapore.taxi_coordinator import (
+        TAXI_AVAILABILITY_URL,
+        _parse_taxis,
+    )
+
+    data = _parse_taxis(_live_json(TAXI_AVAILABILITY_URL), 1.2840, 103.8514)
+    assert data.total > 100, data.total
+    assert data.nearest_km is not None and data.nearest_km < 5
+
+
 def test_e2e_raw_html_debug(capsys):
     """Fetch and print diagnostic info to aid parser debugging.
 

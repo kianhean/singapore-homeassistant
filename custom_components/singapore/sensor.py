@@ -1,4 +1,5 @@
-"""Sensor platform: tariffs, COE, weather, PSI, trains, floods, dengue, lightning, UV."""
+"""Sensor platform: tariffs, COE, weather, PSI, trains, floods, dengue, lightning,
+UV, heat stress, HDB carparks and taxis."""
 
 from __future__ import annotations
 
@@ -22,10 +23,15 @@ from homeassistant.const import (
     UnitOfSpeed,
     UnitOfTemperature,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import SingaporeConfigEntry
+from .carpark_coordinator import (
+    LOT_CAR,
+    LOT_TYPE_NAMES,
+    CarparkCoordinator,
+)
 from .coe_coordinator import (
     _CATEGORY_DESCRIPTIONS,
     COE_CATEGORIES,
@@ -36,10 +42,12 @@ from .coordinator import UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER, SPGroupCoordina
 from .dengue_coordinator import DengueClusterCoordinator, nearest_cluster
 from .entity import (
     DEVICE_AIR_QUALITY,
+    DEVICE_CARPARK,
     DEVICE_COE,
     DEVICE_ENERGY,
     DEVICE_FLOOD,
     DEVICE_NEA,
+    DEVICE_TAXI,
     DEVICE_TRAIN,
     DEVICE_WEATHER,
     SingaporeEntity,
@@ -52,13 +60,17 @@ from .lightning_coordinator import (
 )
 from .psi_coordinator import (
     DEFAULT_REGION_LOCATIONS,
+    PM25_ONE_HOUR_KEY,
     PSI_REGIONS,
     PsiCoordinator,
+    pm25_band,
     psi_band,
 )
 from .sp_account_sensor import async_setup_sp_account_sensors
+from .taxi_coordinator import NEARBY_KM, TaxiAvailabilityCoordinator
 from .train_coordinator import TRAIN_LINES, TrainStatusCoordinator
 from .uv_coordinator import UV_EXPOSURE_OPTIONS, UvCoordinator, uv_exposure
+from .wbgt_coordinator import HEAT_STRESS_OPTIONS, WbgtCoordinator
 from .weather_coordinator import SingaporeWeatherCoordinator
 
 PARALLEL_UPDATES = 0
@@ -76,6 +88,12 @@ PSI_POLLUTANT_SENSORS: tuple[tuple[str, str, str | None, str], ...] = (
     (
         "pm25_twenty_four_hourly",
         "pm25",
+        SensorDeviceClass.PM25,
+        CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
+    ),
+    (
+        PM25_ONE_HOUR_KEY,
+        "pm25_one_hour",
         SensorDeviceClass.PM25,
         CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
     ),
@@ -176,8 +194,23 @@ async def async_setup_entry(
             SingaporeUvIndexSensor(uv, eid),
             SingaporeUvExposureSensor(uv, eid),
         ]
+    if (wbgt := data.wbgt) is not None:
+        entities += [
+            SingaporeWbgtSensor(wbgt, eid),
+            SingaporeHeatStressSensor(wbgt, eid),
+        ]
+    if (taxi := data.taxi) is not None:
+        entities += [
+            SingaporeTaxisAvailableSensor(taxi, eid),
+            SingaporeTaxisNearbySensor(taxi, eid),
+        ]
 
     async_add_entities(entities)
+
+    if (carpark := data.carpark) is not None:
+        entry.async_on_unload(
+            async_setup_carpark_sensors(carpark, eid, async_add_entities)
+        )
 
     for unsub in async_setup_sp_account_sensors(
         entry.entry_id, data.sp_accounts, async_add_entities
@@ -605,6 +638,9 @@ class SingaporePollutantSensor(_BasePsiSensor):
     def extra_state_attributes(self) -> dict:
         attrs = self._common_attrs()
         attrs["reading"] = self._reading_key
+        if self._reading_key == PM25_ONE_HOUR_KEY:
+            # NEA's 1-hour PM2.5 band (normal/elevated/high/very_high).
+            attrs["band"] = pm25_band(self.native_value)
         if self.coordinator.data is not None:
             attrs["regions"] = self.coordinator.data.readings.get(self._reading_key, {})
         return attrs
@@ -878,3 +914,227 @@ class SingaporeUvExposureSensor(_BaseUvSensor):
         if data is None or data.latest is None:
             return None
         return uv_exposure(data.latest.value)
+
+
+class _BaseWbgtSensor(SingaporeEntity[WbgtCoordinator], SensorEntity):
+    """Shared base for NEA heat stress sensors (nearest station to home)."""
+
+    _device = DEVICE_NEA
+    _attr_attribution = "Data provided by NEA via data.gov.sg"
+
+    def _nearest(self):
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.nearest(
+            self.hass.config.latitude, self.hass.config.longitude
+        )
+
+
+class SingaporeWbgtSensor(_BaseWbgtSensor):
+    """Wet Bulb Globe Temperature at the station nearest home."""
+
+    _attr_translation_key = "wbgt"
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UNIT_TEMP
+    _attr_suggested_display_precision = 1
+
+    def __init__(self, coordinator: WbgtCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "wbgt")
+
+    @property
+    def native_value(self) -> float | None:
+        nearest = self._nearest()
+        return None if nearest is None else nearest[0].wbgt
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        nearest = self._nearest()
+        if nearest is None:
+            return {}
+        reading, distance = nearest
+        data = self.coordinator.data
+        highest = data.highest
+        return {
+            "heat_stress": reading.heat_stress,
+            "station": reading.name,
+            "town": reading.town,
+            "distance_km": round(distance, 2),
+            ATTR_LATITUDE: reading.latitude,
+            ATTR_LONGITUDE: reading.longitude,
+            "highest_wbgt": highest.wbgt if highest else None,
+            "highest_station": highest.name if highest else None,
+            "reading_time": data.timestamp.isoformat() if data.timestamp else None,
+            "source": "NEA via data.gov.sg",
+        }
+
+
+class SingaporeHeatStressSensor(_BaseWbgtSensor):
+    """NEA heat stress category (low/moderate/high) at the station nearest home."""
+
+    _attr_translation_key = "heat_stress"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = HEAT_STRESS_OPTIONS
+
+    def __init__(self, coordinator: WbgtCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "heat_stress")
+
+    @property
+    def native_value(self) -> str | None:
+        nearest = self._nearest()
+        return None if nearest is None else nearest[0].heat_stress
+
+
+class _BaseTaxiSensor(SingaporeEntity[TaxiAvailabilityCoordinator], SensorEntity):
+    """Shared base for LTA taxi availability sensors."""
+
+    _device = DEVICE_TAXI
+    _attr_attribution = "Data provided by LTA via data.gov.sg"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+
+class SingaporeTaxisAvailableSensor(_BaseTaxiSensor):
+    """Free taxis island-wide."""
+
+    _attr_translation_key = "taxis_available"
+    _attr_native_unit_of_measurement = "taxis"
+
+    def __init__(self, coordinator: TaxiAvailabilityCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "taxis_available")
+
+    @property
+    def native_value(self) -> int | None:
+        data = self.coordinator.data
+        return None if data is None else data.total
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        data = self.coordinator.data
+        if data is None:
+            return {}
+        return {
+            "reading_time": data.timestamp.isoformat() if data.timestamp else None,
+            "source": "LTA via data.gov.sg",
+        }
+
+
+class SingaporeTaxisNearbySensor(_BaseTaxiSensor):
+    """Free taxis within 1 km of the Home Assistant home location."""
+
+    _attr_translation_key = "taxis_nearby"
+    _attr_native_unit_of_measurement = "taxis"
+
+    def __init__(self, coordinator: TaxiAvailabilityCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "taxis_nearby")
+
+    @property
+    def native_value(self) -> int | None:
+        data = self.coordinator.data
+        return None if data is None else data.nearby
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        data = self.coordinator.data
+        if data is None:
+            return {}
+        return {
+            "radius_km": NEARBY_KM,
+            "within_500_m": data.within_500_m,
+            "within_2_km": data.within_2_km,
+            "nearest_km": data.nearest_km,
+            "reading_time": data.timestamp.isoformat() if data.timestamp else None,
+        }
+
+
+@callback
+def async_setup_carpark_sensors(
+    coordinator: CarparkCoordinator,
+    entry_id: str,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+):
+    """Add a sensor per tracked carpark as they become known; return the unsub.
+
+    The carparks nearest home are only known once the carpark information has
+    loaded (the first refresh runs in the background), so sensors are added
+    from the coordinator's data rather than at setup.
+    """
+    known: set[str] = set()
+
+    @callback
+    def _add_new() -> None:
+        data = coordinator.data
+        if data is None:
+            return
+        fresh = [number for number in data.tracked if number not in known]
+        if not fresh:
+            return
+        known.update(fresh)
+        async_add_entities(
+            [SingaporeCarparkSensor(coordinator, entry_id, n) for n in fresh]
+        )
+
+    _add_new()
+    return coordinator.async_add_listener(_add_new)
+
+
+class SingaporeCarparkSensor(SingaporeEntity[CarparkCoordinator], SensorEntity):
+    """Car lots available at one HDB carpark."""
+
+    _device = DEVICE_CARPARK
+    _attr_translation_key = "carpark"
+    _attr_attribution = "Data provided by HDB via data.gov.sg"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = "lots"
+
+    def __init__(
+        self, coordinator: CarparkCoordinator, entry_id: str, number: str
+    ) -> None:
+        super().__init__(coordinator, entry_id, f"carpark_{number.lower()}")
+        self._number = number
+        self._attr_translation_placeholders = {"number": number}
+
+    def _availability(self):
+        data = self.coordinator.data
+        return None if data is None else data.availability.get(self._number)
+
+    @property
+    def native_value(self) -> int | None:
+        availability = self._availability()
+        if availability is None or (car := availability.lots.get(LOT_CAR)) is None:
+            return None
+        return car.available
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        data = self.coordinator.data
+        attrs: dict = {"carpark_number": self._number}
+        if data is None:
+            return attrs
+        if (availability := self._availability()) is not None:
+            for lot_type, count in availability.lots.items():
+                name = LOT_TYPE_NAMES.get(lot_type, lot_type.lower())
+                attrs[f"{name}_lots_available"] = count.available
+                attrs[f"{name}_lots_total"] = count.total
+            if availability.updated is not None:
+                attrs["updated"] = availability.updated.isoformat()
+        if (info := data.info.get(self._number)) is not None:
+            attrs["address"] = info.address
+            if info.latitude is not None and info.longitude is not None:
+                attrs[ATTR_LATITUDE] = info.latitude
+                attrs[ATTR_LONGITUDE] = info.longitude
+                distance = info.distance_km(
+                    self.hass.config.latitude, self.hass.config.longitude
+                )
+                if distance is not None:
+                    attrs["distance_km"] = round(distance, 2)
+            for key in (
+                "car_park_type",
+                "parking_system",
+                "short_term_parking",
+                "free_parking",
+                "night_parking",
+                "gantry_height",
+            ):
+                if (value := getattr(info, key)) is not None:
+                    attrs[key] = value
+        return attrs

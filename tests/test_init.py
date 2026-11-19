@@ -219,6 +219,10 @@ async def test_unload_stops_sp_imports_and_remove_clears_issues():
                 "uv",
                 "radar",
                 "school",
+                "wbgt",
+                "hawker",
+                "carpark",
+                "taxi",
             )
         ),
         sp_accounts={"sub1": account},
