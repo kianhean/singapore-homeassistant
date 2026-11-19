@@ -18,9 +18,13 @@ from custom_components.singapore.config_flow import (
 )
 from custom_components.singapore.const import (
     CONF_API_KEY,
+    CONF_CARPARKS,
     CONF_DISABLED_SOURCES,
+    CONF_ENABLED_SOURCES,
     CONF_POLLING,
+    OPT_IN_SOURCES,
     SOURCES,
+    carpark_numbers,
     data_gov_headers,
     enabled_sources,
     scaled_interval,
@@ -57,14 +61,21 @@ def _entry(options: dict | None = None) -> ConfigEntry:
 # -- const helpers -----------------------------------------------------------
 
 
-def test_every_source_enabled_by_default():
-    assert enabled_sources(_entry()) == set(SOURCES)
-    assert enabled_sources(None) == set(SOURCES)
+def test_every_source_but_the_opt_in_ones_enabled_by_default():
+    default = set(SOURCES) - set(OPT_IN_SOURCES)
+    assert {"carpark", "taxi"} == set(OPT_IN_SOURCES)
+    assert enabled_sources(_entry()) == default
+    assert enabled_sources(None) == default
 
 
 def test_disabled_sources_are_excluded():
     entry = _entry({CONF_DISABLED_SOURCES: ["psi", "radar", "gone_in_a_later_release"]})
-    assert enabled_sources(entry) == set(SOURCES) - {"psi", "radar"}
+    assert enabled_sources(entry) == set(SOURCES) - {"psi", "radar", *OPT_IN_SOURCES}
+
+
+def test_opt_in_sources_are_on_once_ticked():
+    entry = _entry({CONF_ENABLED_SOURCES: ["taxi"], CONF_DISABLED_SOURCES: ["uv"]})
+    assert enabled_sources(entry) == set(SOURCES) - {"uv", "carpark"}
 
 
 def test_data_gov_headers():
@@ -97,9 +108,27 @@ def test_options_from_input_stores_disabled_sources():
         {"sources": enabled, "api_key": " k ", "polling": "reduced"}
     ) == {
         CONF_DISABLED_SOURCES: ["lightning"],
+        # Opt-in sources are stored as the ones ticked.
+        CONF_ENABLED_SOURCES: ["carpark", "taxi"],
         CONF_POLLING: "reduced",
         CONF_API_KEY: "k",
     }
+    # Unticked opt-in sources are simply not stored (off by default).
+    stored = options_from_input(
+        {"sources": [s for s in SOURCES if s not in OPT_IN_SOURCES]}
+    )
+    assert stored[CONF_DISABLED_SOURCES] == []
+    assert CONF_ENABLED_SOURCES not in stored
+
+
+def test_options_from_input_stores_carparks():
+    stored = options_from_input(
+        {"sources": ["carpark"], "carparks": " bj55;TM24  bj55 ,, "}
+    )
+    assert stored[CONF_CARPARKS] == "BJ55, TM24"
+    assert carpark_numbers(stored) == ["BJ55", "TM24"]
+    assert CONF_CARPARKS not in options_from_input({"sources": ["carpark"]})
+    assert carpark_numbers({}) == []
     # An empty key is dropped (clears a stored one).
     assert CONF_API_KEY not in options_from_input(
         {"sources": list(SOURCES), "api_key": "", "polling": "normal"}
@@ -116,7 +145,9 @@ async def test_options_flow_requires_a_source():
 
     result = await flow.async_step_init({"sources": ["uv"], "polling": "normal"})
     assert result["type"] == "create_entry"
-    assert set(result["data"][CONF_DISABLED_SOURCES]) == set(SOURCES) - {"uv"}
+    assert set(result["data"][CONF_DISABLED_SOURCES]) == (
+        set(SOURCES) - {"uv", *OPT_IN_SOURCES}
+    )
 
 
 # -- setup with sources turned off -----------------------------------------

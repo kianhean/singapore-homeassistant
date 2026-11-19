@@ -16,24 +16,30 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
+from .carpark_coordinator import CarparkCoordinator
 from .coe_coordinator import CoeCoordinator
 from .const import (
     DOMAIN,
     SCHOOL_EVENT_KINDS,
+    SOURCE_CARPARK,
     SOURCE_COE,
     SOURCE_DENGUE,
     SOURCE_FLOOD,
+    SOURCE_HAWKER,
     SOURCE_HOLIDAY,
     SOURCE_LIGHTNING,
     SOURCE_PSI,
     SOURCE_RADAR,
     SOURCE_SCHOOL,
     SOURCE_TARIFF,
+    SOURCE_TAXI,
     SOURCE_TRAFFIC,
     SOURCE_TRAIN,
     SOURCE_UV,
+    SOURCE_WBGT,
     SOURCE_WEATHER,
     SOURCES,
+    carpark_numbers,
     enabled_school_events,
     enabled_sources,
 )
@@ -46,6 +52,7 @@ from .entity import (
     school_translation_key,
 )
 from .flood_coordinator import FloodAlertCoordinator
+from .hawker_coordinator import HawkerClosureCoordinator
 from .health import async_clear_source_issues, async_setup_source_health
 from .holiday_coordinator import PublicHolidayCoordinator
 from .lightning_coordinator import LightningCoordinator
@@ -57,9 +64,11 @@ from .sp_account_coordinator import (
     SpAccountCoordinator,
     auth_issue_id,
 )
+from .taxi_coordinator import TaxiAvailabilityCoordinator
 from .traffic_coordinator import TrafficImagesCoordinator
 from .train_coordinator import TrainStatusCoordinator
 from .uv_coordinator import UvCoordinator
+from .wbgt_coordinator import WbgtCoordinator
 from .weather_coordinator import SingaporeWeatherCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -99,6 +108,10 @@ class SingaporeData:
     uv: UvCoordinator | None
     radar: RadarCoordinator | None
     school: SchoolCalendarCoordinator | None
+    wbgt: WbgtCoordinator | None
+    hawker: HawkerClosureCoordinator | None
+    carpark: CarparkCoordinator | None
+    taxi: TaxiAvailabilityCoordinator | None
     # One per SP Group e-account subentry, keyed by subentry id.
     sp_accounts: dict[str, SpAccountCoordinator] = field(default_factory=dict)
     # The options this setup used; a change to them reloads the entry.
@@ -130,6 +143,10 @@ _COORDINATORS: dict[str, type[DataUpdateCoordinator]] = {
     SOURCE_UV: UvCoordinator,
     SOURCE_RADAR: RadarCoordinator,
     SOURCE_SCHOOL: SchoolCalendarCoordinator,
+    SOURCE_WBGT: WbgtCoordinator,
+    SOURCE_HAWKER: HawkerClosureCoordinator,
+    SOURCE_CARPARK: CarparkCoordinator,
+    SOURCE_TAXI: TaxiAvailabilityCoordinator,
 }
 
 # Weather, holidays and train status are the core sources: setup waits for
@@ -257,6 +274,12 @@ def async_remove_stale(
         for kind in SCHOOL_EVENT_KINDS
         if kind not in enabled_school_events(entry)
     }
+    # Carparks dropped from the options' list go too. (In "nearest home" mode
+    # the set is only known after the first poll; those stay until deleted.)
+    chosen_carparks = {
+        f"{entry.entry_id}_carpark_{number.lower()}"
+        for number in carpark_numbers(entry)
+    }
     entity_registry = er.async_get(hass)
     for reg_entry in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
         if getattr(reg_entry, "config_subentry_id", None) is not None:
@@ -264,7 +287,15 @@ def async_remove_stale(
         source = entity_source(reg_entry.domain, reg_entry.translation_key)
         if source is None:
             continue
-        if source not in enabled or reg_entry.translation_key in school_off:
+        if (
+            source not in enabled
+            or reg_entry.translation_key in school_off
+            or (
+                reg_entry.translation_key == "carpark"
+                and chosen_carparks
+                and reg_entry.unique_id not in chosen_carparks
+            )
+        ):
             _LOGGER.debug("Removing %s: its source is turned off", reg_entry.entity_id)
             entity_registry.async_remove(reg_entry.entity_id)
 
@@ -316,6 +347,10 @@ _BACKGROUND_LABELS = {
     SOURCE_UV: "UV index",
     SOURCE_RADAR: "rain radar",
     SOURCE_SCHOOL: "MOE school calendar",
+    SOURCE_WBGT: "heat stress",
+    SOURCE_HAWKER: "hawker closure",
+    SOURCE_CARPARK: "carpark availability",
+    SOURCE_TAXI: "taxi availability",
 }
 
 

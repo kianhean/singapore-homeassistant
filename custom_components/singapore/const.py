@@ -15,11 +15,16 @@ DOMAIN: Final = "singapore"
 CONF_DISABLED_SOURCES: Final = "disabled_sources"
 # The options form shows the enabled sources (a ticked box means "on").
 CONF_SOURCES: Final = "sources"
+# Opt-in sources (OPT_IN_SOURCES) are stored the other way round: the ones the
+# user turned on. They poll large payloads and only suit some users.
+CONF_ENABLED_SOURCES: Final = "enabled_sources"
 CONF_API_KEY: Final = "api_key"
 CONF_POLLING: Final = "polling"
 # Which MOE school calendars to create; stored inverted like the sources.
 CONF_SCHOOL_EVENTS: Final = "school_events"
 CONF_DISABLED_SCHOOL_EVENTS: Final = "disabled_school_events"
+# HDB carpark numbers to track, comma separated (empty: the ones nearest home).
+CONF_CARPARKS: Final = "carparks"
 
 SCHOOL_HOLIDAYS: Final = "holidays"
 SCHOOL_TERMS: Final = "terms"
@@ -49,6 +54,10 @@ SOURCE_DENGUE: Final = "dengue"
 SOURCE_LIGHTNING: Final = "lightning"
 SOURCE_UV: Final = "uv"
 SOURCE_RADAR: Final = "radar"
+SOURCE_WBGT: Final = "wbgt"
+SOURCE_HAWKER: Final = "hawker"
+SOURCE_CARPARK: Final = "carpark"
+SOURCE_TAXI: Final = "taxi"
 
 SOURCES: Final = (
     SOURCE_TARIFF,
@@ -64,7 +73,15 @@ SOURCES: Final = (
     SOURCE_LIGHTNING,
     SOURCE_UV,
     SOURCE_RADAR,
+    SOURCE_WBGT,
+    SOURCE_HAWKER,
+    SOURCE_CARPARK,
+    SOURCE_TAXI,
 )
+
+# Off until ticked in the options (stored in CONF_ENABLED_SOURCES): both poll
+# a large island-wide payload every few minutes for a few local numbers.
+OPT_IN_SOURCES: Final = (SOURCE_CARPARK, SOURCE_TAXI)
 
 # English names for log lines and repair placeholders (UI labels for the
 # options form are translated under selector.sources in strings.json).
@@ -82,6 +99,10 @@ SOURCE_NAMES: Final = {
     SOURCE_LIGHTNING: "NEA lightning",
     SOURCE_UV: "NEA UV index",
     SOURCE_RADAR: "NEA rain radar",
+    SOURCE_WBGT: "NEA heat stress (WBGT)",
+    SOURCE_HAWKER: "Hawker centre closures",
+    SOURCE_CARPARK: "HDB carpark availability",
+    SOURCE_TAXI: "Taxi availability",
 }
 
 # data.gov.sg reads an optional API key from this header (higher rate limits).
@@ -98,15 +119,36 @@ def _options(entry: Any) -> Mapping[str, Any]:
 
 
 def enabled_sources(entry: Any) -> set[str]:
-    """The data sources turned on for this entry (all of them by default)."""
-    disabled = set(_options(entry).get(CONF_DISABLED_SOURCES) or ())
-    return {source for source in SOURCES if source not in disabled}
+    """The data sources turned on for this entry.
+
+    Every source is on by default except the opt-in ones, which are on only
+    once ticked in the options.
+    """
+    options = _options(entry)
+    disabled = set(options.get(CONF_DISABLED_SOURCES) or ())
+    opted_in = set(options.get(CONF_ENABLED_SOURCES) or ())
+    return {
+        source
+        for source in SOURCES
+        if source not in disabled
+        and (source not in OPT_IN_SOURCES or source in opted_in)
+    }
 
 
 def enabled_school_events(entry: Any) -> set[str]:
     """The MOE school calendars turned on for this entry (all by default)."""
     disabled = set(_options(entry).get(CONF_DISABLED_SCHOOL_EVENTS) or ())
     return {kind for kind in SCHOOL_EVENT_KINDS if kind not in disabled}
+
+
+def carpark_numbers(entry: Any) -> list[str]:
+    """The HDB carpark numbers chosen in the options (upper-cased, in order)."""
+    raw = _options(entry).get(CONF_CARPARKS) or ""
+    numbers: list[str] = []
+    for part in raw.replace(";", ",").replace(" ", ",").split(","):
+        if (number := part.strip().upper()) and number not in numbers:
+            numbers.append(number)
+    return numbers
 
 
 def data_gov_headers(entry: Any) -> dict[str, str]:

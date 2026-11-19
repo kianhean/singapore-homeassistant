@@ -20,18 +20,22 @@ from homeassistant.helpers.update_coordinator import (
 from .const import (
     DOMAIN,
     SCHOOL_EVENT_KINDS,
+    SOURCE_CARPARK,
     SOURCE_COE,
     SOURCE_DENGUE,
     SOURCE_FLOOD,
+    SOURCE_HAWKER,
     SOURCE_HOLIDAY,
     SOURCE_LIGHTNING,
     SOURCE_PSI,
     SOURCE_RADAR,
     SOURCE_SCHOOL,
     SOURCE_TARIFF,
+    SOURCE_TAXI,
     SOURCE_TRAFFIC,
     SOURCE_TRAIN,
     SOURCE_UV,
+    SOURCE_WBGT,
     SOURCE_WEATHER,
 )
 
@@ -47,6 +51,9 @@ DEVICE_AIR_QUALITY = "air_quality"
 DEVICE_FLOOD = "flood"
 DEVICE_TRAFFIC = "traffic_cameras"
 DEVICE_NEA = "nea"
+DEVICE_HAWKER = "hawker"
+DEVICE_CARPARK = "carparks"
+DEVICE_TAXI = "taxis"
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,8 +126,26 @@ DEVICES: dict[str, SingaporeDevice] = {
     DEVICE_NEA: SingaporeDevice(
         "NEA",
         "NEA via data.gov.sg",
-        (SOURCE_DENGUE, SOURCE_LIGHTNING, SOURCE_UV),
+        (SOURCE_DENGUE, SOURCE_LIGHTNING, SOURCE_UV, SOURCE_WBGT),
         "https://www.nea.gov.sg",
+    ),
+    DEVICE_HAWKER: SingaporeDevice(
+        "Hawker Centres",
+        "NEA Hawker Centres",
+        (SOURCE_HAWKER,),
+        "https://data.gov.sg/datasets/d_bda4baa634dd1cc7a6c7cad5f19e2d68/view",
+    ),
+    DEVICE_CARPARK: SingaporeDevice(
+        "HDB Carparks",
+        "HDB Carpark Availability",
+        (SOURCE_CARPARK,),
+        "https://data.gov.sg/datasets/d_ca933a644e55d34fe21f28b8052fac63/view",
+    ),
+    DEVICE_TAXI: SingaporeDevice(
+        "Taxis",
+        "LTA Taxi Availability",
+        (SOURCE_TAXI,),
+        "https://data.gov.sg/datasets/d_e25662f1a062dd046453926aa284ba64/view",
     ),
 }
 
@@ -153,6 +178,7 @@ ENTITY_SOURCES: dict[str, str] = {
             "nitrogen_dioxide",
             "sulphur_dioxide",
             "carbon_monoxide",
+            "pm25_one_hour",
         ),
         SOURCE_PSI,
     ),
@@ -162,6 +188,10 @@ ENTITY_SOURCES: dict[str, str] = {
     **dict.fromkeys(("lightning_strikes", "nearest_lightning"), SOURCE_LIGHTNING),
     **dict.fromkeys(("uv_index", "uv_exposure"), SOURCE_UV),
     **dict.fromkeys(("rain_radar", "rain_radar_animation"), SOURCE_RADAR),
+    **dict.fromkeys(("wbgt", "heat_stress"), SOURCE_WBGT),
+    "hawker_closures": SOURCE_HAWKER,
+    "carpark": SOURCE_CARPARK,
+    **dict.fromkeys(("taxis_available", "taxis_nearby"), SOURCE_TAXI),
 }
 
 

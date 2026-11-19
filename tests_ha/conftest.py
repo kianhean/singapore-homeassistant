@@ -21,21 +21,28 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 )
 
 from custom_components.singapore import datagov
+from custom_components.singapore.carpark_coordinator import (
+    CARPARK_AVAILABILITY_URL,
+    CARPARK_INFO_URL,
+)
 from custom_components.singapore.coe_coordinator import COE_API_URL
 from custom_components.singapore.coordinator import TARIFF_URL
 from custom_components.singapore.dengue_coordinator import POLL_DOWNLOAD_URL
 from custom_components.singapore.flood_coordinator import FLOOD_ALERTS_URL
+from custom_components.singapore.hawker_coordinator import HAWKER_URL
 from custom_components.singapore.holiday_coordinator import PUBLIC_HOLIDAYS_URL
 from custom_components.singapore.lightning_coordinator import LIGHTNING_URL
-from custom_components.singapore.psi_coordinator import PSI_URL
+from custom_components.singapore.psi_coordinator import PM25_URL, PSI_URL
 from custom_components.singapore.radar_coordinator import RADAR_URL
 from custom_components.singapore.radar_image import BASEMAPS
 from custom_components.singapore.school_coordinator import SCHOOL_CALENDAR_URL
 from custom_components.singapore.sp_account import client as client_module
 from custom_components.singapore.sp_account.client import SpGroupClient
+from custom_components.singapore.taxi_coordinator import TAXI_AVAILABILITY_URL
 from custom_components.singapore.traffic_coordinator import TRAFFIC_IMAGES_URL
 from custom_components.singapore.train_coordinator import TRAIN_STATUS_URL
 from custom_components.singapore.uv_coordinator import UV_URL
+from custom_components.singapore.wbgt_coordinator import WBGT_URL
 from custom_components.singapore.weather_coordinator import (
     _READINGS_ENDPOINTS,
     FOUR_DAY_URL,
@@ -179,6 +186,157 @@ _PSI_PAYLOAD = {
             }
         ],
     },
+}
+
+
+_PM25_PAYLOAD = {
+    "code": 0,
+    "data": {
+        "regionMetadata": [],
+        "items": [
+            {
+                "timestamp": "2026-04-05T08:00:00+08:00",
+                "readings": {
+                    "pm25_one_hourly": {
+                        "north": 7,
+                        "south": 4,
+                        "east": 61,
+                        "west": 4,
+                        "central": 2,
+                    }
+                },
+            }
+        ],
+    },
+}
+
+_WBGT_PAYLOAD = {
+    "code": 0,
+    "data": {
+        "records": [
+            {
+                "datetime": "2026-11-19T13:00:00+08:00",
+                "item": {
+                    "readings": [
+                        {
+                            "station": {
+                                "id": "S124",
+                                "name": "Upper Changi Road North",
+                            },
+                            "location": {
+                                "latitude": "1.36777",
+                                "longitude": "103.982262",
+                            },
+                            "wbgt": "33.4",
+                            "heatStress": "High",
+                        },
+                        {
+                            # Near the harness home location, so it's the nearest.
+                            "station": {"id": "S999", "name": "Harness Home"},
+                            "location": {
+                                "latitude": "32.87",
+                                "longitude": "-117.22",
+                            },
+                            "wbgt": "31.2",
+                            "heatStress": "Moderate",
+                        },
+                    ]
+                },
+            }
+        ]
+    },
+}
+
+
+def _hawker_payload() -> dict:
+    # Dates next year, so they're always upcoming.
+    year = dt_util.now().year + 1
+    row = {
+        "name": "Adam Road Food Centre",
+        "latitude_hc": "1.324131966",
+        "longitude_hc": "103.8141632",
+        "address_myenv": "2, Adam Road, Singapore 289876",
+        "q1_cleaningstartdate": f"9/3/{year}",
+        "q1_cleaningenddate": f"10/3/{year}",
+        "remarks_q1": "nil",
+        "q2_cleaningstartdate": "TBC",
+        "q2_cleaningenddate": "TBC",
+        "other_works_startdate": "NA",
+        "other_works_enddate": "NA",
+    }
+    return {"success": True, "result": {"records": [row]}}
+
+
+_CARPARK_INFO_PAYLOAD = {
+    "success": True,
+    "result": {
+        "records": [
+            {
+                "car_park_no": "ACB",
+                "address": "BLK 270/271 ALBERT CENTRE BASEMENT CAR PARK",
+                "x_coord": "30314.7936",
+                "y_coord": "31490.4942",
+                "car_park_type": "BASEMENT CAR PARK",
+                "free_parking": "NO",
+                "night_parking": "YES",
+                "gantry_height": "1.8",
+            }
+        ]
+    },
+}
+
+_CARPARK_AVAILABILITY_PAYLOAD = {
+    "items": [
+        {
+            "timestamp": "2026-11-19T18:15:36+08:00",
+            "carpark_data": [
+                {
+                    "carpark_info": [
+                        {"lot_type": "C", "lots_available": "103", "total_lots": "105"}
+                    ],
+                    "carpark_number": "ACB",
+                    "update_datetime": "2026-11-19T18:14:20",
+                },
+                # The carparks examples/dashboard.yaml uses (live, 2026-11-19).
+                *(
+                    {
+                        "carpark_info": [
+                            {
+                                "lot_type": "C",
+                                "lots_available": available,
+                                "total_lots": total,
+                            }
+                        ],
+                        "carpark_number": number,
+                        "update_datetime": "2026-11-19T19:44:00",
+                    }
+                    for number, available, total in (
+                        ("B8B", "82", "229"),
+                        ("B8", "31", "113"),
+                        ("B6", "230", "521"),
+                    )
+                ),
+            ],
+        }
+    ]
+}
+
+_TAXI_PAYLOAD = {
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "MultiPoint",
+                # [lon, lat]: one ~300 m from the harness home, one in Singapore.
+                "coordinates": [[-117.22743, 32.87606], [103.85, 1.30]],
+            },
+            "properties": {
+                "timestamp": "2026-11-19T18:19:30+08:00",
+                "taxi_count": 2,
+            },
+        }
+    ],
 }
 
 
@@ -388,6 +546,12 @@ def mock_sources(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
     aioclient_mock.get(SCHOOL_CALENDAR_URL, text=_MOE_CALENDAR_HTML)
     aioclient_mock.post(TRAIN_STATUS_URL, json=_TRAIN_PAYLOAD)
     aioclient_mock.get(PSI_URL, json=_PSI_PAYLOAD)
+    aioclient_mock.get(PM25_URL, json=_PM25_PAYLOAD)
+    aioclient_mock.get(WBGT_URL, json=_WBGT_PAYLOAD)
+    aioclient_mock.get(HAWKER_URL, json=_hawker_payload())
+    aioclient_mock.get(CARPARK_INFO_URL, json=_CARPARK_INFO_PAYLOAD)
+    aioclient_mock.get(CARPARK_AVAILABILITY_URL, json=_CARPARK_AVAILABILITY_PAYLOAD)
+    aioclient_mock.get(TAXI_AVAILABILITY_URL, json=_TAXI_PAYLOAD)
     aioclient_mock.get(FLOOD_ALERTS_URL, json=_flood_payload())
     aioclient_mock.get(TRAFFIC_IMAGES_URL, json=_TRAFFIC_PAYLOAD)
     aioclient_mock.get(

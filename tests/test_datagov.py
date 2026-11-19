@@ -106,15 +106,22 @@ async def test_startup_burst_stays_under_the_measured_limit(datagov_time):
             rejected += 1
         starts.append(now)
 
-    # Startup: weather (3), PSI, UV, flood, lightning, radar (3), dengue = 11.
-    for _ in range(11):
+    # Startup: weather (3), PSI + hourly PM2.5, UV, WBGT, flood, lightning,
+    # radar (3), dengue = 13.
+    for _ in range(13):
         await request()
     # Then every 2 minutes flood + lightning, every 5 minutes 3 radar ranges,
-    # every 10 minutes 3 weather forecasts, all landing on the same tick.
+    # every 10 minutes 3 weather forecasts, every 15 minutes PSI + PM2.5, UV
+    # and WBGT, all landing on the same tick.
     for minute in range(1, 31):
-        burst = 2 + (3 if minute % 5 == 0 else 0) + (3 if minute % 10 == 0 else 0)
+        burst = (
+            (2 if minute % 2 == 0 else 0)
+            + (3 if minute % 5 == 0 else 0)
+            + (3 if minute % 10 == 0 else 0)
+            + (4 if minute % 15 == 0 else 0)
+        )
         datagov_time["now"] += 60
-        for _ in range(burst if minute % 2 == 0 else 3 if minute % 5 == 0 else 0):
+        for _ in range(burst):
             await request()
     assert rejected == 0
 

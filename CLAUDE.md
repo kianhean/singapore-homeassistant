@@ -26,6 +26,10 @@ custom_components/singapore/
 ├── dengue_coordinator.py   # DengueClusterCoordinator: NEA dengue cluster GeoJSON + distance helpers
 ├── lightning_coordinator.py # LightningCoordinator: NEA lightning strikes, 30-min rolling window
 ├── uv_coordinator.py       # UvCoordinator: NEA hourly UV index + exposure bands
+├── wbgt_coordinator.py     # WbgtCoordinator: NEA WBGT heat stress per station (nearest home)
+├── hawker_coordinator.py   # HawkerClosureCoordinator: NEA hawker centre cleaning/works dates
+├── carpark_coordinator.py  # CarparkCoordinator: HDB lot availability + carpark info (SVY21→WGS84)
+├── taxi_coordinator.py     # TaxiAvailabilityCoordinator: free taxis island-wide, counted near home
 ├── radar_coordinator.py    # RadarCoordinator: NEA rain radar PNGs (70/240/480 km)
 ├── radar_image.py          # Pure-Pillow compositing of radar onto NEA base maps (BASEMAPS) + GIF loops
 ├── sp_account_coordinator.py # SpAccountCoordinator: one per SP e-account subentry (usage, bills, stats)
@@ -38,13 +42,15 @@ custom_components/singapore/
 │   ├── const.py / models.py / mapper.py / history.py  # constants, dataclasses, specs, statistics
 │   └── LICENSE             # Upstream MIT licence: must ship with the vendored code
 ├── camera.py               # Camera entities (checkpoint traffic cameras + rain radar still/animated)
-├── calendar.py             # Calendar entities (public holidays; MOE school holidays/terms/exams)
+├── calendar.py             # Calendar entities (public holidays; MOE school holidays/terms/exams;
+│                           #   hawker centre closures)
 ├── event.py                # Event entities: COE new results, MRT/LRT service alerts
 ├── weather.py              # Weather entities (one per Singapore forecast area)
 ├── config_flow.py          # UI config flow (name; single instance), options flow, SP account subentry flow
 ├── quality_scale.yaml      # Self-assessed HA quality scale rules (hassfest skips it for custom integrations)
 ├── diagnostics.py          # "Download diagnostics": coordinator status + parsed data
-├── sensor.py               # Sensor entities (tariff, COE, weather, PSI, trains, flood, dengue, lightning, UV)
+├── sensor.py               # Sensor entities (tariff, COE, weather, PSI, trains, flood, dengue, lightning, UV,
+│                           #   heat stress, HDB carparks (added dynamically), taxis)
 ├── manifest.json           # Integration metadata; declares beautifulsoup4 dep, single_config_entry
 ├── icons.json              # Icon translations (entity icons live here, not in _attr_icon)
 ├── strings.json            # Config flow UI strings + entity names + enum state names
@@ -67,6 +73,10 @@ tests/
 ├── test_dengue_coordinator.py   # Dengue GeoJSON parser, distance math, coordinator, sensors
 ├── test_lightning_coordinator.py # Lightning parser, rolling window, coordinator, sensors
 ├── test_uv_coordinator.py       # UV parser (v1/v2), exposure bands, coordinator, sensors
+├── test_wbgt_coordinator.py     # WBGT parser, heat stress bands, nearest station, sensors
+├── test_hawker_coordinator.py   # Hawker closure parser (d/m/yyyy, TBC), nearest centres, calendar
+├── test_carpark_coordinator.py  # SVY21 conversion, availability/info parsers, nearest/chosen, sensors
+├── test_taxi_coordinator.py     # Taxi GeoJSON parser, counts around home, sensors
 ├── test_sp_account.py           # SP account coordinator, sensors, flow helpers, reload listener
 ├── test_sp_account_insights.py  # Derived SP sensors, account calendar, peer (similar homes) statistics
 ├── sp_account/                  # Vendored upstream client/mapper/history tests + recorded fixtures
@@ -96,7 +106,9 @@ tests_ha/                        # Runs against a REAL Home Assistant (no module
 
 blueprints/automation/singapore/  # Importable automation blueprints (README "Import" buttons)
 tests_ha/test_blueprints.py      # Runs every blueprint in real HA (one test per blueprint, required)
-examples/dashboard.yaml          # Built-in-cards dashboard shown in images/hero.jpg
+examples/dashboard.yaml          # Built-in-cards dashboard: view 1 = images/hero.jpg (hero.html),
+                                 # view 2 "Carparks & taxis" (opt-in sources) = images/carparks-taxis.png
+                                 # (carparks.html); tests_ha checks every entity/attribute in it exists
 examples/sp_account_dashboard.yaml # SP account dashboard (built-in cards); tests_ha checks every
                                  # entity/statistic in it exists (test_sp_account_statistics.py)
                                  # docs/mockups/sp_account.html mirrors it → images/sp-account-dashboard.png
@@ -107,7 +119,7 @@ docs/mockups/                    # HTML sources for the README images (node buil
 
 README images must only show what Home Assistant really renders from this integration's
 entities with built-in cards (no custom cards, invented attributes or reworded states), and
-`hero.html` must stay in sync with `examples/dashboard.yaml` (and `sp_account.html` with `examples/sp_account_dashboard.yaml`). Camera stills are real LTA images,
+`hero.html` / `carparks.html` must stay in sync with the two views of `examples/dashboard.yaml` (and `sp_account.html` with `examples/sp_account_dashboard.yaml`). Camera stills are real LTA images,
 not illustrations.
 
 Entry data is stored on `entry.runtime_data` as a `SingaporeData` dataclass (not
@@ -130,6 +142,10 @@ class SingaporeData:
     uv: UvCoordinator | None
     radar: RadarCoordinator | None
     school: SchoolCalendarCoordinator | None
+    wbgt: WbgtCoordinator | None
+    hawker: HawkerClosureCoordinator | None
+    carpark: CarparkCoordinator | None   # opt-in (off by default)
+    taxi: TaxiAvailabilityCoordinator | None  # opt-in (off by default)
     sp_accounts: dict[str, SpAccountCoordinator]  # keyed by subentry id
     options: dict  # the options this setup used; a change reloads the entry
     def coordinators(self) -> dict[str, DataUpdateCoordinator]: ...  # enabled ones
@@ -147,11 +163,14 @@ Platforms read it via `entry.runtime_data.<coordinator>` (see `sensor.py`, `weat
 
 ## Options flow
 
-`SingaporeOptionsFlow` (Configure button) has four fields; all serializable selectors:
+`SingaporeOptionsFlow` (Configure button) has five fields; all serializable selectors:
 
 - `sources` — multi-select of `SOURCES` (labels under `selector.sources` in strings.json).
   Stored inverted as `options["disabled_sources"]`, so a source added in a later release is
-  on for existing users. `enabled_sources(entry)` reads it. Empty with no SP subentries is
+  on for existing users. **Except `OPT_IN_SOURCES`** (`carpark`, `taxi`: each poll downloads an
+  island-wide payload of ~300 KB / ~80 KB for a few local numbers): those are off by default
+  and stored the other way round, as `options["enabled_sources"]` (only when non-empty), never
+  in `disabled_sources`. `enabled_sources(entry)` reads both. Empty with no SP subentries is
   rejected (`no_sources`).
 - `school_events` — multi-select of `SCHOOL_EVENT_KINDS` (`holidays` / `terms` / `exams`, labels
   under `selector.school_events`), stored inverted as `options["disabled_school_events"]` (only
@@ -162,6 +181,12 @@ Platforms read it via `entry.runtime_data.<coordinator>` (see `sensor.py`, `weat
   every data.gov.sg request (COE, weather, PSI, flood, traffic, dengue, lightning, UV, radar);
   **never** to SP Group, MOM or mytransport.sg. data.gov.sg answers 200 even for a bogus key,
   so it is not validated. Diagnostics report `has_api_key` only.
+- `carparks` — optional text: HDB carpark numbers, comma/space/semicolon separated.
+  `carpark_numbers(entry)` normalises them (upper-case, de-duplicated, in order) and
+  `options_from_input` stores them as `"BJ55, TM24"` (absent when empty). Empty → the
+  `NEAREST_CARPARKS` (3) carparks nearest `hass.config` home that report availability.
+  `async_remove_stale` drops carpark sensors whose number left the list (only when a list is
+  set: in nearest mode the set isn't known until the first poll).
 - `polling` — `normal` / `reduced`. Each coordinator passes
   `update_interval=scaled_interval(config_entry, UPDATE_INTERVAL)`; reduced multiplies
   sub-hourly intervals by 3 (daily/6-hourly ones are unchanged).
@@ -175,7 +200,7 @@ existing device's `sources`) and `ENTITY_SOURCES` keys in `entity.py`, and use b
 Turning a source off removes its entities and devices on the reload: `async_remove_stale`
 (`__init__.py`) maps each registry entry to a source with `entity.entity_source(platform,
 translation_key)` and drops a service device once every source in `DEVICES[key].sources` is off
-(Weather is shared by weather + radar; NEA by dengue + lightning + UV). Devices are looked up
+(Weather is shared by weather + radar; NEA by dengue + lightning + UV + WBGT). Devices are looked up
 with `dr.async_entries_for_config_entry`: `async_get_device(identifiers=...)` is deprecated in
 2026.10 and its replacement doesn't exist in 2025.4. `async_remove_config_entry_device` lets
 the user delete any device that is no longer provided. **A new entity's translation key must be
@@ -190,7 +215,8 @@ Measured 2026-11-15 without a key: `api-open.data.gov.sg` allows ~6 requests per
 client **across all endpoints**, then 429s everything for ~10 s. The 429 has no `Retry-After`;
 the body says "try again in 10 seconds". `api.data.gov.sg` (v1) didn't throttle 40 in a row.
 
-Every data.gov.sg request goes through `data_gov_get(hass, session, url, **kwargs)` (an
+Every data.gov.sg request (including the CKAN `data.gov.sg/api/action` and v1 `api.data.gov.sg`
+hosts used by COE, hawker, carparks and taxis) goes through `data_gov_get(hass, session, url, **kwargs)` (an
 `async with` drop-in for `session.get`) or, in the weather coordinator, `_fetch_with_retry(...,
 limiter=limiter_for(hass, url))`. One `HostLimiter` per host lives in `hass.data`, shared by
 all coordinators:
@@ -203,7 +229,8 @@ all coordinators:
 - Tests: `tests/conftest.py` has an autouse fake clock (`datagov_time`: sleeps advance it and
   are recorded); `tests_ha/conftest.py` makes the sleeps no-ops. Don't call `asyncio.sleep`
   for 429s in coordinators; don't add per-coordinator 429 loops.
-- `test_startup_burst_stays_under_the_measured_limit` replays startup + 30 min of polling
+- `test_startup_burst_stays_under_the_measured_limit` replays startup (13 api-open requests,
+  incl. hourly PM2.5 and WBGT) + 30 min of polling
   against that limit; it fails on the earlier, too-fast pacing (burst 3 / 2.5 s), which got a
   live 429.
 
@@ -652,6 +679,64 @@ headers) when touching this code.
   unique ids are `{entry_id}_sp_{premise_id}_{key}`; entities are added with
   `config_subentry_id`. Diagnostics report SP accounts as flags/counts only (no address,
   account number, premise id, username or tokens).
+
+## How the Heat Stress (WBGT) Coordinator Works
+
+`wbgt_coordinator.py` GETs `https://api-open.data.gov.sg/v2/real-time/api/weather?api=wbgt`
+every **15 minutes**. Payload: `data.records[0]` with `datetime` and `item.readings[]`, each with
+`station{id, name, townCenter}`, `location{latitude, longitude}` (strings), `wbgt` (string, °C)
+and `heatStress` (`Low` / `Moderate` / `High`, lower-cased into `HEAT_STRESS_OPTIONS`; an
+unknown value falls back to `heat_stress()`: <31 low, <33 moderate, else high). A missing
+readings list raises `UpdateFailed`; an empty one is valid. `sensor.nea_heat_stress_wbgt`
+(temperature) and `sensor.nea_heat_stress` (ENUM) use `WbgtData.nearest(home)`, on the *NEA*
+device.
+
+## How Hourly PM2.5 Works
+
+NEA publishes no 1-hour PSI (the 3-hour PSI was dropped in 2014); its 1-hour guide is
+`pm25_one_hourly` from `https://api-open.data.gov.sg/v2/real-time/api/pm25` (same shape as
+PSI v2, so `_parse_psi` reads it). `PsiCoordinator` fetches it after each successful PSI fetch
+and merges it into `readings` / `national` under `PM25_ONE_HOUR_KEY`. It is **soft**: a
+failed/malformed PM2.5 response keeps the previous hourly readings (or leaves the key out) and
+never fails the PSI update. `sensor.air_quality_pm2_5_1_hour` is a `PSI_POLLUTANT_SENSORS`
+entry whose `band` attribute is `pm25_band()` (NEA: ≤55 normal, ≤150 elevated, ≤250 high,
+else very_high); the regional PSI sensors pick the reading up automatically.
+
+## How the Hawker Centre Closure Coordinator Works
+
+`hawker_coordinator.py` GETs the CKAN `datastore_search` for dataset
+`d_bda4baa634dd1cc7a6c7cad5f19e2d68` (`limit=1000`, ~123 centres) every **24 hours** (background
+first refresh). Each row has `q{1..4}_cleaningstartdate/enddate` + `remarks_q{n}` and
+`other_works_startdate/enddate` + `remarks_other_works`, dates as `d/m/yyyy`; "TBC", "NA",
+"nil" are blanks (`_BLANK`). A missing end = one day; swapped dates are put in order. No
+records raises `UpdateFailed`. `calendar.hawker_centres_closures` (device *Hawker Centres*)
+shows the closures of the `NEAREST_CENTRES` (5) centres nearest home (centres without a
+location are skipped), all-day, with HA's exclusive end, the address as `location`.
+
+## How the HDB Carpark Coordinator Works (opt-in)
+
+`carpark_coordinator.py` polls `https://api.data.gov.sg/v1/transport/carpark-availability`
+every **5 minutes** (`items[0].carpark_data[]`: `carpark_number`, `update_datetime` in SGT
+without offset, `carpark_info[{lot_type C/Y/H, lots_available, total_lots}]`; a lot type listed
+twice is summed). It has no location, so the *HDB Carpark Information* CKAN dataset
+(`d_23f946fa557947f93a8043bbef41dd09`, ~2,270 rows, `limit=5000`) is read at most once per
+`INFO_MAX_AGE` (24 h) for address, type, free/night parking and `x_coord`/`y_coord` in SVY21,
+converted by `svy21_to_wgs84()` (SLA transverse Mercator; tested against known locations).
+An info failure is soft (warned, retried next poll): chosen carparks still work, nearest mode
+just tracks nothing yet. `CarparkData.tracked` = the options list, else the nearest 3 that
+appear in the live feed. Sensors (`translation_key="carpark"`, name `{number}`, unique id
+`{entry_id}_carpark_{number.lower()}` → `sensor.hdb_carparks_bj55`) are added by
+`async_setup_carpark_sensors` from a coordinator listener as numbers appear, like the SP account
+sensors. State = car lots available (`lots`); `latitude`/`longitude` attributes for Map cards.
+
+## How the Taxi Availability Coordinator Works (opt-in)
+
+`taxi_coordinator.py` polls `https://api.data.gov.sg/v1/transport/taxi-availability` every
+**5 minutes** (GeoJSON, one MultiPoint of `[lon, lat]`, `properties.taxi_count` /
+`timestamp`). Positions (thousands) are reduced in the coordinator to counts within 500 m /
+1 km / 2 km of `hass.config` home and the nearest distance (`TaxiData`, flat fields so
+diagnostics stay small and JSON-safe). `sensor.taxis_available` (total) and
+`sensor.taxis_nearby` (within `NEARBY_KM`), device *Taxis*.
 
 ## How the Rain Radar Coordinator Works
 

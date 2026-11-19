@@ -34,6 +34,9 @@
       },
       "school_exams": {
         "name": "考试"
+      },
+      "hawker_closures": {
+        "name": "休市"
       }
     },
     "sensor": {
@@ -92,6 +95,9 @@
       "pm25": {
         "name": "PM2.5"
       },
+      "pm25_one_hour": {
+        "name": "PM2.5（1 小时）"
+      },
       "pm10": {
         "name": "PM10"
       },
@@ -134,6 +140,26 @@
           "very_high": "很高",
           "extreme": "极高"
         }
+      },
+      "wbgt": {
+        "name": "热压力 WBGT"
+      },
+      "heat_stress": {
+        "name": "热压力",
+        "state": {
+          "low": "低",
+          "moderate": "中等",
+          "high": "高"
+        }
+      },
+      "carpark": {
+        "name": "{number}"
+      },
+      "taxis_available": {
+        "name": "空车"
+      },
+      "taxis_nearby": {
+        "name": "附近空车"
       },
       "sp_electricity": {
         "name": "累计用电量"
@@ -392,13 +418,15 @@
           "sources": "数据源",
           "school_events": "校历",
           "api_key": "data.gov.sg API 密钥",
+          "carparks": "建屋局停车场",
           "polling": "轮询频率"
         },
         "data_description": {
-          "sources": "关闭 SP Group 电价后，SP 账户的费用统计也将不再计价。",
+          "sources": "关闭 SP Group 电价后，SP 账户的费用统计也将不再计价。建屋局停车场空位和空车德士默认关闭，需勾选才会开启：每次轮询都会下载全岛数据。",
           "school_events": "开启教育部校历数据源时要创建哪些校历。",
           "api_key": "可选。data.gov.sg 的免费密钥可提供更高的速率限制（减少 HTTP 429 错误）。留空则使用公共限制。",
-          "polling": "“降低”会将快速数据源（淹水警报、雷击、交通摄像头、雷达、列车、天气、PSI、紫外线）的轮询频率降低为三分之一。"
+          "carparks": "开启建屋局停车场空位时要追踪的停车场编号，用逗号分隔（例如 BJ55, TM24；可在建屋局或 data.gov.sg 的停车场列表中找到）。留空则使用离您家位置最近的 3 个停车场。",
+          "polling": "“降低”会将快速数据源（淹水警报、雷击、交通摄像头、雷达、列车、天气、PSI、紫外线、热压力、停车场、德士）的轮询频率降低为三分之一。"
         }
       }
     },
@@ -422,7 +450,11 @@
         "dengue": "NEA 骨痛热症病例群",
         "lightning": "NEA 雷击",
         "uv": "NEA 紫外线指数",
-        "radar": "NEA 降雨雷达"
+        "radar": "NEA 降雨雷达",
+        "wbgt": "NEA 热压力（WBGT）",
+        "hawker": "小贩中心休市",
+        "carpark": "建屋局停车场空位",
+        "taxi": "空车德士"
       }
     },
     "school_events": {

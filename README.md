@@ -28,7 +28,7 @@
 </p>
 
 <p align="center">
-  <img src="images/hero.jpg" alt="Example Singapore dashboard: Bedok weather with a 4-day forecast, rainfall, wind, UV index and UV exposure, PSI gauge and PSI by region, MRT/LRT line status, live Woodlands Causeway and Tuas Checkpoint camera stills, nearest lightning and dengue cluster distances, flood alerts, utility tariffs and COE prices" width="100%">
+  <img src="images/hero.jpg" alt="Example Singapore dashboard: Bedok weather with a 4-day forecast, rainfall, wind, UV index and UV exposure, WBGT and heat stress, PSI gauge, 1-hour and 24-hour PM2.5, PM10, ozone and PSI by region, MRT/LRT line status, live Woodlands Causeway and Tuas Checkpoint camera stills, nearest lightning and dengue cluster distances, flood alerts, the current hawker centre closure, utility tariffs and COE prices" width="100%">
   <br>
   <sub>An example dashboard built only from Home Assistant's built-in cards. The integration provides the entities; <a href="examples/dashboard.yaml">this YAML</a> builds the dashboard. Camera stills are real LTA images.</sub>
 </p>
@@ -81,9 +81,10 @@ minute; everything else works without it. Questions about it? See the [FAQ](#faq
 | | | |
 |---|---|---|
 | 🏠 **Your SP account** *(optional)*<br>Sign in once to get your own electricity, water and gas usage, down to the half hour on a smart meter | 📊 **Energy dashboard**<br>Hourly electricity with cost at the current SP tariff, plus monthly water, ready for [Home Assistant's Energy dashboard](#energy-dashboard-electricity-and-water) | 🧾 **Bills**<br>Last bill, amount due, meter readings and SP Green Goals, for [reminders and dashboards](#your-sp-account) |
-| 🌦️ **Weather**<br>A weather entity for every NEA forecast area, with hourly and 4-day forecasts, live temperature, humidity, wind and rain, plus NEA rain radar images and animated loops | 😷 **Air quality**<br>PSI and six pollutants, overall and per region, ready for a Map card | ☀️ **UV index**<br>NEA's hourly UV index and exposure level (low to extreme), with today's peak |
+| 🌦️ **Weather**<br>A weather entity for every NEA forecast area, with hourly and 4-day forecasts, live temperature, humidity, wind and rain, plus NEA rain radar images and animated loops | 😷 **Air quality**<br>PSI, hourly PM2.5 and six pollutants, overall and per region, ready for a Map card | ☀️ **UV index**<br>NEA's hourly UV index and exposure level (low to extreme), with today's peak |
 | 🚇 **MRT/LRT**<br>Network and per-line status (normal, planned works, disruption) with LTA's message | 🛂 **Checkpoints**<br>Woodlands and Tuas traffic camera stills as camera entities | 🚗 **COE**<br>Category A–E premiums, refreshed after each bidding exercise |
 | ⚡ **Lightning**<br>Live strikes and the distance to the nearest one from your home | 🦟 **Dengue**<br>Active NEA clusters and how far the nearest is from your home | 🌊 **Flash floods**<br>PUB flood alerts as they're issued and cancelled |
+| 🌡️ **Heat stress**<br>NEA's Wet Bulb Globe Temperature and heat stress level (low, moderate, high) at the station nearest your home | 🍜 **Hawker centres**<br>Cleaning and repair closures of the five hawker centres nearest your home, as a calendar | 🅿️ **Carparks and taxis** *(opt-in)*<br>Free lots at the HDB carparks you pick (or the nearest three), and free taxis near your home |
 | 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🎉 **Holidays and school terms**<br>MOM's public holidays, plus MOE school holidays, terms and national exams, as calendars | 🧩 **Blueprints**<br>[One-click automations](#one-click-blueprints) for lightning, MRT disruptions, floods, haze, COE, rain, UV, dengue, holidays and SP bills |
 
 The public data needs no API keys and no account: one config entry, and a diagnostics download when
@@ -93,6 +94,9 @@ that part is built on [maci0/home-assistant-sp](https://github.com/maci0/home-as
 
 ## What's new
 
+- **v0.16** [Heat stress (WBGT)](#heat-stress-wbgt), [hourly PM2.5](#air-quality-psi),
+  [hawker centre closures](#hawker-centre-closures) as a calendar, and two opt-in sources:
+  [HDB carpark availability](#hdb-carpark-availability) and [taxis nearby](#taxi-availability).
 - **v0.15** [MOE school holidays, terms and exams](#moe-school-calendar) as calendars; turning a
   data source off now removes its entities and devices; translated update errors; a
   [Known limitations](#known-limitations) section.
@@ -153,14 +157,20 @@ Open **Settings → Devices & Services → Singapore → Configure** to change:
 - **Data sources:** untick any you don't need (for example lightning, radar or checkpoint
   cameras). A source you turn off stops polling data.gov.sg, and its entities and devices
   are removed; turn it back on and they come back. Everything is on by default, and sources
-  added in later releases start out on.
+  added in later releases start out on, except **HDB carpark availability** and **taxi
+  availability**: they are off until you tick them, because each poll downloads data for the
+  whole island (about 300 KB and 80 KB) to report a few numbers near you.
 - **School calendars:** which [MOE calendars](#moe-school-calendar) to create (school holidays,
   school terms, national exams). All three are on by default.
 - **data.gov.sg API key** (optional): a free key from
   [data.gov.sg](https://data.gov.sg) raises the rate limits, which means fewer HTTP 429
   errors. It's sent only to data.gov.sg.
+- **HDB carparks:** the carpark numbers to track, separated by commas (for example
+  `BJ55, TM24`). The number is on the sign at the carpark entrance and in HDB's and
+  data.gov.sg's carpark lists. Leave it empty to track the three carparks nearest your home
+  location. Only used when HDB carpark availability is on.
 - **Polling:** *Reduced* polls the fast sources (flood alerts, lightning, traffic cameras,
-  radar, trains, weather, PSI, UV) three times less often, for example lightning every
+  radar, trains, weather, PSI, UV, heat stress, carparks, taxis) three times less often, for example lightning every
   6 minutes instead of 2.
 
 Saving reloads the integration. Turning off SP Group tariffs also leaves SP account cost
@@ -455,6 +465,15 @@ actions:
 
 **Copy the whole dashboard:** [`examples/dashboard.yaml`](examples/dashboard.yaml) builds the dashboard
 at the top of this page. Paste it into a new dashboard's raw configuration editor.
+
+**Carparks and taxis:** the same YAML has a second view, *Carparks & taxis*, for the two
+opt-in sources: a tile per HDB carpark with its free lots, the total lots per carpark, and
+free taxis near home. Tick **HDB carpark availability** and **Taxi availability** under
+Configure first, and swap the example carpark numbers (`B8B`, `B8`, `B6`) for yours.
+
+<p align="center">
+  <img src="images/carparks-taxis.png" alt="Carparks and taxis dashboard view: three HDB carparks in Bedok with 82, 31 and 230 free car lots and their total lots, 30 free taxis within 1 km, 4,105 island-wide, 4 within 500 m, 110 within 2 km and the nearest 0.312 km away" width="640">
+</p>
 
 **PSI by region:** the hero dashboard lists the 24-hour PSI for each region. Each regional sensor
 also carries `latitude`/`longitude`, so you can put them on a Map card instead ([YAML below](#psi-on-the-map)).
@@ -787,6 +806,7 @@ Grouped under an **Air Quality** device.
 | `sensor.air_quality_psi` | Air Quality PSI | — | Singapore-wide 24-hour PSI (highest region); `band` attribute: `good` / `moderate` / `unhealthy` / `very_unhealthy` / `hazardous` |
 | `sensor.air_quality_psi_<region>` | e.g. Air Quality PSI North | — | 24-hour PSI for north, south, east, west, central — **with map location and every reading for that region** |
 | `sensor.air_quality_pm2_5` | Air Quality PM2.5 | µg/m³ | 24-hour PM2.5 (highest region) |
+| `sensor.air_quality_pm2_5_1_hour` | Air Quality PM2.5 (1-hour) | µg/m³ | 1-hour PM2.5 (highest region), from NEA's separate hourly feed; `band` attribute: `normal` (0–55) / `elevated` (56–150) / `high` (151–250) / `very_high` (251+). NEA publishes no 1-hour PSI: this is the figure it suggests for planning the next few hours |
 | `sensor.air_quality_pm10` | Air Quality PM10 | µg/m³ | 24-hour PM10 (highest region) |
 | `sensor.air_quality_ozone` | Air Quality Ozone | µg/m³ | 8-hour max O₃ (highest region) |
 | `sensor.air_quality_nitrogen_dioxide` | Air Quality Nitrogen Dioxide | µg/m³ | 1-hour max NO₂ (highest region) |
@@ -954,6 +974,82 @@ last reading of the evening.
 | `sensor.nea_uv_exposure` | NEA UV Exposure | — | NEA's exposure level for the latest reading: `low` (0–2), `moderate` (3–5), `high` (6–7), `very_high` (8–10) or `extreme` (11+) |
 
 See [Recipes](#recipes) for a sunscreen reminder.
+
+</details>
+
+### Heat stress (WBGT)
+
+Updated every **15 minutes** from [NEA's Wet Bulb Globe Temperature readings via data.gov.sg](https://api-open.data.gov.sg/v2/real-time/api/weather?api=wbgt).
+WBGT combines temperature, humidity, sun and wind into one figure for heat stress, and is what
+NEA's heat stress advisories use. Both sensors use the station nearest your home location and
+sit on the *NEA* device.
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.nea_heat_stress_wbgt` | NEA Heat stress WBGT | °C | WBGT at the nearest station; attributes `heat_stress`, `station`, `town`, `distance_km`, `latitude` / `longitude`, `highest_wbgt` / `highest_station` (island-wide) and `reading_time` |
+| `sensor.nea_heat_stress` | NEA Heat stress | — | NEA's heat stress level at the nearest station: `low` (below 31 °C), `moderate` (31 to below 33 °C) or `high` (33 °C and above) |
+
+</details>
+
+### Hawker centre closures
+
+Updated every 24 hours from [NEA's hawker centre closure dates via data.gov.sg](https://data.gov.sg/datasets/d_bda4baa634dd1cc7a6c7cad5f19e2d68/view).
+A calendar with all-day events for the quarterly cleaning and other works (repairs,
+redecoration) of the **five hawker centres nearest your home location**, on a *Hawker Centres*
+device. Each event is named like *Adam Road Food Centre closed (cleaning)*, with the
+address as its location and NEA's remarks as its description. Dates NEA hasn't fixed yet
+("TBC") are left out until it publishes them.
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Name |
+|-----------|------|
+| `calendar.hawker_centres_closures` | Hawker Centres Closures |
+
+Attributes: `centres` (the five centres, each with `name`, `address` and `distance_km`) and
+`source`.
+
+</details>
+
+### HDB carpark availability
+
+*Opt-in: tick **HDB carpark availability** under Configure.* Updated every **5 minutes** from
+[HDB's carpark availability via data.gov.sg](https://data.gov.sg/datasets/d_ca933a644e55d34fe21f28b8052fac63/view),
+joined to [HDB's carpark information](https://data.gov.sg/datasets/d_23f946fa557947f93a8043bbef41dd09/view)
+(read once a day) for the address and map location. One sensor per carpark, on an *HDB
+Carparks* device: the carparks listed under **Configure → HDB carparks**, or else the three
+nearest your home location that report availability.
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.hdb_carparks_<number>` | e.g. HDB Carparks BJ55 | lots | Car lots available; attributes `car_lots_total`, `motorcycle_lots_available` / `_total` and `heavy_lots_available` / `_total` where the carpark has them, `updated`, `address`, `latitude` / `longitude` (Map card), `distance_km`, `car_park_type`, `parking_system`, `short_term_parking`, `free_parking`, `night_parking`, `gantry_height` |
+
+Removing a number from the list removes its sensor. In "nearest home" mode, a sensor left
+behind after you move your home location can be deleted from the entity's settings.
+
+</details>
+
+### Taxi availability
+
+*Opt-in: tick **Taxi availability** under Configure.* Updated every **5 minutes** from
+[LTA's taxi availability via data.gov.sg](https://data.gov.sg/datasets/d_e25662f1a062dd046453926aa284ba64/view),
+the position of every free taxi island-wide (positions are counted, not stored). On a
+*Taxis* device.
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.taxis_available` | Taxis Available | taxis | Free taxis island-wide; `reading_time` attribute |
+| `sensor.taxis_nearby` | Taxis Nearby | taxis | Free taxis within 1 km of your home location; attributes `within_500_m`, `within_2_km` and `nearest_km` |
 
 </details>
 
@@ -1141,7 +1237,7 @@ account uses the unofficial APIs behind the SP app, which SP can change without 
 - **Diagnostics:** on the Singapore integration page, open the three-dot menu and choose
   **Download diagnostics**. The file shows each data source's last update result, error
   and parsed data. Attach it when opening an issue.
-- **Unavailable sensors:** flood alerts, traffic cameras, rain radar, dengue clusters, lightning, UV, PSI, COE and SP Group tariffs
+- **Unavailable sensors:** flood alerts, traffic cameras, rain radar, dengue clusters, lightning, UV, heat stress, hawker closures, carparks, taxis, PSI, COE and SP Group tariffs
   load in the background, so the rest of the integration still starts if one of those
   sources is down. Their sensors show as unavailable until a fetch succeeds.
 - **SP account sensors unavailable:** if SP rejects the stored session, a repair appears under
@@ -1229,6 +1325,11 @@ What the integration can't do, mostly because of what the sources publish:
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_08238953fe0f6dd13f10714ebfbcb9f9/view) | Lightning observations | Every 2 min |
 | [data.gov.sg / NEA](https://api-open.data.gov.sg/v2/real-time/api/uv) | Hourly UV index | Every 15 min |
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_418e9ac3414fd927b7405631e0a7bc82/view) | Rain radar images (70 / 240 / 480 km) | Every 5 min |
+| [data.gov.sg / NEA](https://api-open.data.gov.sg/v2/real-time/api/pm25) | Hourly PM2.5 | Every 15 min |
+| [data.gov.sg / NEA](https://api-open.data.gov.sg/v2/real-time/api/weather?api=wbgt) | Wet Bulb Globe Temperature (heat stress) | Every 15 min |
+| [data.gov.sg / NEA](https://data.gov.sg/datasets/d_bda4baa634dd1cc7a6c7cad5f19e2d68/view) | Hawker centre closure dates | Every 24 h |
+| [data.gov.sg / HDB](https://data.gov.sg/datasets/d_ca933a644e55d34fe21f28b8052fac63/view) | Carpark availability (opt-in) | Every 5 min (carpark details daily) |
+| [data.gov.sg / LTA](https://data.gov.sg/datasets/d_e25662f1a062dd046453926aa284ba64/view) | Taxi availability (opt-in) | Every 5 min |
 | [MOM](https://www.mom.gov.sg/employment-practices/public-holidays) | Public holidays | Every 24 h |
 | [MOE](https://www.moe.gov.sg/calendar) | School holidays, terms and national exams | Every 24 h |
 | [mytransport.sg](https://www.mytransport.sg/trainstatus) | MRT/LRT train status | Every 5 min |

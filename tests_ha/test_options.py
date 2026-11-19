@@ -20,6 +20,7 @@ from pytest_homeassistant_custom_component.common import (
 from custom_components.singapore.const import (
     CONF_API_KEY,
     CONF_DISABLED_SOURCES,
+    CONF_ENABLED_SOURCES,
     CONF_POLLING,
     DOMAIN,
     SOURCES,
@@ -61,6 +62,7 @@ async def test_options_form_serializes_over_http(
         "sources",
         "school_events",
         "api_key",
+        "carparks",
         "polling",
     ]
 
@@ -81,6 +83,7 @@ async def test_turning_sources_off_reloads_without_their_entities(
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options == {
         CONF_DISABLED_SOURCES: ["psi", "traffic", "radar"],
+        CONF_ENABLED_SOURCES: ["carpark", "taxi"],
         CONF_POLLING: "reduced",
         CONF_API_KEY: "key-123",
     }

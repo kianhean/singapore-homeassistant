@@ -15,6 +15,9 @@
       },
       "school_exams": {
         "default": "mdi:pencil"
+      },
+      "hawker_closures": {
+        "default": "mdi:food-variant-off"
       }
     },
     "sensor": {
@@ -71,6 +74,9 @@
       "pm25": {
         "default": "mdi:blur"
       },
+      "pm25_one_hour": {
+        "default": "mdi:blur"
+      },
       "pm10": {
         "default": "mdi:blur"
       },
@@ -111,6 +117,25 @@
           "very_high": "mdi:weather-sunny-alert",
           "extreme": "mdi:weather-sunny-alert"
         }
+      },
+      "wbgt": {
+        "default": "mdi:thermometer-water"
+      },
+      "heat_stress": {
+        "default": "mdi:sun-thermometer",
+        "state": {
+          "moderate": "mdi:sun-thermometer-outline",
+          "high": "mdi:alert"
+        }
+      },
+      "carpark": {
+        "default": "mdi:parking"
+      },
+      "taxis_available": {
+        "default": "mdi:taxi"
+      },
+      "taxis_nearby": {
+        "default": "mdi:map-marker-radius"
       },
       "sp_electricity_last_period": {
         "default": "mdi:flash-outline"

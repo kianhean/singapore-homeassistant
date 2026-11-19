@@ -242,6 +242,7 @@ async def _setup_calendars(options: dict, school=True) -> list:
     entry.options = options
     entry.runtime_data = SimpleNamespace(
         holiday=None,
+        hawker=None,
         school=MagicMock() if school else None,
         sp_accounts={},
     )

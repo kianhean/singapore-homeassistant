@@ -10,6 +10,7 @@ from custom_components.singapore.psi_coordinator import (
     PsiCoordinator,
     PsiData,
     _parse_psi,
+    pm25_band,
     psi_band,
 )
 
@@ -230,3 +231,123 @@ async def test_coordinator_unparseable_payload_fails_even_with_cache():
     coordinator.data = PsiData(national={"psi_twenty_four_hourly": 42.0})
     await _refresh(coordinator, _session(payload={"data": {"items": []}}))
     assert coordinator.last_update_success is False
+
+
+# -- hourly PM2.5 (NEA's 1-hour air quality figure) ---------------------------
+
+# Trimmed from the live v2 pm25 payload on 2026-11-19.
+SAMPLE_PM25 = {
+    "code": 0,
+    "data": {
+        "regionMetadata": [],
+        "items": [
+            {
+                "date": "2026-11-19",
+                "timestamp": "2026-11-19T18:00:00+08:00",
+                "readings": {
+                    "pm25_one_hourly": {
+                        "north": 7,
+                        "south": 4,
+                        "west": 4,
+                        "east": 61,
+                        "central": 2,
+                    }
+                },
+            }
+        ],
+    },
+}
+
+
+def _routed_session(pm25):
+    """PSI from SAMPLE_V2; the PM2.5 URL answers ``pm25`` (a response or error)."""
+    from custom_components.singapore.psi_coordinator import PM25_URL
+
+    def _response(status=200, payload=None):
+        response = AsyncMock()
+        response.headers = {}
+        response.status = status
+        response.json = AsyncMock(return_value=payload)
+        response.__aenter__ = AsyncMock(return_value=response)
+        response.__aexit__ = AsyncMock(return_value=False)
+        return response
+
+    def _get(url, **_kwargs):
+        if url != PM25_URL:
+            return _response(payload=SAMPLE_V2)
+        if isinstance(pm25, Exception):
+            raise pm25
+        if isinstance(pm25, int):
+            return _response(status=pm25)
+        return _response(payload=pm25)
+
+    session = MagicMock()
+    session.get = MagicMock(side_effect=_get)
+    return session
+
+
+@pytest.mark.asyncio
+async def test_coordinator_merges_hourly_pm25():
+    coordinator = PsiCoordinator(MagicMock())
+    await _refresh(coordinator, _routed_session(SAMPLE_PM25))
+    data = coordinator.data
+    assert data.readings["pm25_one_hourly"]["east"] == 61.0
+    assert data.national["pm25_one_hourly"] == 61.0
+    # The 24-hour readings are untouched.
+    assert data.national["psi_twenty_four_hourly"] == 39.0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", [503, aiohttp.ClientError("down"), {"data": {}}])
+async def test_hourly_pm25_failure_keeps_previous_readings(failure):
+    coordinator = PsiCoordinator(MagicMock())
+    await _refresh(coordinator, _routed_session(SAMPLE_PM25))
+
+    await _refresh(coordinator, _routed_session(failure))
+    assert coordinator.last_update_success is True
+    assert coordinator.data.national["pm25_one_hourly"] == 61.0
+
+
+@pytest.mark.asyncio
+async def test_hourly_pm25_failure_without_history_leaves_it_out():
+    coordinator = PsiCoordinator(MagicMock())
+    await _refresh(coordinator, _routed_session(503))
+    assert coordinator.last_update_success is True
+    assert "pm25_one_hourly" not in coordinator.data.national
+
+
+@pytest.mark.parametrize(
+    ("value", "band"),
+    [
+        (0, "normal"),
+        (55, "normal"),
+        (56, "elevated"),
+        (150, "elevated"),
+        (151, "high"),
+        (250, "high"),
+        (251, "very_high"),
+        (None, None),
+    ],
+)
+def test_pm25_band(value, band):
+    assert pm25_band(value) == band
+
+
+def test_hourly_pm25_sensor_reports_band():
+    from custom_components.singapore.sensor import (
+        PSI_POLLUTANT_SENSORS,
+        SingaporePollutantSensor,
+    )
+
+    spec = next(s for s in PSI_POLLUTANT_SENSORS if s[1] == "pm25_one_hour")
+    coordinator = MagicMock()
+    coordinator.data = PsiData(
+        readings={"pm25_one_hourly": {"east": 61.0, "west": 4.0}},
+        national={"pm25_one_hourly": 61.0},
+    )
+    sensor = SingaporePollutantSensor(coordinator, "entry1", *spec)
+    assert sensor.unique_id == "entry1_pm25_one_hour"
+    assert sensor.native_value == 61.0
+    attrs = sensor.extra_state_attributes
+    assert attrs["band"] == "elevated"
+    assert attrs["regions"] == {"east": 61.0, "west": 4.0}

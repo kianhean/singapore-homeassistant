@@ -184,6 +184,38 @@ async def test_setup_creates_entities_and_unloads(
         "extreme",
     ]
 
+    pm25_hour = hass.states.get("sensor.air_quality_pm2_5_1_hour")
+    assert pm25_hour is not None
+    assert pm25_hour.state == "61.0"
+    assert pm25_hour.attributes["band"] == "elevated"
+    assert pm25_hour.attributes["device_class"] == "pm25"
+    # The regional PSI sensors carry the hourly reading too.
+    assert (
+        hass.states.get("sensor.air_quality_psi_east").attributes["pm25_one_hourly"]
+        == 61.0
+    )
+
+    wbgt = hass.states.get("sensor.nea_heat_stress_wbgt")
+    assert wbgt is not None
+    assert wbgt.state == "31.2"
+    assert wbgt.attributes["station"] == "Harness Home"
+    assert wbgt.attributes["highest_wbgt"] == 33.4
+    assert wbgt.attributes["unit_of_measurement"] == "°C"
+    stress = hass.states.get("sensor.nea_heat_stress")
+    assert stress is not None
+    assert stress.state == "moderate"
+    assert stress.attributes["options"] == ["low", "moderate", "high"]
+
+    hawker = hass.states.get("calendar.hawker_centres_closures")
+    assert hawker is not None
+    assert hawker.attributes["message"] == "Adam Road Food Centre closed (cleaning)"
+    assert hawker.attributes["location"] == "2, Adam Road, Singapore 289876"
+
+    # Carparks and taxis are opt-in: off on a fresh install.
+    assert entry.runtime_data.carpark is None
+    assert entry.runtime_data.taxi is None
+    assert hass.states.get("sensor.taxis_available") is None
+
     # Every entity must use a stable, entry-scoped unique ID.
     registry = er.async_get(hass)
     entities = er.async_entries_for_config_entry(registry, entry.entry_id)
@@ -270,3 +302,87 @@ async def test_diagnostics(hass: HomeAssistant, hass_client, mock_sources) -> No
     assert psi["national"]["psi_twenty_four_hourly"] == 52
     assert diag["coordinators"]["flood"]["data"]["alerts"][0]["severity"] == "Minor"
     assert diag["coordinators"]["dengue"]["last_update_success"] is True
+
+
+async def test_opt_in_carparks_and_taxis(
+    hass: HomeAssistant, hass_client, mock_sources
+) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Singapore",
+        data={"name": "Singapore"},
+        options={"enabled_sources": ["carpark", "taxi"]},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    # Nearest home (no carparks chosen): the only one in the canned feed.
+    carpark = hass.states.get("sensor.hdb_carparks_acb")
+    assert carpark is not None
+    assert carpark.state == "103"
+    assert carpark.attributes["car_lots_total"] == 105
+    assert carpark.attributes["address"].startswith("BLK 270/271")
+    assert abs(carpark.attributes["latitude"] - 1.30106) < 1e-3
+    assert carpark.attributes["unit_of_measurement"] == "lots"
+
+    total = hass.states.get("sensor.taxis_available")
+    assert total is not None and total.state == "2"
+    nearby = hass.states.get("sensor.taxis_nearby")
+    assert nearby is not None and nearby.state == "1"
+    assert nearby.attributes["within_500_m"] == 1
+
+    diagnostics = await get_diagnostics_for_config_entry(hass, hass_client, entry)
+    coordinators = diagnostics["coordinators"]
+    assert coordinators["carpark"]["data"]["tracked"] == ["ACB"]
+    assert coordinators["taxi"]["data"]["total"] == 2
+
+
+async def test_example_dashboard_matches_a_real_install(
+    hass: HomeAssistant, mock_sources
+) -> None:
+    """Every entity (and attribute) examples/dashboard.yaml uses exists.
+
+    With the opt-in carparks and taxis on and the example's carpark numbers
+    chosen, as the dashboard's header comment tells users to set up.
+    """
+    from pathlib import Path
+
+    import yaml
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Singapore",
+        data={"name": "Singapore"},
+        options={"enabled_sources": ["carpark", "taxi"], "carparks": "B8B, B8, B6"},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    def _cards(node):
+        if isinstance(node, dict):
+            if "type" in node:
+                yield node
+            for value in node.values():
+                yield from _cards(value)
+        elif isinstance(node, list):
+            for item in node:
+                yield from _cards(item)
+
+    example = Path(__file__).parents[1] / "examples" / "dashboard.yaml"
+    config = yaml.safe_load(example.read_text())
+    checked = 0
+    for card in _cards(config):
+        entity_id = card.get("entity")
+        if not isinstance(entity_id, str):
+            continue
+        state = hass.states.get(entity_id)
+        assert state is not None, entity_id
+        # Attribute rows and tile state_content must name real attributes.
+        if (attribute := card.get("attribute")) is not None:
+            assert attribute in state.attributes, (entity_id, attribute)
+        if isinstance(content := card.get("state_content"), str) and content != "state":
+            assert content in state.attributes, (entity_id, content)
+        checked += 1
+    assert checked > 30

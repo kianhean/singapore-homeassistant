@@ -6,19 +6,27 @@ from unittest.mock import MagicMock
 from homeassistant.config_entries import ConfigEntry
 
 from custom_components.singapore import SingaporeData
+from custom_components.singapore.carpark_coordinator import (
+    CarparkAvailability,
+    CarparkData,
+    LotCount,
+)
 from custom_components.singapore.dengue_coordinator import DengueData
 from custom_components.singapore.diagnostics import (
     async_get_config_entry_diagnostics,
 )
 from custom_components.singapore.flood_coordinator import FloodAlertData
+from custom_components.singapore.hawker_coordinator import HawkerData
 from custom_components.singapore.holiday_coordinator import PublicHoliday
 from custom_components.singapore.lightning_coordinator import LightningData
 from custom_components.singapore.psi_coordinator import PsiData
 from custom_components.singapore.radar_coordinator import RadarData
 from custom_components.singapore.school_coordinator import SchoolEvent
+from custom_components.singapore.taxi_coordinator import TaxiData
 from custom_components.singapore.traffic_coordinator import TrafficImagesData
 from custom_components.singapore.train_coordinator import TrainStatusData
 from custom_components.singapore.uv_coordinator import UvData
+from custom_components.singapore.wbgt_coordinator import WbgtData
 
 
 def _coordinator(data, success=True, exc=None):
@@ -49,6 +57,17 @@ async def test_diagnostics_serializes_all_coordinators():
         school=_coordinator(
             [SchoolEvent("Term 1", "terms", date(2026, 1, 2), date(2026, 3, 13))]
         ),
+        wbgt=_coordinator(WbgtData()),
+        hawker=_coordinator(HawkerData()),
+        carpark=_coordinator(
+            CarparkData(
+                tracked=["BJ55"],
+                availability={
+                    "BJ55": CarparkAvailability("BJ55", {"C": LotCount(10, 100)})
+                },
+            )
+        ),
+        taxi=_coordinator(TaxiData(3000, 1, 4, 12, 0.3, None)),
     )
 
     result = await async_get_config_entry_diagnostics(MagicMock(), entry)
@@ -68,6 +87,10 @@ async def test_diagnostics_serializes_all_coordinators():
         "uv",
         "radar",
         "school",
+        "wbgt",
+        "hawker",
+        "carpark",
+        "taxi",
     }
     assert coordinators["tariff"]["last_update_success"] is False
     assert "boom" in coordinators["tariff"]["last_exception"]
@@ -82,4 +105,8 @@ async def test_diagnostics_serializes_all_coordinators():
     assert coordinators["lightning"]["data"]["strikes"] == []
     assert coordinators["uv"]["data"]["readings"] == []
     assert coordinators["school"]["data"][0]["kind"] == "terms"
+    assert coordinators["carpark"]["data"]["availability"]["BJ55"]["lots"] == {
+        "C": {"available": 10, "total": 100}
+    }
+    assert coordinators["taxi"]["data"]["within_1_km"] == 4
     assert result["options"]["disabled_school_events"] == []

@@ -20,6 +20,10 @@ from .errors import ERROR_FETCH, ERROR_HTTP, ERROR_PAYLOAD, source_error
 _LOGGER = logging.getLogger(__name__)
 
 PSI_URL = "https://api-open.data.gov.sg/v2/real-time/api/psi"
+# Hourly PM2.5 concentration per region: NEA's guide to the next hour's
+# activities (there is no 1-hour PSI; the 3-hour PSI was dropped in 2014).
+PM25_URL = "https://api-open.data.gov.sg/v2/real-time/api/pm25"
+PM25_ONE_HOUR_KEY: Final = "pm25_one_hourly"
 # data.gov.sg refreshes PSI readings every 15 minutes.
 UPDATE_INTERVAL = timedelta(minutes=15)
 
@@ -44,6 +48,15 @@ _PSI_BANDS: Final[tuple[tuple[float, str], ...]] = (
 )
 PSI_BAND_HAZARDOUS: Final = "hazardous"
 
+# NEA's 1-hour PM2.5 bands in µg/m³ (upper bound inclusive): I Normal,
+# II Elevated, III High, IV Very High.
+_PM25_BANDS: Final[tuple[tuple[float, str], ...]] = (
+    (55, "normal"),
+    (150, "elevated"),
+    (250, "high"),
+)
+PM25_BAND_VERY_HIGH: Final = "very_high"
+
 
 def psi_band(value: float | None) -> str | None:
     """Map a 24-hour PSI value to NEA's descriptor band."""
@@ -53,6 +66,16 @@ def psi_band(value: float | None) -> str | None:
         if value <= upper:
             return band
     return PSI_BAND_HAZARDOUS
+
+
+def pm25_band(value: float | None) -> str | None:
+    """Map a 1-hour PM2.5 concentration to NEA's band."""
+    if value is None:
+        return None
+    for upper, band in _PM25_BANDS:
+        if value <= upper:
+            return band
+    return PM25_BAND_VERY_HIGH
 
 
 @dataclass
@@ -124,7 +147,36 @@ class PsiCoordinator(DataUpdateCoordinator[PsiData]):
             raise source_error(
                 ERROR_PAYLOAD, SOURCE_PSI, detail="No PSI readings found"
             )
+        await self._async_add_pm25_one_hour(session, parsed)
         return parsed
+
+    async def _async_add_pm25_one_hour(self, session, parsed: PsiData) -> None:
+        """Merge the hourly PM2.5 readings into ``parsed`` (failures are soft).
+
+        A failed or malformed PM2.5 response keeps the previous hourly
+        readings, so the 24-hour PSI never goes unavailable because of it.
+        """
+        regional: dict[str, float] = {}
+        try:
+            async with data_gov_get(
+                self.hass,
+                session,
+                PM25_URL,
+                headers=data_gov_headers(self.config_entry),
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as response:
+                if response.status == 200:
+                    pm25 = _parse_psi(await response.json(content_type=None))
+                    regional = pm25.readings.get(PM25_ONE_HOUR_KEY, {})
+                else:
+                    _LOGGER.debug("Hourly PM2.5 returned HTTP %s", response.status)
+        except (aiohttp.ClientError, TimeoutError, ValueError) as err:
+            _LOGGER.debug("Error fetching hourly PM2.5: %s", err)
+        if not regional and self.data is not None:
+            regional = self.data.readings.get(PM25_ONE_HOUR_KEY, {})
+        if regional:
+            parsed.readings[PM25_ONE_HOUR_KEY] = dict(regional)
+            parsed.national[PM25_ONE_HOUR_KEY] = max(regional.values())
 
 
 def _to_float(value) -> float | None:
