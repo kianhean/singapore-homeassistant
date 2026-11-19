@@ -14,6 +14,9 @@
   --purple: #9c27b0;
   --teal: #009688;
   --yellow: #ffc107;
+  --deep-orange: #ff6f22;
+  --brown: #795548;
+  --indigo: #3f51b5;
   --sg-red: #EF3340;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -41,7 +44,7 @@ svg.mdi { width: 24px; height: 24px; fill: currentColor; flex: none; }
 }
 .topbar .title { font-size: 20px; font-weight: 500; }
 .tabs { display: flex; gap: 26px; height: 100%; }
-.tabs span { display: flex; align-items: center; color: var(--muted); font-weight: 500; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; }
+.tabs span { display: flex; align-items: center; color: var(--muted); font-weight: 500; font-size: 14px; }
 .tabs .on { color: var(--primary); box-shadow: inset 0 -2px 0 var(--primary); }
 .topbar .spacer { flex: 1; }
 

@@ -106,7 +106,9 @@ tests_ha/                        # Runs against a REAL Home Assistant (no module
 
 blueprints/automation/singapore/  # Importable automation blueprints (README "Import" buttons)
 tests_ha/test_blueprints.py      # Runs every blueprint in real HA (one test per blueprint, required)
-examples/dashboard.yaml          # Built-in-cards dashboard shown in images/hero.jpg
+examples/dashboard.yaml          # Built-in-cards dashboard: view 1 = images/hero.jpg (hero.html),
+                                 # view 2 "Carparks & taxis" (opt-in sources) = images/carparks-taxis.png
+                                 # (carparks.html); tests_ha checks every entity/attribute in it exists
 examples/sp_account_dashboard.yaml # SP account dashboard (built-in cards); tests_ha checks every
                                  # entity/statistic in it exists (test_sp_account_statistics.py)
                                  # docs/mockups/sp_account.html mirrors it → images/sp-account-dashboard.png
@@ -117,7 +119,7 @@ docs/mockups/                    # HTML sources for the README images (node buil
 
 README images must only show what Home Assistant really renders from this integration's
 entities with built-in cards (no custom cards, invented attributes or reworded states), and
-`hero.html` must stay in sync with `examples/dashboard.yaml` (and `sp_account.html` with `examples/sp_account_dashboard.yaml`). Camera stills are real LTA images,
+`hero.html` / `carparks.html` must stay in sync with the two views of `examples/dashboard.yaml` (and `sp_account.html` with `examples/sp_account_dashboard.yaml`). Camera stills are real LTA images,
 not illustrations.
 
 Entry data is stored on `entry.runtime_data` as a `SingaporeData` dataclass (not

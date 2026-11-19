@@ -336,3 +336,53 @@ async def test_opt_in_carparks_and_taxis(
     coordinators = diagnostics["coordinators"]
     assert coordinators["carpark"]["data"]["tracked"] == ["ACB"]
     assert coordinators["taxi"]["data"]["total"] == 2
+
+
+async def test_example_dashboard_matches_a_real_install(
+    hass: HomeAssistant, mock_sources
+) -> None:
+    """Every entity (and attribute) examples/dashboard.yaml uses exists.
+
+    With the opt-in carparks and taxis on and the example's carpark numbers
+    chosen, as the dashboard's header comment tells users to set up.
+    """
+    from pathlib import Path
+
+    import yaml
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Singapore",
+        data={"name": "Singapore"},
+        options={"enabled_sources": ["carpark", "taxi"], "carparks": "B8B, B8, B6"},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    def _cards(node):
+        if isinstance(node, dict):
+            if "type" in node:
+                yield node
+            for value in node.values():
+                yield from _cards(value)
+        elif isinstance(node, list):
+            for item in node:
+                yield from _cards(item)
+
+    example = Path(__file__).parents[1] / "examples" / "dashboard.yaml"
+    config = yaml.safe_load(example.read_text())
+    checked = 0
+    for card in _cards(config):
+        entity_id = card.get("entity")
+        if not isinstance(entity_id, str):
+            continue
+        state = hass.states.get(entity_id)
+        assert state is not None, entity_id
+        # Attribute rows and tile state_content must name real attributes.
+        if (attribute := card.get("attribute")) is not None:
+            assert attribute in state.attributes, (entity_id, attribute)
+        if isinstance(content := card.get("state_content"), str) and content != "state":
+            assert content in state.attributes, (entity_id, content)
+        checked += 1
+    assert checked > 30

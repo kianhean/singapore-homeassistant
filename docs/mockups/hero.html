@@ -33,7 +33,7 @@
   </nav>
   <div class="main">
     <header class="topbar">
-      <span class="title">Singapore</span>
+      <div class="tabs"><span class="on">Singapore</span><span>Carparks &amp; taxis</span></div>
       <span class="spacer"></span><i m="mdiMagnify"></i><i m="mdiPencil"></i>
     </header>
     <div class="view">
@@ -58,6 +58,8 @@
           <div class="card tile"><span class="bubble" style="--c:var(--teal)"><i m="mdiWeatherWindy"></i></span><div><div class="name">Wind speed</div><div class="state">9.2 km/h</div></div></div>
           <div class="card tile"><span class="bubble" style="--c:var(--orange)"><i m="mdiSunWireless"></i></span><div><div class="name">UV index</div><div class="state">6 UV index</div></div></div>
           <div class="card tile"><span class="bubble" style="--c:var(--orange)"><i m="mdiWeatherSunnyAlert"></i></span><div><div class="name">UV exposure</div><div class="state">High</div></div></div>
+          <div class="card tile"><span class="bubble" style="--c:var(--deep-orange)"><i m="mdiThermometerWater"></i></span><div><div class="name">WBGT</div><div class="state">31.4 °C</div></div></div>
+          <div class="card tile"><span class="bubble" style="--c:var(--deep-orange)"><i m="mdiSunThermometerOutline"></i></span><div><div class="name">Heat stress</div><div class="state">Moderate</div></div></div>
         </div>
 
         <div class="heading"><i m="mdiAirFilter"></i>Air quality</div>
@@ -69,8 +71,10 @@
           <div class="v">42</div><div class="n">PSI</div>
         </div>
         <div class="grid2">
-          <div class="card tile"><span class="bubble" style="--c:var(--green)"><i m="mdiBlur"></i></span><div><div class="name">PM2.5</div><div class="state">14 µg/m³</div></div></div>
+          <div class="card tile"><span class="bubble" style="--c:var(--green)"><i m="mdiBlur"></i></span><div><div class="name">PM2.5 (1-hour)</div><div class="state">12 µg/m³</div></div></div>
+          <div class="card tile"><span class="bubble" style="--c:var(--green)"><i m="mdiBlur"></i></span><div><div class="name">PM2.5 (24-hour)</div><div class="state">14 µg/m³</div></div></div>
           <div class="card tile"><span class="bubble" style="--c:var(--green)"><i m="mdiBlur"></i></span><div><div class="name">PM10</div><div class="state">27 µg/m³</div></div></div>
+          <div class="card tile"><span class="bubble" style="--c:var(--green)"><i m="mdiMolecule"></i></span><div><div class="name">Ozone</div><div class="state">28 µg/m³</div></div></div>
         </div>
         <div class="card"><div class="card-title">PSI by region</div><div class="rows">
           <div class="row"><span class="ic"><i m="mdiAirFilter"></i></span><span class="label">North</span><span class="val">35</span></div>
@@ -101,6 +105,7 @@
         <div class="card tile"><span class="bubble" style="--c:var(--amber)"><i m="mdiMapMarkerDistance"></i></span><div><div class="name">Nearest lightning</div><div class="state">7.4 km</div></div></div>
         <div class="card tile"><span class="bubble" style="--c:var(--orange)"><i m="mdiMapMarkerDistance"></i></span><div><div class="name">Nearest dengue cluster</div><div class="state">1.2 km</div></div></div>
         <div class="card tile"><span class="bubble" style="--c:var(--blue)"><i m="mdiHomeFlood"></i></span><div><div class="name">PUB flood alerts</div><div class="state">0</div></div></div>
+        <div class="card tile"><span class="bubble" style="--c:var(--brown)"><i m="mdiFoodVariantOff"></i></span><div><div class="name">Hawker closures</div><div class="state">Bedok North Street 1 Blk 216 closed (cleaning)</div></div></div>
 
         <div class="heading"><i m="mdiLightningBolt"></i>Utilities</div>
         <div class="grid2">

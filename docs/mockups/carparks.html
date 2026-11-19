@@ -1,0 +1,46 @@
+<!doctype html>
+<!-- Mirrors the "Carparks & taxis" view of examples/dashboard.yaml: only built-in Home
+     Assistant cards, with the states they display (live values, 2026-11-19 19:45, Bedok).
+     Keep the two in sync. -->
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="ha.css">
+<style>
+  .view { grid-template-columns: repeat(2, 1fr); }
+</style></head>
+<body><div class="app">
+  <nav class="sidebar">
+    <i m="mdiMenu"></i><span class="active"><i m="mdiViewDashboard"></i></span><i m="mdiChartBox"></i><i m="mdiFormatListBulletedType"></i><i m="mdiCalendar"></i><i m="mdiCog"></i>
+  </nav>
+  <div class="main">
+    <header class="topbar">
+      <div class="tabs"><span>Singapore</span><span class="on">Carparks &amp; taxis</span></div>
+      <span class="spacer"></span><i m="mdiMagnify"></i><i m="mdiPencil"></i>
+    </header>
+    <div class="view">
+
+      <div class="section">
+        <div class="heading"><i m="mdiParking"></i>Carparks near home</div>
+        <div class="card tile"><span class="bubble" style="--c:var(--indigo)"><i m="mdiParking"></i></span><div><div class="name">Blk 222 Bedok North Drive</div><div class="state">82 lots</div></div></div>
+        <div class="card tile"><span class="bubble" style="--c:var(--indigo)"><i m="mdiParking"></i></span><div><div class="name">Blk 201/203 Bedok North Street 1</div><div class="state">31 lots</div></div></div>
+        <div class="card tile"><span class="bubble" style="--c:var(--indigo)"><i m="mdiParking"></i></span><div><div class="name">Blk 204/209 New Upper Changi Road</div><div class="state">230 lots</div></div></div>
+        <div class="card"><div class="card-title">Total car lots</div><div class="rows">
+          <div class="row"><span class="ic"><i m="mdiParking"></i></span><span class="label">Blk 222 Bedok North Drive</span><span class="val">229</span></div>
+          <div class="row"><span class="ic"><i m="mdiParking"></i></span><span class="label">Blk 201/203 Bedok North Street 1</span><span class="val">113</span></div>
+          <div class="row"><span class="ic"><i m="mdiParking"></i></span><span class="label">Blk 204/209 New Upper Changi Road</span><span class="val">521</span></div>
+        </div></div>
+      </div>
+
+      <div class="section">
+        <div class="heading"><i m="mdiTaxi"></i>Taxis</div>
+        <div class="card tile"><span class="bubble" style="--c:var(--amber)"><i m="mdiMapMarkerRadius"></i></span><div><div class="name">Free taxis within 1 km</div><div class="state">30 taxis</div></div></div>
+        <div class="card tile"><span class="bubble" style="--c:var(--amber)"><i m="mdiTaxi"></i></span><div><div class="name">Free taxis island-wide</div><div class="state">4,105 taxis</div></div></div>
+        <div class="card"><div class="card-title">Around home</div><div class="rows">
+          <div class="row"><span class="ic"><i m="mdiMapMarkerRadius"></i></span><span class="label">Within 500 m</span><span class="val">4</span></div>
+          <div class="row"><span class="ic"><i m="mdiMapMarkerRadius"></i></span><span class="label">Within 2 km</span><span class="val">110</span></div>
+          <div class="row"><span class="ic"><i m="mdiMapMarkerDistance"></i></span><span class="label">Nearest free taxi</span><span class="val">0.312 km</span></div>
+        </div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</body></html>

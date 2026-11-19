@@ -1,4 +1,5 @@
-# The dashboard in images/hero.jpg, built only from Home Assistant's built-in cards.
+# The dashboard in images/hero.jpg (and its second view, Carparks & taxis, in
+# images/carparks-taxis.png), built only from Home Assistant's built-in cards.
 #
 # To use it: Settings → Dashboards → Add dashboard → New dashboard from scratch,
 # open it, ⋮ → Edit dashboard → ⋮ → Raw configuration editor, and paste this in.
@@ -6,6 +7,10 @@
 # Entity IDs are the ones a new install gets. Installs from before v0.3.0 use
 # sensor.singapore_* IDs instead (see the README). Swap weather.weather_bedok for
 # your own forecast area.
+#
+# The Carparks & taxis view needs the two opt-in sources: tick "HDB carpark
+# availability" and "Taxi availability" under Settings → Devices & services →
+# Singapore → Configure, and swap the carpark numbers (B8B, B8, B6) for yours.
 title: Singapore
 views:
   - title: Singapore
@@ -42,6 +47,16 @@ views:
             name: UV exposure
             color: orange
             grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.nea_heat_stress_wbgt
+            name: WBGT
+            color: deep-orange
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.nea_heat_stress
+            name: Heat stress
+            color: deep-orange
+            grid_options: { columns: 6 }
           - type: heading
             heading: Air quality
             icon: mdi:air-filter
@@ -52,13 +67,23 @@ views:
             max: 300
             severity: { green: 0, yellow: 51, red: 201 }
           - type: tile
+            entity: sensor.air_quality_pm2_5_1_hour
+            name: PM2.5 (1-hour)
+            color: green
+            grid_options: { columns: 6 }
+          - type: tile
             entity: sensor.air_quality_pm2_5
-            name: PM2.5
+            name: PM2.5 (24-hour)
             color: green
             grid_options: { columns: 6 }
           - type: tile
             entity: sensor.air_quality_pm10
             name: PM10
+            color: green
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.air_quality_ozone
+            name: Ozone
             color: green
             grid_options: { columns: 6 }
           - type: entities
@@ -124,6 +149,11 @@ views:
             entity: sensor.pub_flood_alerts
             name: PUB flood alerts
             color: blue
+          - type: tile
+            entity: calendar.hawker_centres_closures
+            name: Hawker closures
+            color: brown
+            state_content: message
           - type: heading
             heading: Utilities
             icon: mdi:lightning-bolt
@@ -162,3 +192,74 @@ views:
                 name: Category D
               - entity: sensor.coe_category_e
                 name: Category E
+
+  - title: Carparks & taxis
+    path: carparks-taxis
+    type: sections
+    max_columns: 2
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Carparks near home
+            icon: mdi:parking
+          - type: tile
+            entity: sensor.hdb_carparks_b8b
+            name: Blk 222 Bedok North Drive
+            color: indigo
+          - type: tile
+            entity: sensor.hdb_carparks_b8
+            name: Blk 201/203 Bedok North Street 1
+            color: indigo
+          - type: tile
+            entity: sensor.hdb_carparks_b6
+            name: Blk 204/209 New Upper Changi Road
+            color: indigo
+          - type: entities
+            title: Total car lots
+            entities:
+              - type: attribute
+                entity: sensor.hdb_carparks_b8b
+                attribute: car_lots_total
+                name: Blk 222 Bedok North Drive
+              - type: attribute
+                entity: sensor.hdb_carparks_b8
+                attribute: car_lots_total
+                name: Blk 201/203 Bedok North Street 1
+              - type: attribute
+                entity: sensor.hdb_carparks_b6
+                attribute: car_lots_total
+                name: Blk 204/209 New Upper Changi Road
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Taxis
+            icon: mdi:taxi
+          - type: tile
+            entity: sensor.taxis_nearby
+            name: Free taxis within 1 km
+            color: amber
+          - type: tile
+            entity: sensor.taxis_available
+            name: Free taxis island-wide
+            color: amber
+          - type: entities
+            title: Around home
+            entities:
+              - type: attribute
+                entity: sensor.taxis_nearby
+                attribute: within_500_m
+                name: Within 500 m
+                icon: mdi:map-marker-radius
+              - type: attribute
+                entity: sensor.taxis_nearby
+                attribute: within_2_km
+                name: Within 2 km
+                icon: mdi:map-marker-radius
+              - type: attribute
+                entity: sensor.taxis_nearby
+                attribute: nearest_km
+                name: Nearest free taxi
+                suffix: km
+                icon: mdi:map-marker-distance

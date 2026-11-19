@@ -296,7 +296,26 @@ _CARPARK_AVAILABILITY_PAYLOAD = {
                     ],
                     "carpark_number": "ACB",
                     "update_datetime": "2026-11-19T18:14:20",
-                }
+                },
+                # The carparks examples/dashboard.yaml uses (live, 2026-11-19).
+                *(
+                    {
+                        "carpark_info": [
+                            {
+                                "lot_type": "C",
+                                "lots_available": available,
+                                "total_lots": total,
+                            }
+                        ],
+                        "carpark_number": number,
+                        "update_datetime": "2026-11-19T19:44:00",
+                    }
+                    for number, available, total in (
+                        ("B8B", "82", "229"),
+                        ("B8", "31", "113"),
+                        ("B6", "230", "521"),
+                    )
+                ),
             ],
         }
     ]
