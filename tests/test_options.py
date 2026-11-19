@@ -63,7 +63,7 @@ def _entry(options: dict | None = None) -> ConfigEntry:
 
 def test_every_source_but_the_opt_in_ones_enabled_by_default():
     default = set(SOURCES) - set(OPT_IN_SOURCES)
-    assert {"carpark", "taxi"} == set(OPT_IN_SOURCES)
+    assert {"carpark", "taxi", "capitaland"} == set(OPT_IN_SOURCES)
     assert enabled_sources(_entry()) == default
     assert enabled_sources(None) == default
 
@@ -75,7 +75,7 @@ def test_disabled_sources_are_excluded():
 
 def test_opt_in_sources_are_on_once_ticked():
     entry = _entry({CONF_ENABLED_SOURCES: ["taxi"], CONF_DISABLED_SOURCES: ["uv"]})
-    assert enabled_sources(entry) == set(SOURCES) - {"uv", "carpark"}
+    assert enabled_sources(entry) == set(SOURCES) - {"uv", "carpark", "capitaland"}
 
 
 def test_data_gov_headers():
@@ -109,7 +109,7 @@ def test_options_from_input_stores_disabled_sources():
     ) == {
         CONF_DISABLED_SOURCES: ["lightning"],
         # Opt-in sources are stored as the ones ticked.
-        CONF_ENABLED_SOURCES: ["carpark", "taxi"],
+        CONF_ENABLED_SOURCES: ["carpark", "taxi", "capitaland"],
         CONF_POLLING: "reduced",
         CONF_API_KEY: "k",
     }

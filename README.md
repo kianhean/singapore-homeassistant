@@ -84,7 +84,7 @@ minute; everything else works without it. Questions about it? See the [FAQ](#faq
 | 🌦️ **Weather**<br>A weather entity for every NEA forecast area, with hourly and 4-day forecasts, live temperature, humidity, wind and rain, plus NEA rain radar images and animated loops | 😷 **Air quality**<br>PSI, hourly PM2.5 and six pollutants, overall and per region, ready for a Map card | ☀️ **UV index**<br>NEA's hourly UV index and exposure level (low to extreme), with today's peak |
 | 🚇 **MRT/LRT**<br>Network and per-line status (normal, planned works, disruption) with LTA's message | 🛂 **Checkpoints**<br>Woodlands and Tuas traffic camera stills as camera entities | 🚗 **COE**<br>Category A–E premiums, refreshed after each bidding exercise |
 | ⚡ **Lightning**<br>Live strikes and the distance to the nearest one from your home | 🦟 **Dengue**<br>Active NEA clusters and how far the nearest is from your home | 🌊 **Flash floods**<br>PUB flood alerts as they're issued and cancelled |
-| 🌡️ **Heat stress**<br>NEA's Wet Bulb Globe Temperature and heat stress level (low, moderate, high) at the station nearest your home | 🍜 **Hawker centres**<br>Cleaning and repair closures of the five hawker centres nearest your home, as a calendar | 🅿️ **Carparks and taxis** *(opt-in)*<br>Free lots at the HDB carparks you pick (or the nearest three), and free taxis near your home |
+| 🌡️ **Heat stress**<br>NEA's Wet Bulb Globe Temperature and heat stress level (low, moderate, high) at the station nearest your home | 🍜 **Hawker centres**<br>Cleaning and repair closures of the five hawker centres nearest your home, as a calendar | 🅿️ **Carparks and taxis** *(opt-in)*<br>Free lots at the HDB carparks you pick (or the nearest three) and at CapitaLand malls, and free taxis near your home |
 | 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🎉 **Holidays and school terms**<br>MOM's public holidays, plus MOE school holidays, terms and national exams, as calendars | 🧩 **Blueprints**<br>[One-click automations](#one-click-blueprints) for lightning, MRT disruptions, floods, haze, COE, rain, UV, dengue, holidays and SP bills |
 
 The public data needs no API keys and no account: one config entry, and a diagnostics download when
@@ -94,6 +94,8 @@ that part is built on [maci0/home-assistant-sp](https://github.com/maci0/home-as
 
 ## What's new
 
+- **v0.17** [CapitaLand mall carparks](#capitaland-mall-carparks) (opt-in): free lots at
+  Plaza Singapura, Tampines Mall, IMM, Westgate and the other CapitaLand malls.
 - **v0.16** [Heat stress (WBGT)](#heat-stress-wbgt), [hourly PM2.5](#air-quality-psi),
   [hawker centre closures](#hawker-centre-closures) as a calendar, and two opt-in sources:
   [HDB carpark availability](#hdb-carpark-availability) and [taxis nearby](#taxi-availability).
@@ -157,9 +159,10 @@ Open **Settings → Devices & Services → Singapore → Configure** to change:
 - **Data sources:** untick any you don't need (for example lightning, radar or checkpoint
   cameras). A source you turn off stops polling data.gov.sg, and its entities and devices
   are removed; turn it back on and they come back. Everything is on by default, and sources
-  added in later releases start out on, except **HDB carpark availability** and **taxi
-  availability**: they are off until you tick them, because each poll downloads data for the
-  whole island (about 300 KB and 80 KB) to report a few numbers near you.
+  added in later releases start out on, except **HDB carpark availability**, **taxi
+  availability** and **CapitaLand mall carparks**: they are off until you tick them. The first
+  two download data for the whole island on each poll (about 300 KB and 80 KB) to report a few
+  numbers near you; the CapitaLand lots come from its JustPark website rather than open data.
 - **School calendars:** which [MOE calendars](#moe-school-calendar) to create (school holidays,
   school terms, national exams). All three are on by default.
 - **data.gov.sg API key** (optional): a free key from
@@ -170,7 +173,7 @@ Open **Settings → Devices & Services → Singapore → Configure** to change:
   data.gov.sg's carpark lists. Leave it empty to track the three carparks nearest your home
   location. Only used when HDB carpark availability is on.
 - **Polling:** *Reduced* polls the fast sources (flood alerts, lightning, traffic cameras,
-  radar, trains, weather, PSI, UV, heat stress, carparks, taxis) three times less often, for example lightning every
+  radar, trains, weather, PSI, UV, heat stress, carparks, taxis, CapitaLand carparks) three times less often, for example lightning every
   6 minutes instead of 2.
 
 Saving reloads the integration. Turning off SP Group tariffs also leaves SP account cost
@@ -1053,6 +1056,25 @@ the position of every free taxi island-wide (positions are counted, not stored).
 
 </details>
 
+### CapitaLand mall carparks
+
+*Opt-in: tick **CapitaLand mall carparks** under Configure.* Updated every **5 minutes** from
+[CapitaLand JustPark's lot availability](https://justpark.capitaland.com/Lot-Availability), the
+same numbers that page shows. One sensor per CapitaLand mall that reports its lots (Bedok Mall,
+Bugis+, Clarke Quay, Funan, IMM, Junction 8, Lot One, Plaza Singapura, Raffles City, Sengkang
+Grand Mall, Tampines Mall, The Atrium@Orchard and Westgate as of November 2026), on a
+*CapitaLand Carparks* device. A mall CapitaLand adds later gets its sensor automatically;
+disable the ones you don't need from their entity settings.
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.capitaland_carparks_<mall>` | e.g. CapitaLand Carparks Plaza Singapura | lots | Car lots available; attributes `site_code`, `total_lots` and `full` |
+
+</details>
+
 ### Public holidays
 
 Updated every 24 hours from [MOM](https://www.mom.gov.sg/employment-practices/public-holidays).
@@ -1330,6 +1352,7 @@ What the integration can't do, mostly because of what the sources publish:
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_bda4baa634dd1cc7a6c7cad5f19e2d68/view) | Hawker centre closure dates | Every 24 h |
 | [data.gov.sg / HDB](https://data.gov.sg/datasets/d_ca933a644e55d34fe21f28b8052fac63/view) | Carpark availability (opt-in) | Every 5 min (carpark details daily) |
 | [data.gov.sg / LTA](https://data.gov.sg/datasets/d_e25662f1a062dd046453926aa284ba64/view) | Taxi availability (opt-in) | Every 5 min |
+| [CapitaLand JustPark](https://justpark.capitaland.com/Lot-Availability) | CapitaLand mall carpark lots (opt-in) | Every 5 min |
 | [MOM](https://www.mom.gov.sg/employment-practices/public-holidays) | Public holidays | Every 24 h |
 | [MOE](https://www.moe.gov.sg/calendar) | School holidays, terms and national exams | Every 24 h |
 | [mytransport.sg](https://www.mytransport.sg/trainstatus) | MRT/LRT train status | Every 5 min |

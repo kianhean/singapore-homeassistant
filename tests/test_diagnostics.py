@@ -6,6 +6,10 @@ from unittest.mock import MagicMock
 from homeassistant.config_entries import ConfigEntry
 
 from custom_components.singapore import SingaporeData
+from custom_components.singapore.capitaland_coordinator import (
+    CapitaLandData,
+    CapitaLandSite,
+)
 from custom_components.singapore.carpark_coordinator import (
     CarparkAvailability,
     CarparkData,
@@ -68,6 +72,11 @@ async def test_diagnostics_serializes_all_coordinators():
             )
         ),
         taxi=_coordinator(TaxiData(3000, 1, 4, 12, 0.3, None)),
+        capitaland=_coordinator(
+            CapitaLandData(
+                {"BM": CapitaLandSite("BM", "Bedok Mall", "Retail", 39, 264, False)}
+            )
+        ),
     )
 
     result = await async_get_config_entry_diagnostics(MagicMock(), entry)
@@ -91,6 +100,7 @@ async def test_diagnostics_serializes_all_coordinators():
         "hawker",
         "carpark",
         "taxi",
+        "capitaland",
     }
     assert coordinators["tariff"]["last_update_success"] is False
     assert "boom" in coordinators["tariff"]["last_exception"]
@@ -109,4 +119,5 @@ async def test_diagnostics_serializes_all_coordinators():
         "C": {"available": 10, "total": 100}
     }
     assert coordinators["taxi"]["data"]["within_1_km"] == 4
+    assert coordinators["capitaland"]["data"]["sites"]["BM"]["available"] == 39
     assert result["options"]["disabled_school_events"] == []

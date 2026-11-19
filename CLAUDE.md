@@ -30,6 +30,7 @@ custom_components/singapore/
 ├── hawker_coordinator.py   # HawkerClosureCoordinator: NEA hawker centre cleaning/works dates
 ├── carpark_coordinator.py  # CarparkCoordinator: HDB lot availability + carpark info (SVY21→WGS84)
 ├── taxi_coordinator.py     # TaxiAvailabilityCoordinator: free taxis island-wide, counted near home
+├── capitaland_coordinator.py # CapitaLandCarparkCoordinator: CapitaLand JustPark mall lots (opt-in)
 ├── radar_coordinator.py    # RadarCoordinator: NEA rain radar PNGs (70/240/480 km)
 ├── radar_image.py          # Pure-Pillow compositing of radar onto NEA base maps (BASEMAPS) + GIF loops
 ├── sp_account_coordinator.py # SpAccountCoordinator: one per SP e-account subentry (usage, bills, stats)
@@ -77,6 +78,7 @@ tests/
 ├── test_hawker_coordinator.py   # Hawker closure parser (d/m/yyyy, TBC), nearest centres, calendar
 ├── test_carpark_coordinator.py  # SVY21 conversion, availability/info parsers, nearest/chosen, sensors
 ├── test_taxi_coordinator.py     # Taxi GeoJSON parser, counts around home, sensors
+├── test_capitaland_coordinator.py # JustPark parser (tests/fixtures/capitaland_lots.json), token reuse, sensors
 ├── test_sp_account.py           # SP account coordinator, sensors, flow helpers, reload listener
 ├── test_sp_account_insights.py  # Derived SP sensors, account calendar, peer (similar homes) statistics
 ├── sp_account/                  # Vendored upstream client/mapper/history tests + recorded fixtures
@@ -146,6 +148,7 @@ class SingaporeData:
     hawker: HawkerClosureCoordinator | None
     carpark: CarparkCoordinator | None   # opt-in (off by default)
     taxi: TaxiAvailabilityCoordinator | None  # opt-in (off by default)
+    capitaland: CapitaLandCarparkCoordinator | None  # opt-in (off by default)
     sp_accounts: dict[str, SpAccountCoordinator]  # keyed by subentry id
     options: dict  # the options this setup used; a change reloads the entry
     def coordinators(self) -> dict[str, DataUpdateCoordinator]: ...  # enabled ones
@@ -168,7 +171,8 @@ Platforms read it via `entry.runtime_data.<coordinator>` (see `sensor.py`, `weat
 - `sources` — multi-select of `SOURCES` (labels under `selector.sources` in strings.json).
   Stored inverted as `options["disabled_sources"]`, so a source added in a later release is
   on for existing users. **Except `OPT_IN_SOURCES`** (`carpark`, `taxi`: each poll downloads an
-  island-wide payload of ~300 KB / ~80 KB for a few local numbers): those are off by default
+  island-wide payload of ~300 KB / ~80 KB for a few local numbers; `capitaland`: scraped from a
+  mall operator's website, not open data): those are off by default
   and stored the other way round, as `options["enabled_sources"]` (only when non-empty), never
   in `disabled_sources`. `enabled_sources(entry)` reads both. Empty with no SP subentries is
   rejected (`no_sources`).
@@ -737,6 +741,26 @@ sensors. State = car lots available (`lots`); `latitude`/`longitude` attributes 
 1 km / 2 km of `hass.config` home and the nearest distance (`TaxiData`, flat fields so
 diagnostics stay small and JSON-safe). `sensor.taxis_available` (total) and
 `sensor.taxis_nearby` (within `NEARBY_KM`), device *Taxis*.
+
+## How the CapitaLand Mall Carpark Coordinator Works (opt-in)
+
+`capitaland_coordinator.py` polls https://justpark.capitaland.com/Lot-Availability every
+**5 minutes**. The page is a Vue app; its lots come from a form POST to
+`https://justpark.capitaland.com/AjaxNoAuth/OnHttpPost` with `JData={"DisplayType":"LotAvail",
+"LotType":null}` and the headers `X-APIAction: SelectSiteNoAuth/OnSelectSite`, `x-ModID:
+FELotAvail` and `__RequestVerificationToken` (the page's hidden input), plus the
+`__RequestVerificationToken` cookie the page sets. Without the token/cookie the endpoint answers
+an HTML error page. The coordinator loads the page once, keeps the token and cookies (passed as an
+explicit `Cookie` header, not via HA's shared cookie jar), and reloads the page once when the POST
+stops answering JSON. Answer: `{"HasError": false, "Result": "<JSON string>"}`; each site has
+`SiteCode`, `SiteDesc`, `BusinessUnit` (`Retail` = malls; `Commercial` and business parks are
+skipped), `LotBalance` / `LotTotal` (strings, `"NA"` / null when not reported) and `IsFull`.
+HTTP errors / network errors keep last-known data; a non-JSON answer from a fresh token, a missing
+token or `HasError` raise `UpdateFailed`. Sensors (`translation_key="capitaland_carpark"`, name
+`{mall}`, unique id `{entry_id}_capitaland_{code.lower()}` → `sensor.capitaland_carparks_bedok_mall`)
+are added by `async_setup_capitaland_sensors` as malls with a lot count appear. Not a data.gov.sg
+host, so it doesn't go through `datagov.py`. `tests/fixtures/capitaland_lots.json` is a real
+answer trimmed to a few sites (unit tests + `tests_ha`).
 
 ## How the Rain Radar Coordinator Works
 

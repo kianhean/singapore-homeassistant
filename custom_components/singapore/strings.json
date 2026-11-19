@@ -295,6 +295,9 @@
           "open": "Open",
           "closed": "Closed"
         }
+      },
+      "capitaland_carpark": {
+        "name": "{mall}"
       }
     },
     "camera": {
@@ -422,11 +425,11 @@
           "polling": "Polling"
         },
         "data_description": {
-          "sources": "Turning off SP Group tariffs also leaves SP account cost statistics unpriced. HDB carpark availability and taxi availability are off until you tick them: each poll downloads island-wide data.",
+          "sources": "Turning off SP Group tariffs also leaves SP account cost statistics unpriced. HDB carpark availability, taxi availability and CapitaLand mall carparks are off until you tick them: the first two download island-wide data on each poll; CapitaLand's lots come from its JustPark website.",
           "school_events": "Which MOE school calendars to create when the MOE school calendar source is on.",
           "api_key": "Optional. A free key from data.gov.sg gives higher rate limits (fewer HTTP 429 errors). Leave empty to use the public limits.",
           "carparks": "Carpark numbers to track when HDB carpark availability is on, separated by commas (e.g. BJ55, TM24; shown on HDB's and data.gov.sg's carpark lists). Leave empty for the 3 carparks nearest your home location.",
-          "polling": "Reduced polls the fast sources (flood alerts, lightning, traffic cameras, radar, trains, weather, PSI, UV, heat stress, carparks, taxis) three times less often."
+          "polling": "Reduced polls the fast sources (flood alerts, lightning, traffic cameras, radar, trains, weather, PSI, UV, heat stress, carparks, taxis, CapitaLand carparks) three times less often."
         }
       }
     },
@@ -454,7 +457,8 @@
         "wbgt": "NEA heat stress (WBGT)",
         "hawker": "Hawker centre closures",
         "carpark": "HDB carpark availability",
-        "taxi": "Taxi availability"
+        "taxi": "Taxi availability",
+        "capitaland": "CapitaLand mall carparks"
       }
     },
     "school_events": {

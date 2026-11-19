@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from unittest.mock import MagicMock, patch
 
 import aiohttp
 import pytest
@@ -510,6 +511,38 @@ def test_e2e_taxi_availability_fetch_and_parse():
     data = _parse_taxis(_live_json(TAXI_AVAILABILITY_URL), 1.2840, 103.8514)
     assert data.total > 100, data.total
     assert data.nearest_km is not None and data.nearest_km < 5
+
+
+def test_e2e_capitaland_carparks_fetch_and_parse():
+    """Load the JustPark page, then post for the lots the way the page does."""
+    from custom_components.singapore.capitaland_coordinator import (
+        CapitaLandCarparkCoordinator,
+    )
+
+    async def _fetch():
+        hass = MagicMock()
+        async with aiohttp.ClientSession(trust_env=True) as session:
+            coordinator = CapitaLandCarparkCoordinator(hass)
+            with patch(
+                "custom_components.singapore.capitaland_coordinator"
+                ".async_get_clientsession",
+                return_value=session,
+            ):
+                return await coordinator._async_update_data()
+
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+
+    try:
+        data = asyncio.run(_fetch())
+    except UpdateFailed as err:
+        if isinstance(err.__cause__, (aiohttp.ClientError, TimeoutError)):
+            pytest.skip(f"Skipping e2e due to network error: {err}")
+        raise
+    malls = {site.name for site in data.malls()}
+    assert len(malls) >= 5, malls
+    assert "Plaza Singapura" in malls
+    for site in data.malls():
+        assert site.total is None or 0 <= site.available <= site.total * 2, site
 
 
 def test_e2e_raw_html_debug(capsys):
