@@ -171,8 +171,9 @@ ENTITY_SOURCES: dict[str, str] = {
         ("temperature", "humidity", "wind_speed", "wind_bearing", "rainfall"),
         SOURCE_WEATHER,
     ),
-    "public_holidays": SOURCE_HOLIDAY,
+    **dict.fromkeys(("public_holidays", "public_holiday_today"), SOURCE_HOLIDAY),
     **{f"school_{kind}": SOURCE_SCHOOL for kind in SCHOOL_EVENT_KINDS},
+    "school_holiday_today": SOURCE_SCHOOL,
     **dict.fromkeys(
         ("train_status", "train_line_status", "train_service_alert"), SOURCE_TRAIN
     ),
@@ -190,10 +191,15 @@ ENTITY_SOURCES: dict[str, str] = {
         ),
         SOURCE_PSI,
     ),
-    "flood_alerts": SOURCE_FLOOD,
+    **dict.fromkeys(("flood_alerts", "flood_alert_nearby"), SOURCE_FLOOD),
     "checkpoint_camera": SOURCE_TRAFFIC,
-    **dict.fromkeys(("dengue_clusters", "nearest_dengue_cluster"), SOURCE_DENGUE),
-    **dict.fromkeys(("lightning_strikes", "nearest_lightning"), SOURCE_LIGHTNING),
+    **dict.fromkeys(
+        ("dengue_clusters", "nearest_dengue_cluster", "in_dengue_cluster"),
+        SOURCE_DENGUE,
+    ),
+    **dict.fromkeys(
+        ("lightning_strikes", "nearest_lightning", "lightning_nearby"), SOURCE_LIGHTNING
+    ),
     **dict.fromkeys(("uv_index", "uv_exposure"), SOURCE_UV),
     **dict.fromkeys(("rain_radar", "rain_radar_animation"), SOURCE_RADAR),
     **dict.fromkeys(("wbgt", "heat_stress"), SOURCE_WBGT),

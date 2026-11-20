@@ -145,7 +145,19 @@ class SensorStateClass(str):
     MEASUREMENT_ANGLE = "measurement_angle"
 
 
+class BinarySensorEntity:
+    @property
+    def device_class(self):
+        return getattr(self, "_attr_device_class", None)
+
+
+class BinarySensorDeviceClass(str):
+    PROBLEM = "problem"
+    SAFETY = "safety"
+
+
 class Platform:
+    BINARY_SENSOR = "binary_sensor"
     SENSOR = "sensor"
     WEATHER = "weather"
     CALENDAR = "calendar"
@@ -535,6 +547,11 @@ _HA_MODULES: dict[str, ModuleType] = {
     ),
     "homeassistant.components.camera": _mod(
         "homeassistant.components.camera", Camera=Camera
+    ),
+    "homeassistant.components.binary_sensor": _mod(
+        "homeassistant.components.binary_sensor",
+        BinarySensorEntity=BinarySensorEntity,
+        BinarySensorDeviceClass=BinarySensorDeviceClass,
     ),
     "homeassistant.components.sensor": _mod(
         "homeassistant.components.sensor",

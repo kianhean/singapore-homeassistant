@@ -19,6 +19,23 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "public_holiday_today": {
+        "name": "今日公假"
+      },
+      "school_holiday_today": {
+        "name": "今日学校假期"
+      },
+      "lightning_nearby": {
+        "name": "附近有闪电"
+      },
+      "flood_alert_nearby": {
+        "name": "附近有水灾警报"
+      },
+      "in_dengue_cluster": {
+        "name": "位于骨痛热症黑区"
+      }
+    },
     "calendar": {
       "public_holidays": {
         "name": "公共假期"

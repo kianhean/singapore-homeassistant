@@ -19,6 +19,23 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "public_holiday_today": {
+        "name": "Today"
+      },
+      "school_holiday_today": {
+        "name": "Holiday today"
+      },
+      "lightning_nearby": {
+        "name": "Lightning nearby"
+      },
+      "flood_alert_nearby": {
+        "name": "Flood alert nearby"
+      },
+      "in_dengue_cluster": {
+        "name": "In dengue cluster"
+      }
+    },
     "calendar": {
       "public_holidays": {
         "name": "Public holidays"

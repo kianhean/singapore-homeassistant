@@ -55,6 +55,11 @@ async def test_setup_creates_entities_and_unloads(
     assert weather.state == "lightning-rainy"
 
     assert hass.states.get("calendar.public_holidays") is not None
+    assert hass.states.get("binary_sensor.public_holidays_today") is not None
+    assert hass.states.get("binary_sensor.school_holiday_today") is not None
+    assert hass.states.get("binary_sensor.nea_lightning_nearby").state == "on"
+    assert hass.states.get("binary_sensor.nea_in_dengue_cluster").state == "on"
+    assert hass.states.get("binary_sensor.pub_flood_alert_nearby").state == "off"
 
     # MOE school calendars: one per kind, on the School device.
     for entity_id in (

@@ -94,6 +94,11 @@ that part is built on [maci0/home-assistant-sp](https://github.com/maci0/home-as
 
 ## What's new
 
+- **v0.18** Nearest-station [realtime weather readings](#nea-realtime-weather-readings) (with
+  station name, distance and island-wide average as attributes); new `binary_sensor` entities for
+  [public holidays today](#public-holidays), [school holidays today](#moe-school-calendar),
+  [lightning nearby](#lightning), [flood alerts nearby](#pub-flood-alerts) and
+  [dengue cluster](#dengue-clusters); Malay (Bahasa Melayu) and Tamil (தமிழ்) translations.
 - **v0.17** [CapitaLand mall carparks](#capitaland-mall-carparks) (opt-in): free lots at
   Plaza Singapura, Tampines Mall, IMM, Westgate and the other CapitaLand malls. Free taxis
   within 1 km of home now show [on a Map card](#taxi-availability).
@@ -720,18 +725,20 @@ next exercise.
 ### NEA realtime weather readings
 
 Updated every **10 minutes** from [data.gov.sg collection 1459](https://data.gov.sg/collections/1459/view).
-Station readings are averaged across all available stations at fetch time.
+Uses the **nearest NEA station** to your Home Assistant home location (falling back to the
+island-wide average when station coordinates are unavailable). Each sensor exposes `station`,
+`station_id`, `distance_km`, and `island_average` as attributes.
 
 <details>
 <summary>Entities and attributes</summary>
 
 | Entity ID | Name | Unit | Description |
 |-----------|------|------|-------------|
-| `sensor.weather_temperature` | Weather Temperature | °C | Aggregated air temperature |
-| `sensor.weather_humidity` | Weather Humidity | % | Aggregated relative humidity |
-| `sensor.weather_wind_speed` | Weather Wind Speed | km/h | Aggregated wind speed |
-| `sensor.weather_wind_bearing` | Weather Wind Bearing | ° | Aggregated wind direction |
-| `sensor.weather_rainfall` | Weather Rainfall | mm | Aggregated rainfall |
+| `sensor.weather_temperature` | Weather Temperature | °C | Air temperature at nearest station |
+| `sensor.weather_humidity` | Weather Humidity | % | Relative humidity at nearest station |
+| `sensor.weather_wind_speed` | Weather Wind Speed | km/h | Wind speed at nearest station |
+| `sensor.weather_wind_bearing` | Weather Wind Bearing | ° | Wind direction at nearest station |
+| `sensor.weather_rainfall` | Weather Rainfall | mm | Rainfall at nearest station |
 
 <p align="center">
   <img src="images/weather-overview.jpeg" alt="Singapore Weather entity list showing area forecasts alongside humidity, rainfall, temperature, wind bearing, and wind speed sensors" width="320">
@@ -856,6 +863,7 @@ Updated every **2 minutes** from [PUB via data.gov.sg](https://data.gov.sg/datas
 | Entity ID | Name | Description |
 |-----------|------|-------------|
 | `sensor.pub_flood_alerts` | PUB Flood Alerts | Number of active flash-flood alerts (`0` when none) |
+| `binary_sensor.pub_flood_alert_nearby` | PUB Flood alert nearby | `on` when an active flash-flood alert is within 5 km of home (`safety`); attributes `radius_km`, `nearest_km`, `nearby_alerts` |
 
 Attributes: `locations` (list of alert descriptions) and `alerts` (full details per alert:
 description, area, severity, instruction, issued time, latitude/longitude). An alert stays
@@ -937,6 +945,7 @@ Updated every **6 hours** from [NEA via data.gov.sg](https://data.gov.sg/dataset
 |-----------|------|------|-------------|
 | `sensor.nea_dengue_clusters` | NEA Dengue Clusters | — | Number of active clusters; attributes `total_cases` and `clusters` (locality, cases, centroid) |
 | `sensor.nea_nearest_dengue_cluster` | NEA Nearest Dengue Cluster | km | Distance from your HA home location to the nearest cluster boundary (`0` = inside a cluster) |
+| `binary_sensor.nea_in_dengue_cluster` | NEA In dengue cluster | — | `on` when your HA home location is inside an active dengue cluster (`problem`); attributes `nearest_km`, `locality`, `cases` |
 
 The nearest-cluster distance uses the home location in **Settings → System → General**.
 
@@ -955,6 +964,7 @@ around Singapore (for example Johor and the Riau Islands).
 |-----------|------|------|-------------|
 | `sensor.nea_lightning_strikes` | NEA Lightning Strikes | — | Strikes detected in the last 30 min; attributes `cloud_to_ground`, `cloud_to_cloud` and `strikes` (newest 50: time, latitude, longitude, type) |
 | `sensor.nea_nearest_lightning` | NEA Nearest Lightning | km | Distance from your HA home location to the nearest strike in the last 30 min (unknown when there's none); attributes `strikes_within_10_km`, plus the nearest strike's `type`, `time`, `latitude` and `longitude` |
+| `binary_sensor.nea_lightning_nearby` | NEA Lightning nearby | — | `on` when lightning was detected within 10 km of home in the last 30 min (`safety`); attributes `radius_km`, `nearest_km`, `strikes_within_10_km` |
 
 Cloud-to-ground strikes are the dangerous kind; cloud-to-cloud lightning often comes
 before them. NEA notes that most strikes fall within 5–6 km of a thunderstorm, and a storm
@@ -1110,6 +1120,7 @@ Shows up as a Home Assistant calendar with all-day events from the current year 
 | Entity ID | Name |
 |-----------|------|
 | `calendar.public_holidays` | Public Holidays |
+| `binary_sensor.public_holidays_today` | Public Holidays Today (`on` when today is a public holiday; attributes `holiday`, `next_holiday`, `next_holiday_date`) |
 
 <p align="center">
   <img src="images/public-holidays-calendar.jpeg" alt="Singapore public holidays calendar showing Good Friday and Saturday as all-day events" width="320">
@@ -1139,6 +1150,7 @@ Years 1, 2)*. A calendar is *on* while one of its events is under way, so
 | `calendar.school_holidays` | School Holidays | Term breaks, the year-end holidays and one-day school holidays (e.g. Youth Day, Children's Day) |
 | `calendar.school_terms` | School Terms | Terms 1–4, per level |
 | `calendar.school_exams` | School Exams | PSLE and GCE exam periods, marking and results release |
+| `binary_sensor.school_holiday_today` | School Holiday today | `on` when today falls within a school holiday (created when School holidays is ticked) |
 
 Attributes: `events` (number of events in the calendar), `source` and `url`.
 
