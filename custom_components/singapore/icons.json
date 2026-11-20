@@ -1,5 +1,22 @@
 {
   "entity": {
+    "binary_sensor": {
+      "public_holiday_today": {
+        "default": "mdi:calendar-star"
+      },
+      "school_holiday_today": {
+        "default": "mdi:beach"
+      },
+      "lightning_nearby": {
+        "default": "mdi:weather-lightning"
+      },
+      "flood_alert_nearby": {
+        "default": "mdi:home-flood"
+      },
+      "in_dengue_cluster": {
+        "default": "mdi:bug"
+      }
+    },
     "calendar": {
       "public_holidays": {
         "default": "mdi:calendar-star"

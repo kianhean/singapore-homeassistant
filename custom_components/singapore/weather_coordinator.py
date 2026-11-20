@@ -6,7 +6,7 @@ import asyncio
 import logging
 import math
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
@@ -16,6 +16,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .const import SOURCE_WEATHER, data_gov_headers, scaled_interval
 from .datagov import MAX_RETRIES, HostLimiter, limiter_for, retry_seconds
+from .dengue_coordinator import _haversine_km
 from .errors import ERROR_FETCH, ERROR_HTTP, ERROR_PAYLOAD, source_error
 from .psi_coordinator import DEFAULT_REGION_LOCATIONS
 
@@ -69,15 +70,27 @@ def _wind_direction_to_degrees(text: str | None) -> float | None:
     return _WIND_DIRECTION_DEGREES.get(text.strip().upper())
 
 
+@dataclass(frozen=True)
+class StationReading:
+    """Nearest-station reading metadata for one weather metric."""
+
+    station_id: str
+    name: str
+    value: float
+    distance_km: float
+    average: float
+
+
 @dataclass
 class WeatherReadings:
-    """Realtime readings (collection 1459) aggregated across stations."""
+    """Realtime readings (collection 1459), nearest station to home when available."""
 
     temperature: float | None = None
     humidity: float | None = None
     wind_speed: float | None = None
     wind_bearing: float | None = None
     precipitation: float | None = None
+    stations: dict[str, StationReading] = field(default_factory=dict)
 
 
 @dataclass
@@ -193,6 +206,7 @@ class SingaporeWeatherCoordinator(DataUpdateCoordinator[WeatherData]):
                 self._readings_sem,
                 headers,
                 limiter_for(self.hass, next(iter(_READINGS_ENDPOINTS.values()))),
+                home=_home_coords(self.hass),
             )
             return parsed
         except (aiohttp.ClientError, TimeoutError) as err:
@@ -252,46 +266,86 @@ async def _fetch_with_retry(
     raise AssertionError("unreachable")  # pragma: no cover
 
 
+def _home_coords(hass: HomeAssistant) -> tuple[float, float] | None:
+    """Return (lat, lon) from hass.config when both are real numbers."""
+    config = getattr(hass, "config", None)
+    lat = getattr(config, "latitude", None)
+    lon = getattr(config, "longitude", None)
+    if (
+        isinstance(lat, (int, float))
+        and isinstance(lon, (int, float))
+        and not isinstance(lat, bool)
+        and not isinstance(lon, bool)
+    ):
+        return (float(lat), float(lon))
+    return None
+
+
 async def _fetch_aggregated_readings(
     session: aiohttp.ClientSession,
     sem: asyncio.Semaphore,
     headers: dict[str, str] | None = None,
     limiter: HostLimiter | None = None,
+    home: tuple[float, float] | None = None,
 ) -> WeatherReadings:
     keys = list(_READINGS_ENDPOINTS.keys())
+    if home is None:
+        results = await asyncio.gather(
+            *(
+                _fetch_reading_average(
+                    session, sem, _READINGS_ENDPOINTS[k], k, headers, limiter
+                )
+                for k in keys
+            ),
+            return_exceptions=True,
+        )
+        values: dict[str, float | None] = {}
+        for key, result in zip(keys, results):
+            if isinstance(result, BaseException):
+                _LOGGER.debug("Reading %s raised %s; treating as None", key, result)
+                values[key] = None
+            else:
+                values[key] = result
+        return WeatherReadings(**values)
+
     results = await asyncio.gather(
         *(
-            _fetch_reading_average(
-                session, sem, _READINGS_ENDPOINTS[k], k, headers, limiter
+            _fetch_reading(
+                session, sem, _READINGS_ENDPOINTS[k], k, headers, limiter, home
             )
             for k in keys
         ),
         return_exceptions=True,
     )
-    values: dict[str, float | None] = {}
+    values = {}
+    stations: dict[str, StationReading] = {}
     for key, result in zip(keys, results):
         if isinstance(result, BaseException):
             _LOGGER.debug("Reading %s raised %s; treating as None", key, result)
             values[key] = None
         else:
-            values[key] = result
-    return WeatherReadings(**values)
+            val, station = result
+            values[key] = val
+            if station is not None:
+                stations[key] = station
+    return WeatherReadings(**values, stations=stations)
 
 
-async def _fetch_reading_average(
+async def _fetch_reading(
     session: aiohttp.ClientSession,
     sem: asyncio.Semaphore,
     url: str,
     metric_key: str,
     headers: dict[str, str] | None = None,
     limiter: HostLimiter | None = None,
-) -> float | None:
-    """Return station-average reading for a metric endpoint.
+    home: tuple[float, float] | None = None,
+) -> tuple[float | None, StationReading | None]:
+    """Return (value, nearest_station) for a metric endpoint.
 
-    Handles common payload variants where the metric value may be located as:
-    - items[0].readings[].value
-    - data.items[0].readings[].value
-    - data.readings[]
+    When ``home`` and station locations are present, picks the reading from
+    the station closest to ``home`` and records it (along with the island-wide
+    average) in ``StationReading``. Falls back to the station average when
+    station metadata or home coordinates are unavailable.
     """
     async with sem:
         response = None
@@ -302,24 +356,100 @@ async def _fetch_reading_average(
             if response.status != 200:
                 _LOGGER.debug("Skipping %s due to HTTP %s", metric_key, response.status)
                 response.release()
-                return None
+                return None, None
             payload = await response.json()
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug("Skipping %s due to fetch error: %s", metric_key, err)
             if response is not None:
                 response.release()
-            return None
+            return None, None
 
+    return _parse_reading_payload(payload, home)
+
+
+async def _fetch_reading_average(
+    session: aiohttp.ClientSession,
+    sem: asyncio.Semaphore,
+    url: str,
+    metric_key: str,
+    headers: dict[str, str] | None = None,
+    limiter: HostLimiter | None = None,
+) -> float | None:
+    """Return station-average reading for a metric endpoint."""
+    value, _ = await _fetch_reading(
+        session, sem, url, metric_key, headers, limiter, home=None
+    )
+    return value
+
+
+def _extract_station_locations(payload: dict) -> dict[str, tuple[str, float, float]]:
+    """Extract station_id -> (name, latitude, longitude) from metadata."""
+    raw_stations = (
+        payload.get("metadata", {}).get("stations")
+        or payload.get("data", {}).get("stations")
+        or []
+    )
+    stations: dict[str, tuple[str, float, float]] = {}
+    if not isinstance(raw_stations, list):
+        return stations
+    for row in raw_stations:
+        if not isinstance(row, dict):
+            continue
+        station_id = str(row.get("id") or row.get("device_id") or "").strip()
+        name = str(row.get("name") or station_id).strip()
+        loc = row.get("location") or {}
+        if not isinstance(loc, dict):
+            continue
+        lat = _to_float(loc.get("latitude"))
+        lon = _to_float(loc.get("longitude"))
+        if station_id and lat is not None and lon is not None:
+            stations[station_id] = (name, lat, lon)
+    return stations
+
+
+def _parse_reading_payload(
+    payload: dict, home: tuple[float, float] | None = None
+) -> tuple[float | None, StationReading | None]:
+    """Parse a collection 1459 reading payload into (value, nearest_station)."""
     rows = _extract_readings_rows(payload)
     numeric_values: list[float] = []
+    station_values: list[tuple[str, float]] = []
     for row in rows:
+        if not isinstance(row, dict):
+            continue
         val = _to_float(row.get("value"))
-        if val is not None:
-            numeric_values.append(val)
+        if val is None:
+            continue
+        numeric_values.append(val)
+        sid = str(row.get("station_id") or row.get("stationId") or "").strip()
+        if sid:
+            station_values.append((sid, val))
 
     if not numeric_values:
-        return None
-    return round(sum(numeric_values) / len(numeric_values), 2)
+        return None, None
+    average = round(sum(numeric_values) / len(numeric_values), 2)
+
+    if home is not None and station_values:
+        locations = _extract_station_locations(payload)
+        best: StationReading | None = None
+        for sid, val in station_values:
+            info = locations.get(sid)
+            if info is None:
+                continue
+            name, lat, lon = info
+            dist = _haversine_km(home[0], home[1], lat, lon)
+            if best is None or dist < best.distance_km:
+                best = StationReading(
+                    station_id=sid,
+                    name=name,
+                    value=round(val, 2),
+                    distance_km=dist,
+                    average=average,
+                )
+        if best is not None:
+            return best.value, best
+
+    return average, None
 
 
 def _extract_readings_rows(payload: dict) -> list[dict]:
@@ -369,7 +499,7 @@ def _parse_iso_datetime(value: str | None) -> datetime | None:
     except ValueError:
         return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     return dt
 
 
@@ -536,7 +666,7 @@ def _parse_weather(payload: dict) -> WeatherData:
         if start is None:
             start = _parse_iso_datetime(item0.get("timestamp"))
         if start is None:
-            start = datetime.now(timezone.utc)
+            start = datetime.now(UTC)
         if end is None:
             end = start + timedelta(hours=2)
 
@@ -567,9 +697,7 @@ def _parse_weather(payload: dict) -> WeatherData:
         if periods:
             period0 = periods[0]
             time_period = period0.get("timePeriod") or period0.get("time_period") or {}
-            start = _parse_iso_datetime(time_period.get("start")) or datetime.now(
-                timezone.utc
-            )
+            start = _parse_iso_datetime(time_period.get("start")) or datetime.now(UTC)
             end = _parse_iso_datetime(time_period.get("end")) or (
                 start + timedelta(hours=2)
             )

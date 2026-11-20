@@ -377,16 +377,28 @@ class _BaseWeatherReadingSensor(
     """Base class for realtime weather reading sensors from data.gov.sg collection 1459."""
 
     _device = DEVICE_WEATHER
+    _metric_key: str
     _attr_attribution = "Data provided by NEA via data.gov.sg"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 1
 
     @property
     def extra_state_attributes(self) -> dict:
-        return {"source": "data.gov.sg / NEA (collection 1459)"}
+        attrs: dict = {"source": "data.gov.sg / NEA (collection 1459)"}
+        data = self.coordinator.data
+        if (
+            data is not None
+            and (station := data.readings.stations.get(self._metric_key)) is not None
+        ):
+            attrs["station"] = station.name
+            attrs["station_id"] = station.station_id
+            attrs["distance_km"] = round(station.distance_km, 2)
+            attrs["island_average"] = station.average
+        return attrs
 
 
 class SingaporeTemperatureSensor(_BaseWeatherReadingSensor):
+    _metric_key = "temperature"
     _attr_translation_key = "temperature"
     _attr_device_class = SensorDeviceClass.TEMPERATURE
     _attr_native_unit_of_measurement = UNIT_TEMP
@@ -402,6 +414,7 @@ class SingaporeTemperatureSensor(_BaseWeatherReadingSensor):
 
 
 class SingaporeHumiditySensor(_BaseWeatherReadingSensor):
+    _metric_key = "humidity"
     _attr_translation_key = "humidity"
     _attr_device_class = SensorDeviceClass.HUMIDITY
     _attr_native_unit_of_measurement = UNIT_HUMIDITY
@@ -417,6 +430,7 @@ class SingaporeHumiditySensor(_BaseWeatherReadingSensor):
 
 
 class SingaporeWindSpeedSensor(_BaseWeatherReadingSensor):
+    _metric_key = "wind_speed"
     _attr_translation_key = "wind_speed"
     _attr_device_class = SensorDeviceClass.WIND_SPEED
     _attr_native_unit_of_measurement = UNIT_WIND_SPEED
@@ -432,6 +446,7 @@ class SingaporeWindSpeedSensor(_BaseWeatherReadingSensor):
 
 
 class SingaporeWindBearingSensor(_BaseWeatherReadingSensor):
+    _metric_key = "wind_bearing"
     _attr_translation_key = "wind_bearing"
     _attr_device_class = SensorDeviceClass.WIND_DIRECTION
     # Angles wrap at 360°, so long-term statistics use a circular mean.
@@ -450,6 +465,7 @@ class SingaporeWindBearingSensor(_BaseWeatherReadingSensor):
 
 
 class SingaporeRainfallSensor(_BaseWeatherReadingSensor):
+    _metric_key = "precipitation"
     _attr_translation_key = "rainfall"
     _attr_device_class = SensorDeviceClass.PRECIPITATION
     _attr_native_unit_of_measurement = UNIT_RAINFALL

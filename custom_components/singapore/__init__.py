@@ -78,6 +78,7 @@ _LOGGER = logging.getLogger(__name__)
 __all__ = ["DOMAIN", "SingaporeConfigEntry", "SingaporeData"]
 
 PLATFORMS = [
+    Platform.BINARY_SENSOR,
     Platform.SENSOR,
     Platform.WEATHER,
     Platform.CALENDAR,
@@ -274,11 +275,14 @@ def async_remove_stale(
     itself when a subentry is deleted.
     """
     # MOE school calendars unticked in the options go too, source on or not.
+    enabled_school = enabled_school_events(entry)
     school_off = {
         school_translation_key(kind)
         for kind in SCHOOL_EVENT_KINDS
-        if kind not in enabled_school_events(entry)
+        if kind not in enabled_school
     }
+    if "holidays" not in enabled_school:
+        school_off.add("school_holiday_today")
     # Carparks dropped from the options' list go too. (In "nearest home" mode
     # the set is only known after the first poll; those stay until deleted.)
     chosen_carparks = {

@@ -1,6 +1,6 @@
 """Tests for weather payload parsing and coordinator output models."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -35,7 +35,7 @@ def test_parse_v1_shape_area_forecasts():
 
     assert set(data.areas) == {"Bedok", "Woodlands"}
     assert data.areas["Bedok"].condition_text == "Partly Cloudy (Day)"
-    assert data.areas["Bedok"].valid_start.astimezone(timezone.utc).hour == 0
+    assert data.areas["Bedok"].valid_start.astimezone(UTC).hour == 0
 
 
 def test_parse_v2_regions_shape():
@@ -132,8 +132,8 @@ async def test_weather_coordinator_http_error_uses_last_known_data():
             "Bedok": WeatherAreaData(
                 area="Bedok",
                 condition_text="Cloudy",
-                valid_start=datetime(2026, 4, 5, 0, 0, tzinfo=timezone.utc),
-                valid_end=datetime(2026, 4, 5, 2, 0, tzinfo=timezone.utc),
+                valid_start=datetime(2026, 4, 5, 0, 0, tzinfo=UTC),
+                valid_end=datetime(2026, 4, 5, 2, 0, tzinfo=UTC),
             )
         },
         updated_at=None,
@@ -190,7 +190,7 @@ def test_parse_four_day_shape_a():
     assert e0.wind_speed_low == 10
     assert e0.wind_speed_high == 20
     assert e0.wind_direction == "S"
-    from datetime import timedelta, timezone
+    from datetime import timedelta
 
     sgt = timezone(timedelta(hours=8))
     assert e0.date.tzinfo == sgt
@@ -792,7 +792,7 @@ def test_parsers_tolerate_junk():
     assert _parse_iso_datetime(None) is None
     assert _parse_iso_datetime("not a date") is None
     naive = _parse_iso_datetime("2026-04-05T08:00:00")
-    assert naive.tzinfo is timezone.utc
+    assert naive.tzinfo is UTC
     assert _parse_iso_datetime("2026-04-05T00:00:00Z").tzinfo is not None
 
     assert (
@@ -806,6 +806,85 @@ def test_parsers_tolerate_junk():
         )
         == []
     )
+
+
+def test_nearest_station_reading_picked_over_island_average():
+    from custom_components.singapore.weather_coordinator import (
+        _parse_reading_payload,
+    )
+
+    payload = {
+        "metadata": {
+            "stations": [
+                {
+                    "id": "S109",
+                    "name": "Ang Mo Kio Avenue 5",
+                    "location": {"latitude": 1.3764, "longitude": 103.8492},
+                },
+                {
+                    "id": "S24",
+                    "name": "Upper Changi Road North",
+                    "location": {"latitude": 1.3678, "longitude": 103.9826},
+                },
+            ]
+        },
+        "items": [
+            {
+                "readings": [
+                    {"station_id": "S109", "value": 12.4},
+                    {"station_id": "S24", "value": 0.0},
+                ]
+            }
+        ],
+    }
+
+    # Near Ang Mo Kio: picks S109 (12.4) instead of island average (6.2).
+    val, station = _parse_reading_payload(payload, home=(1.375, 103.85))
+    assert val == 12.4
+    assert station is not None
+    assert station.station_id == "S109"
+    assert station.name == "Ang Mo Kio Avenue 5"
+    assert station.average == 6.2
+    assert station.distance_km < 0.5
+
+    # Without home coordinates: falls back to island average, no station metadata.
+    avg_val, no_station = _parse_reading_payload(payload, home=None)
+    assert avg_val == 6.2
+    assert no_station is None
+
+
+def test_weather_sensor_exposes_nearest_station_attributes():
+    from custom_components.singapore.sensor import SingaporeRainfallSensor
+    from custom_components.singapore.weather_coordinator import (
+        StationReading,
+        WeatherData,
+        WeatherReadings,
+    )
+
+    coord = MagicMock()
+    coord.data = WeatherData(
+        areas={},
+        updated_at=None,
+        readings=WeatherReadings(
+            precipitation=12.4,
+            stations={
+                "precipitation": StationReading(
+                    station_id="S109",
+                    name="Ang Mo Kio Avenue 5",
+                    value=12.4,
+                    distance_km=0.184,
+                    average=6.2,
+                )
+            },
+        ),
+    )
+    sensor = SingaporeRainfallSensor(coord, "e1")
+    assert sensor.native_value == 12.4
+    attrs = sensor.extra_state_attributes
+    assert attrs["station"] == "Ang Mo Kio Avenue 5"
+    assert attrs["station_id"] == "S109"
+    assert attrs["distance_km"] == 0.18
+    assert attrs["island_average"] == 6.2
 
 
 def test_parse_four_day_skips_junk_rows():

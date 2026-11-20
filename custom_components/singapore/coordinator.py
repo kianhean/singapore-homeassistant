@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -162,7 +162,7 @@ class SPGroupCoordinator(DataUpdateCoordinator[TariffData]):
         # to propagate so the coordinator reports the update as failed rather
         # than silently reusing stale data forever.
         result = await self.hass.async_add_executor_job(_parse_tariff, html)
-        self.last_updated = datetime.now(timezone.utc)
+        self.last_updated = datetime.now(UTC)
         return result
 
 

@@ -42,6 +42,7 @@ custom_components/singapore/
 │   ├── client.py           # Sync urllib Auth0/Jarvis/Njord client (runs in the executor), MFA, cooldown
 │   ├── const.py / models.py / mapper.py / history.py  # constants, dataclasses, specs, statistics
 │   └── LICENSE             # Upstream MIT licence: must ship with the vendored code
+├── binary_sensor.py        # Binary sensors: public/school holiday today, lightning/flood nearby, in dengue cluster
 ├── camera.py               # Camera entities (checkpoint traffic cameras + rain radar still/animated)
 ├── calendar.py             # Calendar entities (public holidays; MOE school holidays/terms/exams;
 │                           #   hawker centre closures)
@@ -58,6 +59,8 @@ custom_components/singapore/
 ├── strings.json            # Config flow UI strings + entity names + enum state names
 └── translations/
     ├── en.json             # English translations (mirrors strings.json)
+    ├── ms.json             # Malay: same keys + placeholders (tests/test_translations.py)
+    ├── ta.json             # Tamil: same keys + placeholders (tests/test_translations.py)
     └── zh-Hans.json        # Simplified Chinese: same keys + placeholders (tests/test_translations.py)
 
 tests/
@@ -84,6 +87,7 @@ tests/
 ├── test_sp_account_insights.py  # Derived SP sensors, account calendar, peer (similar homes) statistics
 ├── sp_account/                  # Vendored upstream client/mapper/history tests + recorded fixtures
 ├── test_radar.py                # Radar parser, per-range fallback, radar camera entity + cache
+├── test_binary_sensor.py        # Binary sensors (holidays today, lightning/flood nearby, in dengue cluster)
 ├── test_calendar.py             # Calendar event and range query tests
 ├── test_school_calendar.py      # MOE parser (tests/fixtures/moe_calendar.html), calendars, school options
 ├── test_sensor.py               # Sensor value, unit, attributes, unique_id, None-safety
@@ -944,7 +948,8 @@ Both commands must exit cleanly — CI will fail otherwise.
   installed via HACS; every `release.yml` run (merge, `workflow_dispatch`, or a release
   published by hand) attaches one, built from its own tag, to any release that lacks it.
 - Translations live in `translations/en.json` and must mirror `strings.json`. Other languages
-  (`zh-Hans.json`) must have exactly the same keys and `{placeholders}`; when you add a string,
-  add its translation too (`tests/test_translations.py` fails otherwise). zh-Hans isn't in
-  HA's `NATIVE_ENTITY_IDS`, so entity IDs stay English-derived.
+  (`zh-Hans.json`, `ms.json`, `ta.json`) must have exactly the same keys and `{placeholders}`;
+  when you add a string, add its translation to every language (`tests/test_translations.py`
+  fails otherwise). Non-English translations aren't in HA's `NATIVE_ENTITY_IDS`, so entity IDs
+  stay English-derived.
 - For quick one-off API/scraping investigations, use `uv run script.py` with inline `# /// script` dependency blocks — avoids venv setup entirely

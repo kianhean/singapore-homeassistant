@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -214,7 +214,7 @@ def test_health_monitor_opens_issue_after_threshold_and_clears_it():
         last_update_success=False, last_exception=ValueError("markup changed")
     )
     monitor = SourceHealthMonitor(MagicMock(), {"tariff": coordinator})
-    start = datetime(2026, 11, 15, tzinfo=timezone.utc)
+    start = datetime(2026, 11, 15, tzinfo=UTC)
 
     monitor.async_check(start)
     monitor.async_check(start + FAILING_THRESHOLD - timedelta(minutes=1))

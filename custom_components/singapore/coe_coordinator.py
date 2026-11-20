@@ -6,7 +6,7 @@ import asyncio
 import logging
 import random
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
@@ -101,7 +101,7 @@ class CoeCoordinator(DataUpdateCoordinator[CoeData]):
                 # Parse failures (API shape changed) are not transient: let
                 # them propagate rather than retrying or serving stale data.
                 result = _parse_coe(payload)
-                self.last_updated = datetime.now(timezone.utc)
+                self.last_updated = datetime.now(UTC)
                 return result
 
             if attempt == _MAX_FETCH_ATTEMPTS:

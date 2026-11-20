@@ -13,6 +13,9 @@ from custom_components.singapore import (
     async_remove_config_entry_device,
     async_remove_stale,
 )
+from custom_components.singapore.binary_sensor import (
+    async_setup_entry as binary_sensor_setup_entry,
+)
 from custom_components.singapore.calendar import (
     async_setup_entry as calendar_setup_entry,
 )
@@ -41,6 +44,7 @@ from custom_components.singapore.weather import (
 )
 
 _PLATFORMS = {
+    "binary_sensor": binary_sensor_setup_entry,
     "sensor": sensor_setup_entry,
     "weather": weather_setup_entry,
     "calendar": calendar_setup_entry,

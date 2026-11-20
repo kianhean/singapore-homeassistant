@@ -1,0 +1,500 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Singapura",
+        "description": "Sediakan integrasi Singapura.",
+        "data": {
+          "name": "Nama Integrasi"
+        }
+      }
+    },
+    "error": {
+      "empty_name": "Nama tidak boleh kosong.",
+      "name_too_long": "Nama mestilah 64 aksara atau kurang."
+    },
+    "abort": {
+      "already_configured": "Integrasi ini sudah dikonfigurasikan.",
+      "single_instance_allowed": "Singapura sudah dikonfigurasikan. Hanya satu konfigurasi dibenarkan."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "public_holiday_today": {
+        "name": "Hari ini"
+      },
+      "school_holiday_today": {
+        "name": "Cuti hari ini"
+      },
+      "lightning_nearby": {
+        "name": "Kilat berdekatan"
+      },
+      "flood_alert_nearby": {
+        "name": "Amaran banjir berdekatan"
+      },
+      "in_dengue_cluster": {
+        "name": "Dalam kelompok denggi"
+      }
+    },
+    "calendar": {
+      "public_holidays": {
+        "name": "Cuti umum"
+      },
+      "sp_account_dates": {
+        "name": "Bil dan bacaan meter"
+      },
+      "school_holidays": {
+        "name": "Cuti"
+      },
+      "school_terms": {
+        "name": "Penggal"
+      },
+      "school_exams": {
+        "name": "Peperiksaan"
+      },
+      "hawker_closures": {
+        "name": "Penutupan"
+      }
+    },
+    "sensor": {
+      "electricity_tariff": {
+        "name": "Tarif Elektrik"
+      },
+      "solar_export_price": {
+        "name": "Harga Eksport Suria"
+      },
+      "gas_tariff": {
+        "name": "Tarif Gas"
+      },
+      "water_tariff": {
+        "name": "Tarif Air"
+      },
+      "coe_category": {
+        "name": "Kategori {category}"
+      },
+      "temperature": {
+        "name": "Suhu"
+      },
+      "humidity": {
+        "name": "Kelembapan"
+      },
+      "wind_speed": {
+        "name": "Kelajuan Angin"
+      },
+      "wind_bearing": {
+        "name": "Arah Angin"
+      },
+      "rainfall": {
+        "name": "Hujan"
+      },
+      "train_status": {
+        "name": "Status",
+        "state": {
+          "normal": "Normal",
+          "planned": "Kerja berjadual",
+          "disruption": "Gangguan"
+        }
+      },
+      "train_line_status": {
+        "name": "Status {line}",
+        "state": {
+          "normal": "Normal",
+          "planned": "Kerja berjadual",
+          "disruption": "Gangguan"
+        }
+      },
+      "psi": {
+        "name": "PSI"
+      },
+      "psi_region": {
+        "name": "PSI {region}"
+      },
+      "pm25": {
+        "name": "PM2.5"
+      },
+      "pm25_one_hour": {
+        "name": "PM2.5 (1 jam)"
+      },
+      "pm10": {
+        "name": "PM10"
+      },
+      "ozone": {
+        "name": "Ozon"
+      },
+      "nitrogen_dioxide": {
+        "name": "Nitrogen Dioksida"
+      },
+      "sulphur_dioxide": {
+        "name": "Sulfur Dioksida"
+      },
+      "carbon_monoxide": {
+        "name": "Karbon Monoksida"
+      },
+      "flood_alerts": {
+        "name": "Amaran Banjir"
+      },
+      "dengue_clusters": {
+        "name": "Kelompok Denggi"
+      },
+      "nearest_dengue_cluster": {
+        "name": "Kelompok Denggi Terdekat"
+      },
+      "lightning_strikes": {
+        "name": "Panahan Kilat"
+      },
+      "nearest_lightning": {
+        "name": "Kilat Terdekat"
+      },
+      "uv_index": {
+        "name": "Indeks UV"
+      },
+      "uv_exposure": {
+        "name": "Pendedahan UV",
+        "state": {
+          "low": "Rendah",
+          "moderate": "Sederhana",
+          "high": "Tinggi",
+          "very_high": "Sangat tinggi",
+          "extreme": "Melampau"
+        }
+      },
+      "wbgt": {
+        "name": "Tekanan haba WBGT"
+      },
+      "heat_stress": {
+        "name": "Tekanan haba",
+        "state": {
+          "low": "Rendah",
+          "moderate": "Sederhana",
+          "high": "Tinggi"
+        }
+      },
+      "carpark": {
+        "name": "{number}"
+      },
+      "taxis_available": {
+        "name": "Tersedia"
+      },
+      "taxis_nearby": {
+        "name": "Berdekatan"
+      },
+      "sp_electricity": {
+        "name": "Elektrik terkumpul"
+      },
+      "sp_water": {
+        "name": "Air"
+      },
+      "sp_gas": {
+        "name": "Gas"
+      },
+      "sp_electricity_last_period": {
+        "name": "Elektrik dibil terakhir"
+      },
+      "sp_electricity_today": {
+        "name": "Elektrik hari ini"
+      },
+      "sp_electricity_last_hour": {
+        "name": "Elektrik 30 minit lepas"
+      },
+      "sp_water_last_period": {
+        "name": "Air dibil terakhir"
+      },
+      "sp_gas_last_period": {
+        "name": "Gas dibil terakhir"
+      },
+      "sp_account": {
+        "name": "Akaun",
+        "state": {
+          "unknown": "Tidak diketahui"
+        }
+      },
+      "sp_ppms_credit": {
+        "name": "Kredit prabayar"
+      },
+      "sp_last_bill": {
+        "name": "Bil terakhir"
+      },
+      "sp_amount_due": {
+        "name": "Jumlah perlu dibayar"
+      },
+      "sp_electricity_meter": {
+        "name": "Meter elektrik"
+      },
+      "sp_water_meter": {
+        "name": "Meter air"
+      },
+      "sp_electricity_goal": {
+        "name": "Elektrik bulan ini"
+      },
+      "sp_water_goal": {
+        "name": "Air bulan ini"
+      },
+      "sp_greenup_points": {
+        "name": "Mata GreenUP"
+      },
+      "sp_ev_wallet": {
+        "name": "Dompet EV"
+      },
+      "sp_ev_session": {
+        "name": "Sesi EV",
+        "state": {
+          "unknown": "Tidak diketahui"
+        }
+      },
+      "sp_ev_last_charge": {
+        "name": "Caj EV terakhir"
+      },
+      "sp_ev_unpaid": {
+        "name": "EV belum dibayar"
+      },
+      "sp_unread_notifications": {
+        "name": "Pemberitahuan belum dibaca"
+      },
+      "sp_bill_delivery": {
+        "name": "Penghantaran bil",
+        "state": {
+          "ebill": "E-bil",
+          "paper": "Kertas"
+        }
+      },
+      "sp_fcu": {
+        "name": "FCU",
+        "state": {
+          "on": "Hidup",
+          "off": "Mati"
+        }
+      },
+      "sp_tariff": {
+        "name": "Tarif SP"
+      },
+      "sp_electricity_always_on": {
+        "name": "Kuasa sentiasa hidup"
+      },
+      "sp_electricity_yesterday": {
+        "name": "Elektrik semalam"
+      },
+      "sp_electricity_cost_yesterday": {
+        "name": "Kos elektrik semalam"
+      },
+      "sp_electricity_cost_today": {
+        "name": "Kos elektrik hari ini"
+      },
+      "sp_electricity_cost_month": {
+        "name": "Kos elektrik bulan ini"
+      },
+      "sp_electricity_projected_cost": {
+        "name": "Unjuran kos elektrik"
+      },
+      "sp_electricity_vs_peers": {
+        "name": "Elektrik berbanding rumah serupa"
+      },
+      "sp_water_vs_peers": {
+        "name": "Air berbanding rumah serupa"
+      },
+      "sp_electricity_goal_remaining": {
+        "name": "Baki sasaran elektrik"
+      },
+      "sp_water_goal_remaining": {
+        "name": "Baki sasaran air"
+      },
+      "sp_bill_status": {
+        "name": "Status bil",
+        "state": {
+          "paid": "Dibayar",
+          "due": "Perlu dibayar",
+          "overdue": "Tertunggak"
+        }
+      },
+      "sp_meter_reading_window": {
+        "name": "Tempoh bacaan meter",
+        "state": {
+          "upcoming": "Akan datang",
+          "open": "Dibuka",
+          "closed": "Ditutup"
+        }
+      },
+      "capitaland_carpark": {
+        "name": "{mall}"
+      }
+    },
+    "camera": {
+      "checkpoint_camera": {
+        "name": "{location}"
+      },
+      "rain_radar": {
+        "name": "Radar Hujan {range}"
+      },
+      "rain_radar_animation": {
+        "name": "Animasi Radar Hujan {range}"
+      }
+    },
+    "event": {
+      "coe_results": {
+        "name": "Keputusan baharu",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "new_results": "Keputusan baharu"
+            }
+          }
+        }
+      },
+      "train_service_alert": {
+        "name": "Amaran perkhidmatan",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "disruption": "Gangguan",
+              "planned": "Notis berjadual",
+              "resolved": "Selesai"
+            }
+          }
+        }
+      }
+    },
+    "geo_location": {
+      "taxi": {
+        "name": "Teksi kosong {number}"
+      }
+    }
+  },
+  "config_subentries": {
+    "sp_account": {
+      "initiate_flow": {
+        "user": "Tambah akaun SP"
+      },
+      "entry_type": "Akaun SP",
+      "step": {
+        "user": {
+          "title": "Tambah e-akaun SP Group",
+          "description": "Log masuk dengan e-mel dan kata laluan e-akaun yang sama digunakan dalam aplikasi SP. Kata laluan tidak disimpan: hanya token sesi yang dikembalikan oleh SP disimpan. Kos elektrik untuk papan pemuka Tenaga menggunakan tarif SP Group integrasi ini secara automatik.",
+          "data": {
+            "username": "E-mel",
+            "password": "Kata laluan"
+          }
+        },
+        "mfa": {
+          "title": "Pengesahan SP Group",
+          "description": "Masukkan kod pengesahan sekali guna.",
+          "data": {
+            "mfa_code": "Kod pengesahan"
+          }
+        },
+        "reconfigure": {
+          "title": "Log masuk ke SP Group semula",
+          "description": "Gunakan ini apabila sesi tamat tempoh atau kata laluan ditukar.",
+          "data": {
+            "username": "E-mel",
+            "password": "Kata laluan"
+          }
+        }
+      },
+      "error": {
+        "invalid_auth": "E-mel atau kata laluan e-akaun tidak sah.",
+        "cannot_connect": "Tidak dapat menghubungi SP Group.",
+        "requires_verification": "SP menandakan log masuk ini sebagai mencurigakan. Log masuk sekali dalam aplikasi SP, tunggu beberapa minit, kemudian cuba lagi.",
+        "too_many_attempts": "Terlalu banyak percubaan log masuk. Tunggu seminit sebelum mencuba lagi.",
+        "invalid_username": "Masukkan e-mel e-akaun yang sah (maksimum 254 bait).",
+        "invalid_password": "Masukkan kata laluan anda (maksimum 1024 aksara)."
+      },
+      "abort": {
+        "already_configured": "E-akaun SP ini sudah ditambah.",
+        "reconfigure_successful": "Berjaya log masuk semula.",
+        "unique_id_mismatch": "E-mel tidak sepadan dengan e-akaun SP ini. Tambahkannya sebagai akaun baharu sebaliknya."
+      }
+    }
+  },
+  "exceptions": {
+    "auth_failed": {
+      "message": "SP Group menolak kelayakan e-akaun yang disimpan: {error}"
+    },
+    "requires_verification": {
+      "message": "SP menandakan log masuk ini sebagai mencurigakan. Log masuk sekali dalam aplikasi SP, tunggu beberapa minit, kemudian cuba lagi: {error}"
+    },
+    "usage_failed": {
+      "message": "Tidak dapat mengambil penggunaan daripada SP Group: {error}"
+    },
+    "http_error": {
+      "message": "{source} memulangkan HTTP {status}"
+    },
+    "fetch_failed": {
+      "message": "Tidak dapat mengambil {source}: {error}"
+    },
+    "bad_payload": {
+      "message": "{source} menghantar data dalam format tidak dijangka: {detail}"
+    }
+  },
+  "issues": {
+    "sp_account_auth_failed": {
+      "title": "Akaun SP {title} memerlukan anda log masuk semula",
+      "description": "SP Group menolak sesi yang disimpan untuk {title}. Pergi ke Tetapan → Peranti & perkhidmatan → Singapura, buka entri akaun SP {title}, pilih Konfigurasi semula dan log masuk semula. Sensornya kekal tidak tersedia sehingga itu; bahagian lain integrasi terus berfungsi."
+    },
+    "source_failing": {
+      "title": "{source} gagal selama sehari",
+      "description": "Singapura tidak dapat mengemas kini {source} selama 24 jam yang lalu. Sumber mungkin telah menukar laman web atau API-nya. Ralat terakhir: `{error}`\n\nSemak [penjejak isu]({issue_tracker}) dan laporkannya (lampirkan diagnostik integrasi). Jika anda tidak memerlukan data ini, matikan sumber di bawah Tetapan → Peranti & perkhidmatan → Singapura → Konfigurasi. Notis ini akan hilang sendiri setelah kemas kini berjaya."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Pilihan Singapura",
+        "description": "Pilih sumber data yang dijalankan. Sumber yang dimatikan berhenti mengundi, dan entiti serta perantinya dibuang (hidupkan semula untuk mendapatkannya kembali). Menyimpan akan memuat semula integrasi.",
+        "data": {
+          "sources": "Sumber data",
+          "school_events": "Kalendar sekolah",
+          "api_key": "Kunci API data.gov.sg",
+          "carparks": "Tempat letak kereta HDB",
+          "polling": "Pengundian"
+        },
+        "data_description": {
+          "sources": "Mematikan tarif SP Group juga menyebabkan statistik kos akaun SP tidak berharga. Ketersediaan tempat letak kereta HDB, ketersediaan teksi dan tempat letak kereta pusat beli-belah CapitaLand dimatikan sehingga anda menandakannya: dua yang pertama memuat turun data seluruh pulau pada setiap pengundian; lot CapitaLand datang dari laman web JustPark.",
+          "school_events": "Kalendar sekolah MOE yang hendak dicipta apabila sumber kalendar sekolah MOE dihidupkan.",
+          "api_key": "Pilihan. Kunci percuma daripada data.gov.sg memberikan had kadar yang lebih tinggi (kurang ralat HTTP 429). Biarkan kosong untuk menggunakan had awam.",
+          "carparks": "Nombor tempat letak kereta untuk dijejaki apabila ketersediaan tempat letak kereta HDB dihidupkan, dipisahkan dengan koma (cth. BJ55, TM24; ditunjukkan pada senarai tempat letak kereta HDB dan data.gov.sg). Biarkan kosong untuk 3 tempat letak kereta terdekat dengan lokasi rumah anda.",
+          "polling": "Dikurangkan mengundi sumber pantas (amaran banjir, kilat, kamera trafik, radar, kereta api, cuaca, PSI, UV, tekanan haba, tempat letak kereta, teksi, tempat letak kereta CapitaLand) tiga kali kurang kerap."
+        }
+      }
+    },
+    "error": {
+      "no_sources": "Hidupkan sekurang-kurangnya satu sumber data, atau tambah akaun SP terlebih dahulu.",
+      "no_school_events": "Pilih sekurang-kurangnya satu kalendar sekolah, atau matikan sumber kalendar sekolah MOE."
+    }
+  },
+  "selector": {
+    "sources": {
+      "options": {
+        "tariff": "Tarif utiliti SP Group",
+        "coe": "Keputusan bidaan COE",
+        "weather": "Cuaca dan ramalan NEA",
+        "holiday": "Kalendar cuti umum",
+        "school": "Kalendar sekolah MOE",
+        "train": "Status kereta api MRT/LRT",
+        "psi": "Kualiti udara (PSI)",
+        "flood": "Amaran banjir PUB",
+        "traffic": "Kamera trafik pusat pemeriksaan",
+        "dengue": "Kelompok denggi NEA",
+        "lightning": "Kilat NEA",
+        "uv": "Indeks UV NEA",
+        "radar": "Radar hujan NEA",
+        "wbgt": "Tekanan haba NEA (WBGT)",
+        "hawker": "Penutupan pusat penjaja",
+        "carpark": "Ketersediaan tempat letak kereta HDB",
+        "taxi": "Ketersediaan teksi",
+        "capitaland": "Tempat letak kereta pusat beli-belah CapitaLand"
+      }
+    },
+    "school_events": {
+      "options": {
+        "holidays": "Cuti sekolah",
+        "terms": "Penggal sekolah",
+        "exams": "Peperiksaan kebangsaan"
+      }
+    },
+    "polling": {
+      "options": {
+        "normal": "Normal",
+        "reduced": "Dikurangkan (3× kurang kerap)"
+      }
+    }
+  }
+}
