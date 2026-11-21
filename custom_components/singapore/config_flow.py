@@ -6,6 +6,7 @@ import logging
 from functools import partial
 from typing import Any
 
+import aiohttp
 import voluptuous as vol
 from homeassistant.config_entries import (
     SOURCE_USER,
@@ -17,7 +18,8 @@ from homeassistant.config_entries import (
     SubentryFlowResult,
 )
 from homeassistant.const import CONF_NAME, CONF_PASSWORD, CONF_USERNAME
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
@@ -33,10 +35,15 @@ from .const import (
     CONF_DISABLED_SCHOOL_EVENTS,
     CONF_DISABLED_SOURCES,
     CONF_ENABLED_SOURCES,
+    CONF_EV_POSTAL_CODES,
+    CONF_LTA_API_KEY,
     CONF_POLLING,
     CONF_SCHOOL_EVENTS,
     CONF_SOURCES,
+    CONF_TRAIN_CROWD_STATIONS,
     DOMAIN,
+    LTA_DATAMALL_API_KEY_HEADER,
+    LTA_DATAMALL_SOURCES,
     OPT_IN_SOURCES,
     POLLING_NORMAL,
     POLLING_OPTIONS,
@@ -46,6 +53,7 @@ from .const import (
     carpark_numbers,
     enabled_school_events,
     enabled_sources,
+    ev_postal_codes,
 )
 from .sp_account.client import (
     AuthError,
@@ -61,6 +69,7 @@ from .sp_account.const import (
     validate_username,
 )
 from .sp_account_coordinator import SUBENTRY_TYPE_SP_ACCOUNT
+from .train_crowd_coordinator import PCD_REALTIME_URL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -178,6 +187,7 @@ def options_schema(options: dict[str, Any]) -> vol.Schema:
     """The options form, pre-filled from the entry's current options."""
     enabled = enabled_sources(options)
     api_key = options.get(CONF_API_KEY) or ""
+    lta_api_key = options.get(CONF_LTA_API_KEY) or ""
     return vol.Schema(
         {
             vol.Optional(
@@ -207,8 +217,23 @@ def options_schema(options: dict[str, Any]) -> vol.Schema:
                 CONF_API_KEY, description={"suggested_value": api_key}
             ): _PASSWORD_SELECTOR_PLAIN,
             vol.Optional(
+                CONF_LTA_API_KEY, description={"suggested_value": lta_api_key}
+            ): _PASSWORD_SELECTOR_PLAIN,
+            vol.Optional(
                 CONF_CARPARKS,
                 description={"suggested_value": options.get(CONF_CARPARKS) or ""},
+            ): TextSelector(),
+            vol.Optional(
+                CONF_TRAIN_CROWD_STATIONS,
+                description={
+                    "suggested_value": options.get(CONF_TRAIN_CROWD_STATIONS) or ""
+                },
+            ): TextSelector(),
+            vol.Optional(
+                CONF_EV_POSTAL_CODES,
+                description={
+                    "suggested_value": options.get(CONF_EV_POSTAL_CODES) or ""
+                },
             ): TextSelector(),
             vol.Required(
                 CONF_POLLING, default=options.get(CONF_POLLING, POLLING_NORMAL)
@@ -241,8 +266,19 @@ def options_from_input(user_input: dict[str, Any]) -> dict[str, Any]:
         options[CONF_ENABLED_SOURCES] = opted_in
     if api_key := (user_input.get(CONF_API_KEY) or "").strip():
         options[CONF_API_KEY] = api_key
+    if lta_api_key := (user_input.get(CONF_LTA_API_KEY) or "").strip():
+        options[CONF_LTA_API_KEY] = lta_api_key
     if carparks := carpark_numbers(user_input):
         options[CONF_CARPARKS] = ", ".join(carparks)
+    if raw_stations := (user_input.get(CONF_TRAIN_CROWD_STATIONS) or "").strip():
+        stations: list[str] = []
+        for part in raw_stations.replace(";", ",").replace(" ", ",").split(","):
+            if (code := part.strip().upper()) and code not in stations:
+                stations.append(code)
+        if stations:
+            options[CONF_TRAIN_CROWD_STATIONS] = ", ".join(stations)
+    if postal_codes := ev_postal_codes(user_input):
+        options[CONF_EV_POSTAL_CODES] = ", ".join(postal_codes)
     # Absent from the form (an older frontend) means "keep them all".
     school = user_input.get(CONF_SCHOOL_EVENTS)
     if school is not None and (
@@ -250,6 +286,31 @@ def options_from_input(user_input: dict[str, Any]) -> dict[str, Any]:
     ):
         options[CONF_DISABLED_SCHOOL_EVENTS] = off
     return options
+
+
+async def _validate_lta_api_key(hass: HomeAssistant, api_key: str) -> str | None:
+    """Validate an LTA DataMall AccountKey with one lightweight call.
+
+    Returns an error key ("invalid_lta_api_key" or "cannot_connect_lta") or None.
+    """
+    session = async_get_clientsession(hass)
+    try:
+        async with session.get(
+            PCD_REALTIME_URL,
+            params={"TrainLine": "NSL"},
+            headers={
+                LTA_DATAMALL_API_KEY_HEADER: api_key,
+                "accept": "application/json",
+            },
+            timeout=aiohttp.ClientTimeout(total=15),
+        ) as response:
+            if response.status in (401, 403):
+                return "invalid_lta_api_key"
+            if response.status != 200:
+                return "cannot_connect_lta"
+    except (aiohttp.ClientError, TimeoutError):
+        return "cannot_connect_lta"
+    return None
 
 
 class SingaporeOptionsFlow(OptionsFlow):
@@ -260,14 +321,24 @@ class SingaporeOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            if not user_input.get(CONF_SOURCES) and not self.config_entry.subentries:
+            selected = set(user_input.get(CONF_SOURCES) or ())
+            lta_key = (user_input.get(CONF_LTA_API_KEY) or "").strip()
+            existing_lta_key = (
+                self.config_entry.options.get(CONF_LTA_API_KEY) or ""
+            ).strip()
+            if not selected and not self.config_entry.subentries:
                 errors[CONF_SOURCES] = "no_sources"
-            elif SOURCE_SCHOOL in user_input.get(CONF_SOURCES, ()) and not (
+            elif SOURCE_SCHOOL in selected and not (
                 user_input.get(CONF_SCHOOL_EVENTS, SCHOOL_EVENT_KINDS)
             ):
                 # The school calendar is on but would have no calendars.
                 errors[CONF_SCHOOL_EVENTS] = "no_school_events"
-            else:
+            elif (selected & set(LTA_DATAMALL_SOURCES)) and not lta_key:
+                errors[CONF_LTA_API_KEY] = "lta_api_key_required"
+            elif lta_key and lta_key != existing_lta_key:
+                if error := await _validate_lta_api_key(self.hass, lta_key):
+                    errors[CONF_LTA_API_KEY] = error
+            if not errors:
                 # Saving the options reloads the entry (see _async_entry_updated).
                 return self.async_create_entry(data=options_from_input(user_input))
         schema = options_schema(dict(self.config_entry.options))

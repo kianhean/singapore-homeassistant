@@ -295,6 +295,20 @@
       },
       "capitaland_carpark": {
         "default": "mdi:parking"
+      },
+      "train_crowd": {
+        "default": "mdi:account-group",
+        "state": {
+          "low": "mdi:account",
+          "moderate": "mdi:account-multiple",
+          "high": "mdi:account-group"
+        }
+      },
+      "ev_chargers_available": {
+        "default": "mdi:ev-station"
+      },
+      "nearest_ev_charger": {
+        "default": "mdi:map-marker-distance"
       }
     },
     "camera": {

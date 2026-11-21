@@ -343,6 +343,20 @@
       },
       "capitaland_carpark": {
         "name": "{mall}"
+      },
+      "train_crowd": {
+        "name": "Kesesakan {station}",
+        "state": {
+          "low": "Rendah",
+          "moderate": "Sederhana",
+          "high": "Tinggi"
+        }
+      },
+      "ev_chargers_available": {
+        "name": "Tersedia"
+      },
+      "nearest_ev_charger": {
+        "name": "Terdekat tersedia"
       }
     },
     "camera": {
@@ -472,20 +486,29 @@
           "school_events": "Kalendar sekolah",
           "api_key": "Kunci API data.gov.sg",
           "carparks": "Tempat letak kereta HDB",
-          "polling": "Pengundian"
+          "polling": "Pengundian",
+          "lta_api_key": "LTA DataMall AccountKey",
+          "train_crowd_stations": "Stesen kesesakan MRT/LRT",
+          "ev_postal_codes": "Poskod pengecas EV"
         },
         "data_description": {
           "sources": "Mematikan tarif SP Group juga menyebabkan statistik kos akaun SP tidak berharga. Ketersediaan tempat letak kereta HDB, ketersediaan teksi dan tempat letak kereta pusat beli-belah CapitaLand dimatikan sehingga anda menandakannya: dua yang pertama memuat turun data seluruh pulau pada setiap pengundian; lot CapitaLand datang dari laman web JustPark.",
           "school_events": "Kalendar sekolah MOE yang hendak dicipta apabila sumber kalendar sekolah MOE dihidupkan.",
           "api_key": "Pilihan. Kunci percuma daripada data.gov.sg memberikan had kadar yang lebih tinggi (kurang ralat HTTP 429). Biarkan kosong untuk menggunakan had awam.",
           "carparks": "Nombor tempat letak kereta untuk dijejaki apabila ketersediaan tempat letak kereta HDB dihidupkan, dipisahkan dengan koma (cth. BJ55, TM24; ditunjukkan pada senarai tempat letak kereta HDB dan data.gov.sg). Biarkan kosong untuk 3 tempat letak kereta terdekat dengan lokasi rumah anda.",
-          "polling": "Dikurangkan mengundi sumber pantas (amaran banjir, kilat, kamera trafik, radar, kereta api, cuaca, PSI, UV, tekanan haba, tempat letak kereta, teksi, tempat letak kereta CapitaLand) tiga kali kurang kerap."
+          "polling": "Dikurangkan mengundi sumber pantas (amaran banjir, kilat, kamera trafik, radar, kereta api, cuaca, PSI, UV, tekanan haba, tempat letak kereta, teksi, tempat letak kereta CapitaLand) tiga kali kurang kerap.",
+          "lta_api_key": "Pilihan. AccountKey percuma daripada LTA DataMall (datamall.lta.gov.sg) mengaktifkan kesesakan platform MRT/LRT dan ketersediaan pengecas EV.",
+          "train_crowd_stations": "Kod stesen MRT/LRT untuk dijejaki apabila kesesakan dihidupkan, dipisahkan dengan koma (cth. EW13, NS24, CC1). Biarkan kosong untuk EW13, EW14 dan NS24.",
+          "ev_postal_codes": "Poskod Singapura 6 digit pilihan untuk menyemak pengecas EV, dipisahkan dengan koma (cth. 529536, 238839). Biarkan kosong untuk mencari pengecas EV dalam jarak 2 km dari rumah anda."
         }
       }
     },
     "error": {
       "no_sources": "Hidupkan sekurang-kurangnya satu sumber data, atau tambah akaun SP terlebih dahulu.",
-      "no_school_events": "Pilih sekurang-kurangnya satu kalendar sekolah, atau matikan sumber kalendar sekolah MOE."
+      "no_school_events": "Pilih sekurang-kurangnya satu kalendar sekolah, atau matikan sumber kalendar sekolah MOE.",
+      "lta_api_key_required": "Masukkan LTA DataMall AccountKey untuk mengaktifkan kesesakan MRT/LRT atau ketersediaan pengecas EV.",
+      "invalid_lta_api_key": "LTA DataMall menolak AccountKey ini. Semak kunci dan cuba lagi.",
+      "cannot_connect_lta": "Tidak dapat menghubungi LTA DataMall untuk mengesahkan AccountKey. Cuba lagi nanti."
     }
   },
   "selector": {
@@ -511,7 +534,9 @@
         "traffic_incidents": "Insiden trafik LTA",
         "carpark": "Ketersediaan tempat letak kereta HDB",
         "taxi": "Ketersediaan teksi",
-        "capitaland": "Tempat letak kereta pusat beli-belah CapitaLand"
+        "capitaland": "Tempat letak kereta pusat beli-belah CapitaLand",
+        "train_crowd": "Kesesakan MRT/LRT (LTA DataMall)",
+        "ev_chargers": "Ketersediaan pengecas EV (LTA DataMall)"
       }
     },
     "school_events": {

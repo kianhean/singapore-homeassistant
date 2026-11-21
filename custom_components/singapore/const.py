@@ -19,12 +19,18 @@ CONF_SOURCES: Final = "sources"
 # user turned on. They poll large payloads and only suit some users.
 CONF_ENABLED_SOURCES: Final = "enabled_sources"
 CONF_API_KEY: Final = "api_key"
+CONF_LTA_API_KEY: Final = "lta_api_key"
 CONF_POLLING: Final = "polling"
 # Which MOE school calendars to create; stored inverted like the sources.
 CONF_SCHOOL_EVENTS: Final = "school_events"
 CONF_DISABLED_SCHOOL_EVENTS: Final = "disabled_school_events"
 # HDB carpark numbers to track, comma separated (empty: the ones nearest home).
 CONF_CARPARKS: Final = "carparks"
+# MRT/LRT station codes for LTA DataMall crowd density, comma separated.
+CONF_TRAIN_CROWD_STATIONS: Final = "train_crowd_stations"
+DEFAULT_TRAIN_CROWD_STATIONS: Final = ("EW13", "EW14", "NS24")
+# Optional 6-digit Singapore postal codes for EV charger lookup (empty: nearest home).
+CONF_EV_POSTAL_CODES: Final = "ev_postal_codes"
 
 SCHOOL_HOLIDAYS: Final = "holidays"
 SCHOOL_TERMS: Final = "terms"
@@ -62,6 +68,8 @@ SOURCE_TRAFFIC_INCIDENTS: Final = "traffic_incidents"
 SOURCE_CARPARK: Final = "carpark"
 SOURCE_TAXI: Final = "taxi"
 SOURCE_CAPITALAND: Final = "capitaland"
+SOURCE_TRAIN_CROWD: Final = "train_crowd"
+SOURCE_EV_CHARGERS: Final = "ev_chargers"
 
 SOURCES: Final = (
     SOURCE_TARIFF,
@@ -85,12 +93,22 @@ SOURCES: Final = (
     SOURCE_CARPARK,
     SOURCE_TAXI,
     SOURCE_CAPITALAND,
+    SOURCE_TRAIN_CROWD,
+    SOURCE_EV_CHARGERS,
 )
 
 # Off until ticked in the options (stored in CONF_ENABLED_SOURCES): carparks and
 # taxis poll a large island-wide payload every few minutes for a few local
-# numbers; CapitaLand's carparks come from a mall operator's website.
-OPT_IN_SOURCES: Final = (SOURCE_CARPARK, SOURCE_TAXI, SOURCE_CAPITALAND)
+# numbers; CapitaLand's carparks come from a mall operator's website; train
+# crowd density and EV chargers require an optional LTA DataMall AccountKey.
+OPT_IN_SOURCES: Final = (
+    SOURCE_CARPARK,
+    SOURCE_TAXI,
+    SOURCE_CAPITALAND,
+    SOURCE_TRAIN_CROWD,
+    SOURCE_EV_CHARGERS,
+)
+LTA_DATAMALL_SOURCES: Final = (SOURCE_TRAIN_CROWD, SOURCE_EV_CHARGERS)
 
 # English names for log lines and repair placeholders (UI labels for the
 # options form are translated under selector.sources in strings.json).
@@ -116,10 +134,14 @@ SOURCE_NAMES: Final = {
     SOURCE_CARPARK: "HDB carpark availability",
     SOURCE_TAXI: "Taxi availability",
     SOURCE_CAPITALAND: "CapitaLand mall carparks",
+    SOURCE_TRAIN_CROWD: "MRT/LRT crowd density (LTA DataMall)",
+    SOURCE_EV_CHARGERS: "EV charger availability (LTA DataMall)",
 }
 
 # data.gov.sg reads an optional API key from this header (higher rate limits).
 DATA_GOV_API_KEY_HEADER: Final = "x-api-key"
+# LTA DataMall reads the user's AccountKey from this header.
+LTA_DATAMALL_API_KEY_HEADER: Final = "AccountKey"
 
 ISSUE_TRACKER_URL: Final = "https://github.com/kianhean/singapore-homeassistant/issues"
 
@@ -168,6 +190,34 @@ def data_gov_headers(entry: Any) -> dict[str, str]:
     """Request headers for data.gov.sg: the user's API key, when one is set."""
     key = (_options(entry).get(CONF_API_KEY) or "").strip()
     return {DATA_GOV_API_KEY_HEADER: key} if key else {}
+
+
+def lta_datamall_headers(entry: Any) -> dict[str, str]:
+    """Request headers for LTA DataMall: AccountKey when set."""
+    key = (_options(entry).get(CONF_LTA_API_KEY) or "").strip()
+    return (
+        {LTA_DATAMALL_API_KEY_HEADER: key, "accept": "application/json"} if key else {}
+    )
+
+
+def train_crowd_stations(entry: Any) -> list[str]:
+    """MRT/LRT station codes chosen for crowd density (upper-cased, in order)."""
+    raw = _options(entry).get(CONF_TRAIN_CROWD_STATIONS) or ""
+    stations: list[str] = []
+    for part in raw.replace(";", ",").replace(" ", ",").split(","):
+        if (code := part.strip().upper()) and code not in stations:
+            stations.append(code)
+    return stations or list(DEFAULT_TRAIN_CROWD_STATIONS)
+
+
+def ev_postal_codes(entry: Any) -> list[str]:
+    """Optional Singapore postal codes chosen for EV charger lookup."""
+    raw = _options(entry).get(CONF_EV_POSTAL_CODES) or ""
+    codes: list[str] = []
+    for part in raw.replace(";", ",").replace(" ", ",").split(","):
+        if (code := part.strip()) and code.isdigit() and code not in codes:
+            codes.append(code)
+    return codes
 
 
 def scaled_interval(entry: Any, interval: timedelta | None) -> timedelta | None:

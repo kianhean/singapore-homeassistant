@@ -11,6 +11,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from . import SingaporeConfigEntry
 from .const import (
     CONF_API_KEY,
+    CONF_LTA_API_KEY,
     CONF_POLLING,
     POLLING_NORMAL,
     SCHOOL_EVENT_KINDS,
@@ -47,6 +48,7 @@ async def async_get_config_entry_diagnostics(
             "polling": entry.options.get(CONF_POLLING, POLLING_NORMAL),
             # Never the key itself: diagnostics get pasted into public issues.
             "has_api_key": bool(entry.options.get(CONF_API_KEY)),
+            "has_lta_api_key": bool(entry.options.get(CONF_LTA_API_KEY)),
         },
         "coordinators": {
             source: _coordinator_diagnostics(coordinator)

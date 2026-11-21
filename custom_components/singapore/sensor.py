@@ -40,6 +40,7 @@ from .coe_coordinator import (
     UNIT_COE,
     CoeCoordinator,
 )
+from .const import train_crowd_stations
 from .coordinator import UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER, SPGroupCoordinator
 from .dengue_coordinator import DengueClusterCoordinator, nearest_cluster
 from .entity import (
@@ -48,6 +49,7 @@ from .entity import (
     DEVICE_CARPARK,
     DEVICE_COE,
     DEVICE_ENERGY,
+    DEVICE_EV_CHARGERS,
     DEVICE_FLOOD,
     DEVICE_NEA,
     DEVICE_TAXI,
@@ -56,6 +58,7 @@ from .entity import (
     DEVICE_WEATHER,
     SingaporeEntity,
 )
+from .ev_charger_coordinator import EvChargerCoordinator
 from .flood_coordinator import FloodAlertCoordinator
 from .lightning_coordinator import (
     LightningCoordinator,
@@ -80,6 +83,7 @@ from .tide_coordinator import (
 )
 from .traffic_incidents_coordinator import TrafficIncidentsCoordinator
 from .train_coordinator import TRAIN_LINES, TrainStatusCoordinator
+from .train_crowd_coordinator import CROWD_LEVEL_OPTIONS, TrainCrowdCoordinator
 from .uv_coordinator import UV_EXPOSURE_OPTIONS, UvCoordinator, uv_exposure
 from .warning_coordinator import WeatherWarningsCoordinator
 from .wbgt_coordinator import HEAT_STRESS_OPTIONS, WbgtCoordinator
@@ -230,6 +234,16 @@ async def async_setup_entry(
         entities += [
             SingaporeTaxisAvailableSensor(taxi, eid),
             SingaporeTaxisNearbySensor(taxi, eid),
+        ]
+    if (train_crowd := data.train_crowd) is not None:
+        entities += [
+            SingaporeTrainCrowdSensor(train_crowd, eid, code)
+            for code in train_crowd_stations(entry)
+        ]
+    if (ev_chargers := data.ev_chargers) is not None:
+        entities += [
+            SingaporeEvChargersAvailableSensor(ev_chargers, eid),
+            SingaporeNearestEvChargerSensor(ev_chargers, eid),
         ]
 
     async_add_entities(entities)
@@ -1481,4 +1495,129 @@ class SingaporeCapitaLandCarparkSensor(
         if (site := self._site()) is not None:
             attrs["total_lots"] = site.total
             attrs["full"] = site.full
+        return attrs
+
+
+class SingaporeTrainCrowdSensor(SingaporeEntity[TrainCrowdCoordinator], SensorEntity):
+    """Real-time platform crowd density for one MRT/LRT station."""
+
+    _device = DEVICE_TRAIN
+    _attr_translation_key = "train_crowd"
+    _attr_attribution = "Data provided by LTA DataMall"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = CROWD_LEVEL_OPTIONS
+
+    def __init__(
+        self, coordinator: TrainCrowdCoordinator, entry_id: str, station_code: str
+    ) -> None:
+        super().__init__(coordinator, entry_id, f"train_crowd_{station_code.lower()}")
+        self._station = station_code
+        self._attr_translation_placeholders = {"station": station_code}
+
+    def _station_crowd(self):
+        data = self.coordinator.data
+        return None if data is None else data.stations.get(self._station)
+
+    @property
+    def native_value(self) -> str | None:
+        crowd = self._station_crowd()
+        return None if crowd is None else crowd.crowd_level
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs: dict = {"station": self._station, "source": "LTA DataMall (PCDRealTime)"}
+        if (crowd := self._station_crowd()) is not None:
+            attrs["train_line"] = crowd.line
+            if crowd.start_time is not None:
+                attrs["start_time"] = crowd.start_time
+            if crowd.end_time is not None:
+                attrs["end_time"] = crowd.end_time
+        if self.coordinator.last_updated is not None:
+            attrs["last_updated"] = self.coordinator.last_updated.isoformat()
+        return attrs
+
+
+class SingaporeEvChargersAvailableSensor(
+    SingaporeEntity[EvChargerCoordinator], SensorEntity
+):
+    """Count of available EV charging connectors at tracked or nearby locations."""
+
+    _device = DEVICE_EV_CHARGERS
+    _attr_translation_key = "ev_chargers_available"
+    _attr_attribution = "Data provided by LTA DataMall"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = "chargers"
+
+    def __init__(self, coordinator: EvChargerCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "ev_chargers_available")
+
+    @property
+    def native_value(self) -> int | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.available_chargers
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs: dict = {"source": "LTA DataMall"}
+        data = self.coordinator.data
+        if data is not None:
+            attrs["total_chargers"] = data.total_chargers
+            attrs["locations_count"] = len(data.locations)
+            attrs["locations"] = [
+                {
+                    "name": loc.name,
+                    "address": loc.address,
+                    "available": loc.available,
+                    "total": loc.total,
+                    "operators": loc.operators,
+                    "plug_types": loc.plug_types,
+                    "max_power_kw": loc.max_power_kw,
+                    "distance_km": loc.distance_km,
+                }
+                for loc in data.locations[:10]
+            ]
+        if self.coordinator.last_updated is not None:
+            attrs["last_updated"] = self.coordinator.last_updated.isoformat()
+        return attrs
+
+
+class SingaporeNearestEvChargerSensor(
+    SingaporeEntity[EvChargerCoordinator], SensorEntity
+):
+    """Distance to the nearest location with an available EV charger."""
+
+    _device = DEVICE_EV_CHARGERS
+    _attr_translation_key = "nearest_ev_charger"
+    _attr_attribution = "Data provided by LTA DataMall"
+    _attr_device_class = SensorDeviceClass.DISTANCE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfLength.KILOMETERS
+    _attr_suggested_display_precision = 2
+
+    def __init__(self, coordinator: EvChargerCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "nearest_ev_charger")
+
+    @property
+    def native_value(self) -> float | None:
+        data = self.coordinator.data
+        if data is None or data.nearest_available is None:
+            return None
+        return data.nearest_available.distance_km
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs: dict = {"source": "LTA DataMall"}
+        data = self.coordinator.data
+        if data is not None and (nearest := data.nearest_available) is not None:
+            attrs["name"] = nearest.name
+            attrs["address"] = nearest.address
+            attrs["available"] = nearest.available
+            attrs["total"] = nearest.total
+            attrs["operators"] = nearest.operators
+            attrs["plug_types"] = nearest.plug_types
+            if nearest.max_power_kw is not None:
+                attrs["max_power_kw"] = nearest.max_power_kw
+        if self.coordinator.last_updated is not None:
+            attrs["last_updated"] = self.coordinator.last_updated.isoformat()
         return attrs

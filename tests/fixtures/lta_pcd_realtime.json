@@ -1,0 +1,29 @@
+{
+  "odata.metadata": "https://datamall2.mytransport.sg/ltaodataservice/$metadata#PCDRealTime",
+  "value": [
+    {
+      "Station": "EW13",
+      "StartTime": "2026-11-21T15:00:00+08:00",
+      "EndTime": "2026-11-21T15:10:00+08:00",
+      "CrowdLevel": "m"
+    },
+    {
+      "Station": "EW14",
+      "StartTime": "2026-11-21T15:00:00+08:00",
+      "EndTime": "2026-11-21T15:10:00+08:00",
+      "CrowdLevel": "h"
+    },
+    {
+      "Station": "NS24",
+      "StartTime": "2026-11-21T15:00:00+08:00",
+      "EndTime": "2026-11-21T15:10:00+08:00",
+      "CrowdLevel": "l"
+    },
+    {
+      "Station": "EW15",
+      "StartTime": "2026-11-21T15:00:00+08:00",
+      "EndTime": "2026-11-21T15:10:00+08:00",
+      "CrowdLevel": "NA"
+    }
+  ]
+}

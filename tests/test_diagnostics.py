@@ -19,6 +19,7 @@ from custom_components.singapore.dengue_coordinator import DengueData
 from custom_components.singapore.diagnostics import (
     async_get_config_entry_diagnostics,
 )
+from custom_components.singapore.ev_charger_coordinator import EvChargerData
 from custom_components.singapore.flood_coordinator import FloodAlertData
 from custom_components.singapore.hawker_coordinator import HawkerData
 from custom_components.singapore.holiday_coordinator import PublicHoliday
@@ -33,6 +34,7 @@ from custom_components.singapore.traffic_incidents_coordinator import (
     TrafficIncidentsData,
 )
 from custom_components.singapore.train_coordinator import TrainStatusData
+from custom_components.singapore.train_crowd_coordinator import TrainCrowdData
 from custom_components.singapore.uv_coordinator import UvData
 from custom_components.singapore.warning_coordinator import WeatherWarningsData
 from custom_components.singapore.wbgt_coordinator import WbgtData
@@ -87,6 +89,8 @@ async def test_diagnostics_serializes_all_coordinators():
                 {"BM": CapitaLandSite("BM", "Bedok Mall", "Retail", 39, 264, False)}
             )
         ),
+        train_crowd=_coordinator(TrainCrowdData()),
+        ev_chargers=_coordinator(EvChargerData()),
     )
 
     result = await async_get_config_entry_diagnostics(MagicMock(), entry)
@@ -114,6 +118,8 @@ async def test_diagnostics_serializes_all_coordinators():
         "carpark",
         "taxi",
         "capitaland",
+        "train_crowd",
+        "ev_chargers",
     }
     assert coordinators["tariff"]["last_update_success"] is False
     assert "boom" in coordinators["tariff"]["last_exception"]

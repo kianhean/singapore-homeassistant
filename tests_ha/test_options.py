@@ -62,7 +62,10 @@ async def test_options_form_serializes_over_http(
         "sources",
         "school_events",
         "api_key",
+        "lta_api_key",
         "carparks",
+        "train_crowd_stations",
+        "ev_postal_codes",
         "polling",
     ]
 
@@ -75,7 +78,11 @@ async def test_turning_sources_off_reloads_without_their_entities(
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["type"] is FlowResultType.FORM
-    enabled = [s for s in SOURCES if s not in {"psi", "traffic", "radar"}]
+    enabled = [
+        s
+        for s in SOURCES
+        if s not in {"psi", "traffic", "radar", "train_crowd", "ev_chargers"}
+    ]
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {"sources": enabled, "api_key": " key-123 ", "polling": "reduced"},
@@ -117,7 +124,11 @@ async def test_turning_sources_off_reloads_without_their_entities(
     # Turned back on, the source's device and entities come back.
     result = await hass.config_entries.options.async_init(entry.entry_id)
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"sources": list(SOURCES), "polling": "normal"}
+        result["flow_id"],
+        {
+            "sources": [s for s in SOURCES if s not in {"train_crowd", "ev_chargers"}],
+            "polling": "normal",
+        },
     )
     await hass.async_block_till_done(wait_background_tasks=True)
     assert entity_registry.async_get("sensor.air_quality_psi") is not None
@@ -147,7 +158,7 @@ async def test_unticked_school_calendars_are_removed(
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {
-            "sources": list(SOURCES),
+            "sources": [s for s in SOURCES if s not in {"train_crowd", "ev_chargers"}],
             "school_events": ["holidays", "exams"],
             "polling": "normal",
         },
