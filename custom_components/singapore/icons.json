@@ -295,6 +295,18 @@
       },
       "capitaland_carpark": {
         "default": "mdi:parking"
+      },
+      "fuel_ron92": {
+        "default": "mdi:gas-station"
+      },
+      "fuel_ron95": {
+        "default": "mdi:gas-station"
+      },
+      "fuel_ron98": {
+        "default": "mdi:gas-station"
+      },
+      "fuel_diesel": {
+        "default": "mdi:fuel"
       }
     },
     "camera": {

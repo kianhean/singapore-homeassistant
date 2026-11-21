@@ -343,6 +343,18 @@
       },
       "capitaland_carpark": {
         "name": "{mall}"
+      },
+      "fuel_ron92": {
+        "name": "பெட்ரோல் 92"
+      },
+      "fuel_ron95": {
+        "name": "பெட்ரோல் 95"
+      },
+      "fuel_ron98": {
+        "name": "பெட்ரோல் 98"
+      },
+      "fuel_diesel": {
+        "name": "டீசல்"
       }
     },
     "camera": {
@@ -511,7 +523,8 @@
         "traffic_incidents": "LTA போக்குவரத்து சம்பவங்கள்",
         "carpark": "HDB வாகன நிறுத்துமிட கிடைப்பு",
         "taxi": "டாக்சி கிடைப்பு",
-        "capitaland": "CapitaLand வணிக வளாக வாகன நிறுத்துமிடங்கள்"
+        "capitaland": "CapitaLand வணிக வளாக வாகன நிறுத்துமிடங்கள்",
+        "fuel": "எரிபொருள் விலைகள் (SingStat)"
       }
     },
     "school_events": {

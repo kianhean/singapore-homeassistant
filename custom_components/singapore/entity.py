@@ -25,6 +25,7 @@ from .const import (
     SOURCE_COE,
     SOURCE_DENGUE,
     SOURCE_FLOOD,
+    SOURCE_FUEL,
     SOURCE_HAWKER,
     SOURCE_HOLIDAY,
     SOURCE_LIGHTNING,
@@ -60,6 +61,7 @@ DEVICE_TRAFFIC_INCIDENTS = "traffic_incidents"
 DEVICE_CARPARK = "carparks"
 DEVICE_TAXI = "taxis"
 DEVICE_CAPITALAND = "capitaland_carparks"
+DEVICE_FUEL = "fuel"
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,6 +174,12 @@ DEVICES: dict[str, SingaporeDevice] = {
         (SOURCE_CAPITALAND,),
         "https://justpark.capitaland.com/Lot-Availability",
     ),
+    DEVICE_FUEL: SingaporeDevice(
+        "Fuel Prices",
+        "SingStat Retail Fuel Prices",
+        (SOURCE_FUEL,),
+        "https://tablebuilder.singstat.gov.sg/table/TS/M213761",
+    ),
 }
 
 # Translation key -> data source, for every public-source entity. The weather
@@ -237,6 +245,10 @@ ENTITY_SOURCES: dict[str, str] = {
     "carpark": SOURCE_CARPARK,
     **dict.fromkeys(("taxis_available", "taxis_nearby"), SOURCE_TAXI),
     "capitaland_carpark": SOURCE_CAPITALAND,
+    **dict.fromkeys(
+        ("fuel_ron92", "fuel_ron95", "fuel_ron98", "fuel_diesel"),
+        SOURCE_FUEL,
+    ),
 }
 
 

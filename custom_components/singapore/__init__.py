@@ -27,6 +27,7 @@ from .const import (
     SOURCE_COE,
     SOURCE_DENGUE,
     SOURCE_FLOOD,
+    SOURCE_FUEL,
     SOURCE_HAWKER,
     SOURCE_HOLIDAY,
     SOURCE_LIGHTNING,
@@ -57,6 +58,7 @@ from .entity import (
     school_translation_key,
 )
 from .flood_coordinator import FloodAlertCoordinator
+from .fuel_coordinator import FuelPriceCoordinator
 from .hawker_coordinator import HawkerClosureCoordinator
 from .health import async_clear_source_issues, async_setup_source_health
 from .holiday_coordinator import PublicHolidayCoordinator
@@ -123,6 +125,7 @@ class SingaporeData:
     tides: TideCoordinator | None
     hawker: HawkerClosureCoordinator | None
     traffic_incidents: TrafficIncidentsCoordinator | None
+    fuel: FuelPriceCoordinator | None
     carpark: CarparkCoordinator | None
     taxi: TaxiAvailabilityCoordinator | None
     capitaland: CapitaLandCarparkCoordinator | None
@@ -162,6 +165,7 @@ _COORDINATORS: dict[str, type[DataUpdateCoordinator]] = {
     SOURCE_TIDES: TideCoordinator,
     SOURCE_HAWKER: HawkerClosureCoordinator,
     SOURCE_TRAFFIC_INCIDENTS: TrafficIncidentsCoordinator,
+    SOURCE_FUEL: FuelPriceCoordinator,
     SOURCE_CARPARK: CarparkCoordinator,
     SOURCE_TAXI: TaxiAvailabilityCoordinator,
     SOURCE_CAPITALAND: CapitaLandCarparkCoordinator,
@@ -373,6 +377,7 @@ _BACKGROUND_LABELS = {
     SOURCE_TIDES: "tide timings",
     SOURCE_HAWKER: "hawker closure",
     SOURCE_TRAFFIC_INCIDENTS: "traffic incidents",
+    SOURCE_FUEL: "fuel prices",
     SOURCE_CARPARK: "carpark availability",
     SOURCE_TAXI: "taxi availability",
     SOURCE_CAPITALAND: "CapitaLand carpark",

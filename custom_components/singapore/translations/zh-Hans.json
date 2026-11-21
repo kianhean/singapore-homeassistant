@@ -343,6 +343,18 @@
       },
       "capitaland_carpark": {
         "name": "{mall}"
+      },
+      "fuel_ron92": {
+        "name": "92号汽油"
+      },
+      "fuel_ron95": {
+        "name": "95号汽油"
+      },
+      "fuel_ron98": {
+        "name": "98号汽油"
+      },
+      "fuel_diesel": {
+        "name": "柴油"
       }
     },
     "camera": {
@@ -511,7 +523,8 @@
         "traffic_incidents": "陆交局交通事故",
         "carpark": "建屋局停车场空位",
         "taxi": "空车德士",
-        "capitaland": "CapitaLand 商场停车位"
+        "capitaland": "CapitaLand 商场停车位",
+        "fuel": "油站燃油价格 (SingStat)"
       }
     },
     "school_events": {

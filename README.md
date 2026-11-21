@@ -1216,6 +1216,22 @@ Attributes: `events` (number of events in the calendar), `source` and `url`.
 
 </details>
 
+### Fuel pump prices
+
+Updated every **12 hours** from [SingStat TableBuilder table M213761](https://tablebuilder.singstat.gov.sg/table/TS/M213761) (*Average Retail Prices Of Selected Consumer Items, Monthly*), key-free. Reports official monthly average Singapore retail pump prices (SGD/L) for 92-octane petrol, 95-octane petrol, 98-octane petrol and diesel on a *Fuel Prices* device.
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.fuel_prices_petrol_92` | Fuel Prices Petrol 92 | SGD/L | Monthly average retail price for 92-octane petrol; attributes `period`, `series`, `data_last_updated`, `source` |
+| `sensor.fuel_prices_petrol_95` | Fuel Prices Petrol 95 | SGD/L | Monthly average retail price for 95-octane petrol |
+| `sensor.fuel_prices_petrol_98` | Fuel Prices Petrol 98 | SGD/L | Monthly average retail price for 98-octane petrol |
+| `sensor.fuel_prices_diesel` | Fuel Prices Diesel | SGD/L | Monthly average retail price for diesel |
+
+</details>
+
 ## Example sensor states
 
 <details>

@@ -343,6 +343,18 @@
       },
       "capitaland_carpark": {
         "name": "{mall}"
+      },
+      "fuel_ron92": {
+        "name": "Petrol 92"
+      },
+      "fuel_ron95": {
+        "name": "Petrol 95"
+      },
+      "fuel_ron98": {
+        "name": "Petrol 98"
+      },
+      "fuel_diesel": {
+        "name": "Diesel"
       }
     },
     "camera": {
@@ -511,7 +523,8 @@
         "traffic_incidents": "Insiden trafik LTA",
         "carpark": "Ketersediaan tempat letak kereta HDB",
         "taxi": "Ketersediaan teksi",
-        "capitaland": "Tempat letak kereta pusat beli-belah CapitaLand"
+        "capitaland": "Tempat letak kereta pusat beli-belah CapitaLand",
+        "fuel": "Harga pam bahan api (SingStat)"
       }
     },
     "school_events": {

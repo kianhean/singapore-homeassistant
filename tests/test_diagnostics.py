@@ -20,6 +20,7 @@ from custom_components.singapore.diagnostics import (
     async_get_config_entry_diagnostics,
 )
 from custom_components.singapore.flood_coordinator import FloodAlertData
+from custom_components.singapore.fuel_coordinator import FuelData, FuelPrice
 from custom_components.singapore.hawker_coordinator import HawkerData
 from custom_components.singapore.holiday_coordinator import PublicHoliday
 from custom_components.singapore.lightning_coordinator import LightningData
@@ -71,6 +72,12 @@ async def test_diagnostics_serializes_all_coordinators():
         tides=_coordinator(TideData()),
         hawker=_coordinator(HawkerData()),
         traffic_incidents=_coordinator(TrafficIncidentsData()),
+        fuel=_coordinator(
+            FuelData(
+                prices={"ron95": FuelPrice(2.92, "2026 Sep", "Petrol, 95 Octane")},
+                data_last_updated="23/10/2026",
+            )
+        ),
         carpark=_coordinator(
             CarparkData(
                 tracked=["BJ55"],
@@ -111,6 +118,7 @@ async def test_diagnostics_serializes_all_coordinators():
         "tides",
         "hawker",
         "traffic_incidents",
+        "fuel",
         "carpark",
         "taxi",
         "capitaland",

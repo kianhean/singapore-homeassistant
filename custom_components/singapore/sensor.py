@@ -49,6 +49,7 @@ from .entity import (
     DEVICE_COE,
     DEVICE_ENERGY,
     DEVICE_FLOOD,
+    DEVICE_FUEL,
     DEVICE_NEA,
     DEVICE_TAXI,
     DEVICE_TRAFFIC_INCIDENTS,
@@ -57,6 +58,7 @@ from .entity import (
     SingaporeEntity,
 )
 from .flood_coordinator import FloodAlertCoordinator
+from .fuel_coordinator import FUEL_SERIES_KEYS, UNIT_FUEL, FuelPriceCoordinator
 from .lightning_coordinator import (
     LightningCoordinator,
     nearest_strike,
@@ -225,6 +227,10 @@ async def async_setup_entry(
         entities += [
             SingaporeTrafficIncidentsSensor(traffic_incidents, eid),
             SingaporeNearestTrafficIncidentSensor(traffic_incidents, eid),
+        ]
+    if (fuel := data.fuel) is not None:
+        entities += [
+            SingaporeFuelPriceSensor(fuel, eid, key) for key in FUEL_SERIES_KEYS
         ]
     if (taxi := data.taxi) is not None:
         entities += [
@@ -1481,4 +1487,42 @@ class SingaporeCapitaLandCarparkSensor(
         if (site := self._site()) is not None:
             attrs["total_lots"] = site.total
             attrs["full"] = site.full
+        return attrs
+
+
+class SingaporeFuelPriceSensor(SingaporeEntity[FuelPriceCoordinator], SensorEntity):
+    """Monthly average retail pump price for one fuel grade from SingStat."""
+
+    _device = DEVICE_FUEL
+    _attr_attribution = "Data provided by SingStat TableBuilder"
+    _attr_device_class = None
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UNIT_FUEL
+    _attr_suggested_display_precision = 2
+
+    def __init__(
+        self, coordinator: FuelPriceCoordinator, entry_id: str, grade: str
+    ) -> None:
+        super().__init__(coordinator, entry_id, f"fuel_{grade}")
+        self._grade = grade
+        self._attr_translation_key = f"fuel_{grade}"
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        price = self.coordinator.data.prices.get(self._grade)
+        return None if price is None else price.value
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs: dict = {"source": "SingStat TableBuilder (M213761)"}
+        if self.coordinator.data is not None:
+            if (price := self.coordinator.data.prices.get(self._grade)) is not None:
+                attrs["period"] = price.period
+                attrs["series"] = price.series
+            if self.coordinator.data.data_last_updated is not None:
+                attrs["data_last_updated"] = self.coordinator.data.data_last_updated
+        if self.coordinator.last_updated is not None:
+            attrs["last_updated"] = self.coordinator.last_updated.isoformat()
         return attrs
