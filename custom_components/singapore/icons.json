@@ -295,6 +295,33 @@
       },
       "capitaland_carpark": {
         "default": "mdi:parking"
+      },
+      "fx_rate": {
+        "default": "mdi:currency-usd"
+      },
+      "interest_sora": {
+        "default": "mdi:percent-outline"
+      },
+      "interest_sora_3m": {
+        "default": "mdi:percent-outline"
+      },
+      "interest_tbill_1y": {
+        "default": "mdi:bank-outline"
+      },
+      "interest_sgs_2y": {
+        "default": "mdi:chart-line"
+      },
+      "interest_sgs_5y": {
+        "default": "mdi:chart-line"
+      },
+      "interest_sgs_10y": {
+        "default": "mdi:chart-line"
+      },
+      "interest_sgs_15y": {
+        "default": "mdi:chart-line"
+      },
+      "interest_sgs_20y": {
+        "default": "mdi:chart-line"
       }
     },
     "camera": {

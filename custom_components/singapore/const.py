@@ -25,6 +25,41 @@ CONF_SCHOOL_EVENTS: Final = "school_events"
 CONF_DISABLED_SCHOOL_EVENTS: Final = "disabled_school_events"
 # HDB carpark numbers to track, comma separated (empty: the ones nearest home).
 CONF_CARPARKS: Final = "carparks"
+# Foreign currencies to quote against SGD from ECB reference rates.
+CONF_FX_CURRENCIES: Final = "fx_currencies"
+
+DEFAULT_FX_CURRENCIES: Final = ("USD", "EUR", "GBP", "JPY", "MYR", "CNY", "AUD", "HKD")
+FX_CURRENCIES: Final = (
+    "USD",
+    "EUR",
+    "GBP",
+    "JPY",
+    "MYR",
+    "CNY",
+    "AUD",
+    "HKD",
+    "THB",
+    "IDR",
+    "KRW",
+    "INR",
+    "PHP",
+    "NZD",
+    "CAD",
+    "CHF",
+    "SEK",
+    "NOK",
+    "DKK",
+    "PLN",
+    "CZK",
+    "HUF",
+    "RON",
+    "ISK",
+    "TRY",
+    "BRL",
+    "MXN",
+    "ILS",
+    "ZAR",
+)
 
 SCHOOL_HOLIDAYS: Final = "holidays"
 SCHOOL_TERMS: Final = "terms"
@@ -59,6 +94,8 @@ SOURCE_WARNINGS: Final = "warnings"
 SOURCE_TIDES: Final = "tides"
 SOURCE_HAWKER: Final = "hawker"
 SOURCE_TRAFFIC_INCIDENTS: Final = "traffic_incidents"
+SOURCE_FX: Final = "fx"
+SOURCE_INTEREST: Final = "interest"
 SOURCE_CARPARK: Final = "carpark"
 SOURCE_TAXI: Final = "taxi"
 SOURCE_CAPITALAND: Final = "capitaland"
@@ -82,6 +119,8 @@ SOURCES: Final = (
     SOURCE_TIDES,
     SOURCE_HAWKER,
     SOURCE_TRAFFIC_INCIDENTS,
+    SOURCE_FX,
+    SOURCE_INTEREST,
     SOURCE_CARPARK,
     SOURCE_TAXI,
     SOURCE_CAPITALAND,
@@ -113,6 +152,8 @@ SOURCE_NAMES: Final = {
     SOURCE_TIDES: "NEA tide timings",
     SOURCE_HAWKER: "Hawker centre closures",
     SOURCE_TRAFFIC_INCIDENTS: "LTA traffic incidents",
+    SOURCE_FX: "FX rates (ECB)",
+    SOURCE_INTEREST: "Interest rates (MAS/SingStat)",
     SOURCE_CARPARK: "HDB carpark availability",
     SOURCE_TAXI: "Taxi availability",
     SOURCE_CAPITALAND: "CapitaLand mall carparks",
@@ -162,6 +203,16 @@ def carpark_numbers(entry: Any) -> list[str]:
         if (number := part.strip().upper()) and number not in numbers:
             numbers.append(number)
     return numbers
+
+
+def fx_currencies(entry: Any) -> list[str]:
+    """Currencies to quote against SGD (defaults when none stored)."""
+    chosen = _options(entry).get(CONF_FX_CURRENCIES)
+    if not chosen:
+        return list(DEFAULT_FX_CURRENCIES)
+    valid = set(FX_CURRENCIES)
+    result = [code for code in chosen if code in valid]
+    return result or list(DEFAULT_FX_CURRENCIES)
 
 
 def data_gov_headers(entry: Any) -> dict[str, str]:

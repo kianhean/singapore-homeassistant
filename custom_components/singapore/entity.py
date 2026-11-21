@@ -25,8 +25,10 @@ from .const import (
     SOURCE_COE,
     SOURCE_DENGUE,
     SOURCE_FLOOD,
+    SOURCE_FX,
     SOURCE_HAWKER,
     SOURCE_HOLIDAY,
+    SOURCE_INTEREST,
     SOURCE_LIGHTNING,
     SOURCE_PSI,
     SOURCE_RADAR,
@@ -60,6 +62,7 @@ DEVICE_TRAFFIC_INCIDENTS = "traffic_incidents"
 DEVICE_CARPARK = "carparks"
 DEVICE_TAXI = "taxis"
 DEVICE_CAPITALAND = "capitaland_carparks"
+DEVICE_FINANCE = "finance"
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,6 +175,12 @@ DEVICES: dict[str, SingaporeDevice] = {
         (SOURCE_CAPITALAND,),
         "https://justpark.capitaland.com/Lot-Availability",
     ),
+    DEVICE_FINANCE: SingaporeDevice(
+        "Finance",
+        "ECB FX & MAS/SingStat Interest Rates",
+        (SOURCE_FX, SOURCE_INTEREST),
+        "https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html",
+    ),
 }
 
 # Translation key -> data source, for every public-source entity. The weather
@@ -237,6 +246,20 @@ ENTITY_SOURCES: dict[str, str] = {
     "carpark": SOURCE_CARPARK,
     **dict.fromkeys(("taxis_available", "taxis_nearby"), SOURCE_TAXI),
     "capitaland_carpark": SOURCE_CAPITALAND,
+    "fx_rate": SOURCE_FX,
+    **dict.fromkeys(
+        (
+            "interest_sora",
+            "interest_sora_3m",
+            "interest_tbill_1y",
+            "interest_sgs_2y",
+            "interest_sgs_5y",
+            "interest_sgs_10y",
+            "interest_sgs_15y",
+            "interest_sgs_20y",
+        ),
+        SOURCE_INTEREST,
+    ),
 }
 
 

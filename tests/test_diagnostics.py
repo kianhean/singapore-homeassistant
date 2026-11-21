@@ -20,8 +20,10 @@ from custom_components.singapore.diagnostics import (
     async_get_config_entry_diagnostics,
 )
 from custom_components.singapore.flood_coordinator import FloodAlertData
+from custom_components.singapore.fx_coordinator import FxData
 from custom_components.singapore.hawker_coordinator import HawkerData
 from custom_components.singapore.holiday_coordinator import PublicHoliday
+from custom_components.singapore.interest_coordinator import InterestData, InterestRate
 from custom_components.singapore.lightning_coordinator import LightningData
 from custom_components.singapore.psi_coordinator import PsiData
 from custom_components.singapore.radar_coordinator import RadarData
@@ -71,6 +73,13 @@ async def test_diagnostics_serializes_all_coordinators():
         tides=_coordinator(TideData()),
         hawker=_coordinator(HawkerData()),
         traffic_incidents=_coordinator(TrafficIncidentsData()),
+        fx=_coordinator(FxData(date="2026-11-20", rates={"USD": 1.288444})),
+        interest=_coordinator(
+            InterestData(
+                rates={"sora": InterestRate(1.5526, "2026 Oct", "SORA")},
+                data_last_updated="13/11/2026",
+            )
+        ),
         carpark=_coordinator(
             CarparkData(
                 tracked=["BJ55"],
@@ -111,6 +120,8 @@ async def test_diagnostics_serializes_all_coordinators():
         "tides",
         "hawker",
         "traffic_incidents",
+        "fx",
+        "interest",
         "carpark",
         "taxi",
         "capitaland",
