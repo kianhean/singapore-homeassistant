@@ -26,8 +26,10 @@ from .const import (
     SOURCE_DENGUE,
     SOURCE_EV_CHARGERS,
     SOURCE_FLOOD,
+    SOURCE_FX,
     SOURCE_HAWKER,
     SOURCE_HOLIDAY,
+    SOURCE_INTEREST,
     SOURCE_LIGHTNING,
     SOURCE_PSI,
     SOURCE_RADAR,
@@ -63,6 +65,7 @@ DEVICE_CARPARK = "carparks"
 DEVICE_TAXI = "taxis"
 DEVICE_CAPITALAND = "capitaland_carparks"
 DEVICE_EV_CHARGERS = "ev_chargers"
+DEVICE_FINANCE = "finance"
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,6 +184,12 @@ DEVICES: dict[str, SingaporeDevice] = {
         (SOURCE_EV_CHARGERS,),
         "https://datamall.lta.gov.sg",
     ),
+    DEVICE_FINANCE: SingaporeDevice(
+        "Finance",
+        "ECB FX & MAS/SingStat Interest Rates",
+        (SOURCE_FX, SOURCE_INTEREST),
+        "https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html",
+    ),
 }
 
 # Translation key -> data source, for every public-source entity. The weather
@@ -250,6 +259,20 @@ ENTITY_SOURCES: dict[str, str] = {
     **dict.fromkeys(
         ("ev_chargers_available", "nearest_ev_charger"),
         SOURCE_EV_CHARGERS,
+    ),
+    "fx_rate": SOURCE_FX,
+    **dict.fromkeys(
+        (
+            "interest_sora",
+            "interest_sora_3m",
+            "interest_tbill_1y",
+            "interest_sgs_2y",
+            "interest_sgs_5y",
+            "interest_sgs_10y",
+            "interest_sgs_15y",
+            "interest_sgs_20y",
+        ),
+        SOURCE_INTEREST,
     ),
 }
 

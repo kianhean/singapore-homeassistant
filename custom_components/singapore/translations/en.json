@@ -344,6 +344,33 @@
       "capitaland_carpark": {
         "name": "{mall}"
       },
+      "fx_rate": {
+        "name": "{pair}"
+      },
+      "interest_sora": {
+        "name": "SORA"
+      },
+      "interest_sora_3m": {
+        "name": "3-Month Compounded SORA"
+      },
+      "interest_tbill_1y": {
+        "name": "1-Year T-Bill Yield"
+      },
+      "interest_sgs_2y": {
+        "name": "2-Year SGS Bond Yield"
+      },
+      "interest_sgs_5y": {
+        "name": "5-Year SGS Bond Yield"
+      },
+      "interest_sgs_10y": {
+        "name": "10-Year SGS Bond Yield"
+      },
+      "interest_sgs_15y": {
+        "name": "15-Year SGS Bond Yield"
+      },
+      "interest_sgs_20y": {
+        "name": "20-Year SGS Bond Yield"
+      },
       "train_crowd": {
         "name": "{station} Crowd",
         "state": {
@@ -397,6 +424,9 @@
     "geo_location": {
       "taxi": {
         "name": "Free taxi {number}"
+      },
+      "traffic_incident": {
+        "name": "Traffic incident {number}"
       }
     }
   },
@@ -485,27 +515,30 @@
           "sources": "Data sources",
           "school_events": "School calendars",
           "api_key": "data.gov.sg API key",
-          "lta_api_key": "LTA DataMall AccountKey",
           "carparks": "HDB carparks",
+          "fx_currencies": "FX currencies",
+          "polling": "Polling",
+          "lta_api_key": "LTA DataMall AccountKey",
           "train_crowd_stations": "MRT/LRT crowd stations",
-          "ev_postal_codes": "EV charger postal codes",
-          "polling": "Polling"
+          "ev_postal_codes": "EV charger postal codes"
         },
         "data_description": {
           "sources": "Turning off SP Group tariffs also leaves SP account cost statistics unpriced. HDB carpark availability, taxi availability and CapitaLand mall carparks are off until you tick them: the first two download island-wide data on each poll; CapitaLand's lots come from its JustPark website. MRT/LRT crowd density and EV charger availability require an LTA DataMall AccountKey.",
           "school_events": "Which MOE school calendars to create when the MOE school calendar source is on.",
           "api_key": "Optional. A free key from data.gov.sg gives higher rate limits (fewer HTTP 429 errors). Leave empty to use the public limits.",
-          "lta_api_key": "Optional. A free AccountKey from LTA DataMall (datamall.lta.gov.sg) unlocks MRT/LRT platform crowd density and EV charger availability.",
           "carparks": "Carpark numbers to track when HDB carpark availability is on, separated by commas (e.g. BJ55, TM24; shown on HDB's and data.gov.sg's carpark lists). Leave empty for the 3 carparks nearest your home location.",
+          "fx_currencies": "Currencies to quote against SGD when FX rates (ECB) is on.",
+          "polling": "Reduced polls the fast sources (flood alerts, lightning, traffic cameras, radar, trains, weather, PSI, UV, heat stress, carparks, taxis, CapitaLand carparks) three times less often.",
+          "lta_api_key": "Optional. A free AccountKey from LTA DataMall (datamall.lta.gov.sg) unlocks MRT/LRT platform crowd density and EV charger availability.",
           "train_crowd_stations": "MRT/LRT station codes to track when crowd density is on, separated by commas (e.g. EW13, NS24, CC1). Leave empty for EW13, EW14 and NS24.",
-          "ev_postal_codes": "Optional 6-digit Singapore postal codes to query for EV chargers, separated by commas (e.g. 529536, 238839). Leave empty to find EV chargers within 2 km of your home location.",
-          "polling": "Reduced polls the fast sources (flood alerts, lightning, traffic cameras, radar, trains, weather, PSI, UV, heat stress, carparks, taxis, CapitaLand carparks) three times less often."
+          "ev_postal_codes": "Optional 6-digit Singapore postal codes to query for EV chargers, separated by commas (e.g. 529536, 238839). Leave empty to find EV chargers within 2 km of your home location."
         }
       }
     },
     "error": {
       "no_sources": "Turn on at least one data source, or add an SP account first.",
       "no_school_events": "Choose at least one school calendar, or turn off the MOE school calendar source.",
+      "no_fx_currencies": "Choose at least one currency, or turn off the FX rates source.",
       "lta_api_key_required": "Enter an LTA DataMall AccountKey to enable MRT/LRT crowd density or EV charger availability.",
       "invalid_lta_api_key": "LTA DataMall rejected this AccountKey. Check the key and try again.",
       "cannot_connect_lta": "Could not reach LTA DataMall to validate the AccountKey. Try again later."
@@ -532,6 +565,8 @@
         "tides": "NEA tide timings",
         "hawker": "Hawker centre closures",
         "traffic_incidents": "LTA traffic incidents",
+        "fx": "FX rates (ECB)",
+        "interest": "Interest rates (MAS/SingStat)",
         "carpark": "HDB carpark availability",
         "taxi": "Taxi availability",
         "capitaland": "CapitaLand mall carparks",

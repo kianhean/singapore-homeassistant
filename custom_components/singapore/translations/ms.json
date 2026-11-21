@@ -344,6 +344,33 @@
       "capitaland_carpark": {
         "name": "{mall}"
       },
+      "fx_rate": {
+        "name": "{pair}"
+      },
+      "interest_sora": {
+        "name": "SORA"
+      },
+      "interest_sora_3m": {
+        "name": "SORA Terkompaun 3 Bulan"
+      },
+      "interest_tbill_1y": {
+        "name": "Hasil Bil Perbendaharaan 1 Tahun"
+      },
+      "interest_sgs_2y": {
+        "name": "Hasil Bon SGS 2 Tahun"
+      },
+      "interest_sgs_5y": {
+        "name": "Hasil Bon SGS 5 Tahun"
+      },
+      "interest_sgs_10y": {
+        "name": "Hasil Bon SGS 10 Tahun"
+      },
+      "interest_sgs_15y": {
+        "name": "Hasil Bon SGS 15 Tahun"
+      },
+      "interest_sgs_20y": {
+        "name": "Hasil Bon SGS 20 Tahun"
+      },
       "train_crowd": {
         "name": "Kesesakan {station}",
         "state": {
@@ -397,6 +424,9 @@
     "geo_location": {
       "taxi": {
         "name": "Teksi kosong {number}"
+      },
+      "traffic_incident": {
+        "name": "Insiden trafik {number}"
       }
     }
   },
@@ -487,6 +517,7 @@
           "api_key": "Kunci API data.gov.sg",
           "carparks": "Tempat letak kereta HDB",
           "polling": "Pengundian",
+          "fx_currencies": "Mata wang FX",
           "lta_api_key": "LTA DataMall AccountKey",
           "train_crowd_stations": "Stesen kesesakan MRT/LRT",
           "ev_postal_codes": "Poskod pengecas EV"
@@ -497,6 +528,7 @@
           "api_key": "Pilihan. Kunci percuma daripada data.gov.sg memberikan had kadar yang lebih tinggi (kurang ralat HTTP 429). Biarkan kosong untuk menggunakan had awam.",
           "carparks": "Nombor tempat letak kereta untuk dijejaki apabila ketersediaan tempat letak kereta HDB dihidupkan, dipisahkan dengan koma (cth. BJ55, TM24; ditunjukkan pada senarai tempat letak kereta HDB dan data.gov.sg). Biarkan kosong untuk 3 tempat letak kereta terdekat dengan lokasi rumah anda.",
           "polling": "Dikurangkan mengundi sumber pantas (amaran banjir, kilat, kamera trafik, radar, kereta api, cuaca, PSI, UV, tekanan haba, tempat letak kereta, teksi, tempat letak kereta CapitaLand) tiga kali kurang kerap.",
+          "fx_currencies": "Mata wang yang disebut dalam SGD apabila kadar FX (ECB) dihidupkan.",
           "lta_api_key": "Pilihan. AccountKey percuma daripada LTA DataMall (datamall.lta.gov.sg) mengaktifkan kesesakan platform MRT/LRT dan ketersediaan pengecas EV.",
           "train_crowd_stations": "Kod stesen MRT/LRT untuk dijejaki apabila kesesakan dihidupkan, dipisahkan dengan koma (cth. EW13, NS24, CC1). Biarkan kosong untuk EW13, EW14 dan NS24.",
           "ev_postal_codes": "Poskod Singapura 6 digit pilihan untuk menyemak pengecas EV, dipisahkan dengan koma (cth. 529536, 238839). Biarkan kosong untuk mencari pengecas EV dalam jarak 2 km dari rumah anda."
@@ -506,6 +538,7 @@
     "error": {
       "no_sources": "Hidupkan sekurang-kurangnya satu sumber data, atau tambah akaun SP terlebih dahulu.",
       "no_school_events": "Pilih sekurang-kurangnya satu kalendar sekolah, atau matikan sumber kalendar sekolah MOE.",
+      "no_fx_currencies": "Pilih sekurang-kurangnya satu mata wang, atau matikan sumber kadar FX.",
       "lta_api_key_required": "Masukkan LTA DataMall AccountKey untuk mengaktifkan kesesakan MRT/LRT atau ketersediaan pengecas EV.",
       "invalid_lta_api_key": "LTA DataMall menolak AccountKey ini. Semak kunci dan cuba lagi.",
       "cannot_connect_lta": "Tidak dapat menghubungi LTA DataMall untuk mengesahkan AccountKey. Cuba lagi nanti."
@@ -535,6 +568,8 @@
         "carpark": "Ketersediaan tempat letak kereta HDB",
         "taxi": "Ketersediaan teksi",
         "capitaland": "Tempat letak kereta pusat beli-belah CapitaLand",
+        "fx": "Kadar FX (ECB)",
+        "interest": "Kadar faedah (MAS/SingStat)",
         "train_crowd": "Kesesakan MRT/LRT (LTA DataMall)",
         "ev_chargers": "Ketersediaan pengecas EV (LTA DataMall)"
       }

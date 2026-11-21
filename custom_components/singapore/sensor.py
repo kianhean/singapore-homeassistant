@@ -40,7 +40,7 @@ from .coe_coordinator import (
     UNIT_COE,
     CoeCoordinator,
 )
-from .const import train_crowd_stations
+from .const import fx_currencies, train_crowd_stations
 from .coordinator import UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER, SPGroupCoordinator
 from .dengue_coordinator import DengueClusterCoordinator, nearest_cluster
 from .entity import (
@@ -50,6 +50,7 @@ from .entity import (
     DEVICE_COE,
     DEVICE_ENERGY,
     DEVICE_EV_CHARGERS,
+    DEVICE_FINANCE,
     DEVICE_FLOOD,
     DEVICE_NEA,
     DEVICE_TAXI,
@@ -60,6 +61,8 @@ from .entity import (
 )
 from .ev_charger_coordinator import EvChargerCoordinator
 from .flood_coordinator import FloodAlertCoordinator
+from .fx_coordinator import UNIT_SGD, FxCoordinator, fx_quote_units
+from .interest_coordinator import INTEREST_SERIES_KEYS, InterestRateCoordinator
 from .lightning_coordinator import (
     LightningCoordinator,
     nearest_strike,
@@ -229,6 +232,15 @@ async def async_setup_entry(
         entities += [
             SingaporeTrafficIncidentsSensor(traffic_incidents, eid),
             SingaporeNearestTrafficIncidentSensor(traffic_incidents, eid),
+        ]
+    if (fx := data.fx) is not None:
+        entities += [
+            SingaporeFxRateSensor(fx, eid, code) for code in fx_currencies(entry)
+        ]
+    if (interest := data.interest) is not None:
+        entities += [
+            SingaporeInterestRateSensor(interest, eid, key)
+            for key in INTEREST_SERIES_KEYS
         ]
     if (taxi := data.taxi) is not None:
         entities += [
@@ -1618,6 +1630,88 @@ class SingaporeNearestEvChargerSensor(
             attrs["plug_types"] = nearest.plug_types
             if nearest.max_power_kw is not None:
                 attrs["max_power_kw"] = nearest.max_power_kw
+        if self.coordinator.last_updated is not None:
+            attrs["last_updated"] = self.coordinator.last_updated.isoformat()
+        return attrs
+
+
+class SingaporeFxRateSensor(SingaporeEntity[FxCoordinator], SensorEntity):
+    """SGD price of one foreign currency (or 100 units for small-unit currencies)."""
+
+    _device = DEVICE_FINANCE
+    _attr_translation_key = "fx_rate"
+    _attr_attribution = "Data provided by the European Central Bank"
+    _attr_device_class = None
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UNIT_SGD
+    _attr_suggested_display_precision = 4
+
+    def __init__(
+        self, coordinator: FxCoordinator, entry_id: str, currency: str
+    ) -> None:
+        super().__init__(coordinator, entry_id, f"fx_{currency.lower()}")
+        self._currency = currency
+        self._units = fx_quote_units(currency)
+        pair = (
+            f"{currency}/SGD" if self._units == 1 else f"{self._units} {currency}/SGD"
+        )
+        self._attr_translation_placeholders = {"pair": pair}
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.rates.get(self._currency)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs: dict = {
+            "currency": self._currency,
+            "quote_units": self._units,
+            "source": "European Central Bank",
+        }
+        if self.coordinator.data is not None:
+            attrs["rate_date"] = self.coordinator.data.date
+        if self.coordinator.last_updated is not None:
+            attrs["last_updated"] = self.coordinator.last_updated.isoformat()
+        return attrs
+
+
+class SingaporeInterestRateSensor(
+    SingaporeEntity[InterestRateCoordinator], SensorEntity
+):
+    """One Singapore interest rate or SGS bond yield series from MAS via SingStat."""
+
+    _device = DEVICE_FINANCE
+    _attr_attribution = "Data provided by MAS via SingStat TableBuilder"
+    _attr_device_class = None
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_suggested_display_precision = 2
+
+    def __init__(
+        self, coordinator: InterestRateCoordinator, entry_id: str, series_key: str
+    ) -> None:
+        super().__init__(coordinator, entry_id, f"interest_{series_key}")
+        self._series_key = series_key
+        self._attr_translation_key = f"interest_{series_key}"
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        rate = self.coordinator.data.rates.get(self._series_key)
+        return None if rate is None else rate.value
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs: dict = {"source": "MAS via SingStat TableBuilder (M700071)"}
+        if self.coordinator.data is not None:
+            if (rate := self.coordinator.data.rates.get(self._series_key)) is not None:
+                attrs["period"] = rate.period
+                attrs["series"] = rate.series
+            if self.coordinator.data.data_last_updated is not None:
+                attrs["data_last_updated"] = self.coordinator.data.data_last_updated
         if self.coordinator.last_updated is not None:
             attrs["last_updated"] = self.coordinator.last_updated.isoformat()
         return attrs

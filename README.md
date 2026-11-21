@@ -917,6 +917,19 @@ Singapore and around your Home Assistant home location, on a *Traffic* device.
 | `sensor.traffic_incidents` | Traffic Incidents | — | Active traffic incidents island-wide; attributes `counts_by_type` and `incidents` (newest 50: type, message, latitude, longitude) |
 | `sensor.traffic_nearest_incident` | Traffic Nearest incident | km | Distance from your HA home location to the nearest active incident (unknown when none); attributes `type`, `message`, `latitude`, `longitude` |
 | `binary_sensor.traffic_incident_nearby` | Traffic Incident nearby | — | `on` when an active traffic incident is within 5 km of home (`problem`); attributes `radius_km`, `nearest_km`, `nearest_type`, `nearby_incidents` |
+| `geo_location.traffic_incident_<n>` | Traffic incident 1, 2, … | km | One per active incident with coordinates, nearest first (at most 50); state = distance from home, `latitude` / `longitude`, `type`, `message`, `source: singapore_traffic` (Map card) |
+
+Plot active incidents alongside the checkpoint cameras on a Map card:
+
+```yaml
+type: map
+geo_location_sources:
+  - singapore_traffic
+entities:
+  - zone.home
+  - camera.traffic_cameras_woodlands_causeway
+  - camera.traffic_cameras_tuas_second_link
+```
 
 </details>
 
@@ -1216,6 +1229,26 @@ Attributes: `events` (number of events in the calendar), `source` and `url`.
 
 </details>
 
+### FX rates and interest rates
+
+Key-free financial rates on a *Finance* device:
+
+- **FX rates (ECB)**: Updated every **4 hours** from the [European Central Bank daily reference rates](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html) (published each working day around 16:00 CET). Derives SGD crosses for USD, EUR, GBP, JPY (per 100), MYR, CNY, AUD and HKD by default; choose any of the 29 ECB currencies under **Configure → FX currencies**.
+- **Interest rates (MAS/SingStat)**: Updated every **12 hours** from [SingStat TableBuilder table M700071](https://tablebuilder.singstat.gov.sg/api/table/tabledata/M700071) (republishing monthly end-of-period MAS data). Includes SORA, 3-Month Compounded SORA, 1-Year T-Bill Yield, and 2/5/10/15/20-Year SGS Bond Yields. (SIBOR was discontinued at the end of 2024 and replaced by SORA.)
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.finance_usd_sgd` (and other selected currencies) | Finance USD/SGD (or `100 JPY/SGD` for small-unit currencies) | SGD | SGD price per 1 unit (or 100 units); attributes `currency`, `quote_units`, `rate_date`, `source` |
+| `sensor.finance_sora` | Finance SORA | % | Monthly end-of-period SORA; attributes `period`, `series`, `data_last_updated`, `source` |
+| `sensor.finance_3_month_compounded_sora` | Finance 3-Month Compounded SORA | % | Monthly 3-Month Compounded SORA |
+| `sensor.finance_1_year_t_bill_yield` | Finance 1-Year T-Bill Yield | % | 1-Year Singapore Treasury Bill yield |
+| `sensor.finance_2_year_sgs_bond_yield` … `20_year` | Finance 2/5/10/15/20-Year SGS Bond Yield | % | Singapore Government Securities benchmark bond yields |
+
+</details>
+
 ### MRT/LRT crowd density and EV charger availability (optional LTA DataMall key)
 
 *Opt-in: requires a free **LTA DataMall AccountKey**.* Request one at [datamall.lta.gov.sg](https://datamall.lta.gov.sg/content/datamall/en/request-for-api.html), enter it under **Configure → LTA DataMall AccountKey**, and tick either or both sources:
@@ -1233,7 +1266,6 @@ Attributes: `events` (number of events in the calendar), `source` and `url`.
 | `sensor.ev_chargers_nearest_available` | EV Chargers Nearest available | km | Distance to the nearest location with an available EV charger; attributes `name`, `address`, `available`, `total`, `operators`, `plug_types`, `max_power_kw` |
 
 </details>
-
 ## Example sensor states
 
 <details>
