@@ -34,6 +34,10 @@ custom_components/singapore/
 ├── carpark_coordinator.py  # CarparkCoordinator: HDB lot availability + carpark info (SVY21→WGS84)
 ├── taxi_coordinator.py     # TaxiAvailabilityCoordinator: free taxis island-wide, counted near home
 ├── capitaland_coordinator.py # CapitaLandCarparkCoordinator: CapitaLand JustPark mall lots (opt-in)
+├── fx_coordinator.py       # FxCoordinator: ECB daily reference rates → SGD crosses (key-free)
+├── interest_coordinator.py # InterestRateCoordinator: MAS SORA/T-bill/SGS yields via SingStat M700071
+├── train_crowd_coordinator.py # TrainCrowdCoordinator: LTA DataMall PCDRealTime (opt-in, LTA key)
+├── ev_charger_coordinator.py # EvChargerCoordinator: LTA DataMall EV charger availability (opt-in, LTA key)
 ├── radar_coordinator.py    # RadarCoordinator: NEA rain radar PNGs (70/240/480 km)
 ├── radar_image.py          # Pure-Pillow compositing of radar onto NEA base maps (BASEMAPS) + GIF loops
 ├── sp_account_coordinator.py # SpAccountCoordinator: one per SP e-account subentry (usage, bills, stats)
@@ -50,7 +54,7 @@ custom_components/singapore/
 ├── calendar.py             # Calendar entities (public holidays; MOE school holidays/terms/exams;
 │                           #   hawker centre closures)
 ├── event.py                # Event entities: COE new results, MRT/LRT service alerts
-├── geo_location.py         # Free taxis within 1 km as geo_location entities (Map card markers)
+├── geo_location.py         # Free taxis within 1 km + live traffic incidents as geo_location entities (Map card markers)
 ├── weather.py              # Weather entities (one per Singapore forecast area)
 ├── config_flow.py          # UI config flow (name; single instance), options flow, SP account subentry flow
 ├── quality_scale.yaml      # Self-assessed HA quality scale rules (hassfest skips it for custom integrations)

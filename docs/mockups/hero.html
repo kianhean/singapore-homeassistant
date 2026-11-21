@@ -1,6 +1,7 @@
 <!doctype html>
 <!-- Mirrors examples/dashboard.yaml: only built-in Home Assistant cards, with the states
-     they display. Keep the two in sync. -->
+     they display. Keep the two in sync.
+     Finance: ECB reference rates of 2026-11-20 and MAS rates for Oct 2026 (SingStat M700071). -->
 <html><head><meta charset="utf-8"><link rel="stylesheet" href="ha.css">
 <style>
   .view { grid-template-columns: repeat(3, 1fr); }
@@ -106,6 +107,20 @@
         </div>
         <div class="card cam"><img src="cameras/2701.jpg" alt=""><div class="bar">Woodlands Causeway</div></div>
         <div class="card cam"><img src="cameras/4713.jpg" alt=""><div class="bar">Tuas Checkpoint</div></div>
+
+        <div class="heading"><i m="mdiFinance"></i>Finance</div>
+        <div class="grid2">
+          <div class="card tile"><span class="bubble" style="--c:var(--green)"><i m="mdiCurrencyUsd"></i></span><div><div class="name">USD/SGD</div><div class="state">1.2884 SGD</div></div></div>
+          <div class="card tile"><span class="bubble" style="--c:var(--green)"><i m="mdiCurrencyUsd"></i></span><div><div class="name">EUR/SGD</div><div class="state">1.4160 SGD</div></div></div>
+          <div class="card tile"><span class="bubble" style="--c:var(--green)"><i m="mdiCurrencyUsd"></i></span><div><div class="name">100 JPY/SGD</div><div class="state">0.8122 SGD</div></div></div>
+          <div class="card tile"><span class="bubble" style="--c:var(--green)"><i m="mdiCurrencyUsd"></i></span><div><div class="name">MYR/SGD</div><div class="state">0.3133 SGD</div></div></div>
+        </div>
+        <div class="card"><div class="card-title">Interest rates</div><div class="rows">
+          <div class="row"><span class="ic"><i m="mdiPercentOutline"></i></span><span class="label">SORA</span><span class="val">1.55%</span></div>
+          <div class="row"><span class="ic"><i m="mdiPercentOutline"></i></span><span class="label">3-month compounded SORA</span><span class="val">1.30%</span></div>
+          <div class="row"><span class="ic"><i m="mdiBankOutline"></i></span><span class="label">1-year T-bill</span><span class="val">1.90%</span></div>
+          <div class="row"><span class="ic"><i m="mdiChartLine"></i></span><span class="label">10-year SGS bond</span><span class="val">2.24%</span></div>
+        </div></div>
       </div>
 
       <div class="section">

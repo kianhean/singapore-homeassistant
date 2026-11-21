@@ -162,6 +162,40 @@ views:
             entity: camera.traffic_cameras_tuas_checkpoint
             name: Tuas Checkpoint
             show_state: false
+          - type: heading
+            heading: Finance
+            icon: mdi:finance
+          - type: tile
+            entity: sensor.finance_usd_sgd
+            name: USD/SGD
+            color: green
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.finance_eur_sgd
+            name: EUR/SGD
+            color: green
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.finance_100_jpy_sgd
+            name: 100 JPY/SGD
+            color: green
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.finance_myr_sgd
+            name: MYR/SGD
+            color: green
+            grid_options: { columns: 6 }
+          - type: entities
+            title: Interest rates
+            entities:
+              - entity: sensor.finance_sora
+                name: SORA
+              - entity: sensor.finance_3_month_compounded_sora
+                name: 3-month compounded SORA
+              - entity: sensor.finance_1_year_t_bill_yield
+                name: 1-year T-bill
+              - entity: sensor.finance_10_year_sgs_bond_yield
+                name: 10-year SGS bond
 
       - type: grid
         cards:
