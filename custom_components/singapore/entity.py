@@ -24,6 +24,7 @@ from .const import (
     SOURCE_CARPARK,
     SOURCE_COE,
     SOURCE_DENGUE,
+    SOURCE_EV_CHARGERS,
     SOURCE_FLOOD,
     SOURCE_FX,
     SOURCE_HAWKER,
@@ -39,6 +40,7 @@ from .const import (
     SOURCE_TRAFFIC,
     SOURCE_TRAFFIC_INCIDENTS,
     SOURCE_TRAIN,
+    SOURCE_TRAIN_CROWD,
     SOURCE_UV,
     SOURCE_WARNINGS,
     SOURCE_WBGT,
@@ -62,6 +64,7 @@ DEVICE_TRAFFIC_INCIDENTS = "traffic_incidents"
 DEVICE_CARPARK = "carparks"
 DEVICE_TAXI = "taxis"
 DEVICE_CAPITALAND = "capitaland_carparks"
+DEVICE_EV_CHARGERS = "ev_chargers"
 DEVICE_FINANCE = "finance"
 
 
@@ -111,7 +114,7 @@ DEVICES: dict[str, SingaporeDevice] = {
     DEVICE_TRAIN: SingaporeDevice(
         "MRT/LRT",
         "MyTransport Train Status",
-        (SOURCE_TRAIN,),
+        (SOURCE_TRAIN, SOURCE_TRAIN_CROWD),
         "https://www.mytransport.sg/trainstatus#",
     ),
     DEVICE_AIR_QUALITY: SingaporeDevice(
@@ -174,6 +177,12 @@ DEVICES: dict[str, SingaporeDevice] = {
         "CapitaLand JustPark Lot Availability",
         (SOURCE_CAPITALAND,),
         "https://justpark.capitaland.com/Lot-Availability",
+    ),
+    DEVICE_EV_CHARGERS: SingaporeDevice(
+        "EV Chargers",
+        "LTA DataMall EV Charging Points",
+        (SOURCE_EV_CHARGERS,),
+        "https://datamall.lta.gov.sg",
     ),
     DEVICE_FINANCE: SingaporeDevice(
         "Finance",
@@ -246,6 +255,11 @@ ENTITY_SOURCES: dict[str, str] = {
     "carpark": SOURCE_CARPARK,
     **dict.fromkeys(("taxis_available", "taxis_nearby"), SOURCE_TAXI),
     "capitaland_carpark": SOURCE_CAPITALAND,
+    "train_crowd": SOURCE_TRAIN_CROWD,
+    **dict.fromkeys(
+        ("ev_chargers_available", "nearest_ev_charger"),
+        SOURCE_EV_CHARGERS,
+    ),
     "fx_rate": SOURCE_FX,
     **dict.fromkeys(
         (

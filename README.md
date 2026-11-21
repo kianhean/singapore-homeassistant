@@ -1249,6 +1249,23 @@ Key-free financial rates on a *Finance* device:
 
 </details>
 
+### MRT/LRT crowd density and EV charger availability (optional LTA DataMall key)
+
+*Opt-in: requires a free **LTA DataMall AccountKey**.* Request one at [datamall.lta.gov.sg](https://datamall.lta.gov.sg/content/datamall/en/request-for-api.html), enter it under **Configure → LTA DataMall AccountKey**, and tick either or both sources:
+
+- **MRT/LRT crowd density (LTA DataMall)**: Polls `PCDRealTime` every **10 minutes** for the lines covering your chosen stations (set comma-separated station codes such as `EW13, NS24, CC1` under **Configure → MRT/LRT crowd stations**, or leave empty for `EW13`, `EW14` and `NS24`). Adds one enum sensor (`low`, `moderate`, `high`) per station on the *MRT/LRT* device.
+- **EV charger availability (LTA DataMall)**: Polls every **5 minutes** on an *EV Chargers* device. Specify comma-separated 6-digit Singapore postal codes under **Configure → EV charger postal codes** to query `EVChargingPoints` directly, or leave empty to download `EVCBatch` and track chargers within 2 km of your Home Assistant home location.
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.mrt_lrt_ew13_crowd` (per station) | MRT/LRT EW13 Crowd | — | Real-time platform crowd density (`low`, `moderate`, `high`); attributes `station`, `train_line`, `start_time`, `end_time`, `source` |
+| `sensor.ev_chargers_available` | EV Chargers Available | chargers | Total available EV charging connectors; attributes `total_chargers`, `locations_count`, `locations` (operator, plug types, max kW, distance) |
+| `sensor.ev_chargers_nearest_available` | EV Chargers Nearest available | km | Distance to the nearest location with an available EV charger; attributes `name`, `address`, `available`, `total`, `operators`, `plug_types`, `max_power_kw` |
+
+</details>
 ## Example sensor states
 
 <details>

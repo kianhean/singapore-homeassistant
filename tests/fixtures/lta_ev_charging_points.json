@@ -1,0 +1,88 @@
+{
+  "evLocationsData": [
+    {
+      "address": "10 Tampines Central 1, Singapore 529536",
+      "name": "Tampines 1 Carpark",
+      "longtitude": 103.9452,
+      "latitude": 1.3541,
+      "locationId": "529536001",
+      "status": 1,
+      "chargingPoints": [
+        {
+          "status": 1,
+          "operationHours": "24 Hours",
+          "operator": "SP Mobility",
+          "position": "B2 Lot 14",
+          "name": "Charger 1",
+          "id": "SP-529536-1",
+          "plugTypes": [
+            {
+              "plugType": "Type 2",
+              "powerRating": "AC",
+              "chargingSpeed": 7.4,
+              "price": 0.65,
+              "priceType": "Per kWh",
+              "current": "AC",
+              "evIds": [
+                { "evCpId": "SP-529536-1-A", "status": 1 },
+                { "evCpId": "SP-529536-1-B", "status": 0 }
+              ]
+            }
+          ]
+        },
+        {
+          "status": 1,
+          "operationHours": "24 Hours",
+          "operator": "SP Mobility",
+          "position": "B2 Lot 15",
+          "name": "Charger 2",
+          "id": "SP-529536-2",
+          "plugTypes": [
+            {
+              "plugType": "CCS2",
+              "powerRating": "DC",
+              "chargingSpeed": 50.0,
+              "price": 0.72,
+              "priceType": "Per kWh",
+              "current": "DC",
+              "evIds": [
+                { "evCpId": "SP-529536-2-A", "status": 1 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "address": "238 Orchard Road, Singapore 238839",
+      "name": "Orchard Carpark",
+      "longtitude": 103.8388,
+      "latitude": 1.3016,
+      "locationId": "238839001",
+      "status": 0,
+      "chargingPoints": [
+        {
+          "status": 0,
+          "operationHours": "24 Hours",
+          "operator": "Charge+",
+          "position": "L3 Lot 5",
+          "name": "Charger 1",
+          "id": "CP-238839-1",
+          "plugTypes": [
+            {
+              "plugType": "Type 2",
+              "powerRating": "AC",
+              "chargingSpeed": 22.0,
+              "price": 0.60,
+              "priceType": "Per kWh",
+              "current": "AC",
+              "evIds": [
+                { "evCpId": "CP-238839-1-A", "status": 0 }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

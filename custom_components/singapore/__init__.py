@@ -21,11 +21,13 @@ from .carpark_coordinator import CarparkCoordinator
 from .coe_coordinator import CoeCoordinator
 from .const import (
     DOMAIN,
+    LTA_DATAMALL_SOURCES,
     SCHOOL_EVENT_KINDS,
     SOURCE_CAPITALAND,
     SOURCE_CARPARK,
     SOURCE_COE,
     SOURCE_DENGUE,
+    SOURCE_EV_CHARGERS,
     SOURCE_FLOOD,
     SOURCE_FX,
     SOURCE_HAWKER,
@@ -41,6 +43,7 @@ from .const import (
     SOURCE_TRAFFIC,
     SOURCE_TRAFFIC_INCIDENTS,
     SOURCE_TRAIN,
+    SOURCE_TRAIN_CROWD,
     SOURCE_UV,
     SOURCE_WARNINGS,
     SOURCE_WBGT,
@@ -50,6 +53,8 @@ from .const import (
     enabled_school_events,
     enabled_sources,
     fx_currencies,
+    lta_datamall_headers,
+    train_crowd_stations,
 )
 from .coordinator import SPGroupCoordinator
 from .dengue_coordinator import DengueClusterCoordinator
@@ -59,6 +64,7 @@ from .entity import (
     entity_source,
     school_translation_key,
 )
+from .ev_charger_coordinator import EvChargerCoordinator
 from .flood_coordinator import FloodAlertCoordinator
 from .fx_coordinator import FxCoordinator
 from .hawker_coordinator import HawkerClosureCoordinator
@@ -79,6 +85,7 @@ from .tide_coordinator import TideCoordinator
 from .traffic_coordinator import TrafficImagesCoordinator
 from .traffic_incidents_coordinator import TrafficIncidentsCoordinator
 from .train_coordinator import TrainStatusCoordinator
+from .train_crowd_coordinator import TrainCrowdCoordinator
 from .uv_coordinator import UvCoordinator
 from .warning_coordinator import WeatherWarningsCoordinator
 from .wbgt_coordinator import WbgtCoordinator
@@ -133,6 +140,8 @@ class SingaporeData:
     carpark: CarparkCoordinator | None
     taxi: TaxiAvailabilityCoordinator | None
     capitaland: CapitaLandCarparkCoordinator | None
+    train_crowd: TrainCrowdCoordinator | None
+    ev_chargers: EvChargerCoordinator | None
     # One per SP Group e-account subentry, keyed by subentry id.
     sp_accounts: dict[str, SpAccountCoordinator] = field(default_factory=dict)
     # The options this setup used; a change to them reloads the entry.
@@ -174,6 +183,8 @@ _COORDINATORS: dict[str, type[DataUpdateCoordinator]] = {
     SOURCE_CARPARK: CarparkCoordinator,
     SOURCE_TAXI: TaxiAvailabilityCoordinator,
     SOURCE_CAPITALAND: CapitaLandCarparkCoordinator,
+    SOURCE_TRAIN_CROWD: TrainCrowdCoordinator,
+    SOURCE_EV_CHARGERS: EvChargerCoordinator,
 }
 
 # Weather, holidays and train status are the core sources: setup waits for
@@ -187,6 +198,8 @@ _BLOCKING_SOURCES = (SOURCE_WEATHER, SOURCE_HOLIDAY, SOURCE_TRAIN)
 async def async_setup_entry(hass: HomeAssistant, entry: SingaporeConfigEntry) -> bool:
     """Set up the integration and kick off the first data fetch."""
     enabled = enabled_sources(entry)
+    if not lta_datamall_headers(entry):
+        enabled -= set(LTA_DATAMALL_SOURCES)
     coordinators: dict[str, DataUpdateCoordinator] = {
         source: cls(hass, entry)
         for source, cls in _COORDINATORS.items()
@@ -310,6 +323,10 @@ def async_remove_stale(
         f"{entry.entry_id}_carpark_{number.lower()}"
         for number in carpark_numbers(entry)
     }
+    chosen_stations = {
+        f"{entry.entry_id}_train_crowd_{code.lower()}"
+        for code in train_crowd_stations(entry)
+    }
     chosen_fx = {f"{entry.entry_id}_fx_{code.lower()}" for code in fx_currencies(entry)}
     entity_registry = er.async_get(hass)
     for reg_entry in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
@@ -325,6 +342,10 @@ def async_remove_stale(
                 reg_entry.translation_key == "carpark"
                 and chosen_carparks
                 and reg_entry.unique_id not in chosen_carparks
+            )
+            or (
+                reg_entry.translation_key == "train_crowd"
+                and reg_entry.unique_id not in chosen_stations
             )
             or (
                 reg_entry.translation_key == "fx_rate"
@@ -392,6 +413,8 @@ _BACKGROUND_LABELS = {
     SOURCE_CARPARK: "carpark availability",
     SOURCE_TAXI: "taxi availability",
     SOURCE_CAPITALAND: "CapitaLand carpark",
+    SOURCE_TRAIN_CROWD: "train crowd density",
+    SOURCE_EV_CHARGERS: "EV charger availability",
 }
 
 
