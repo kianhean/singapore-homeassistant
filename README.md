@@ -1216,6 +1216,26 @@ Attributes: `events` (number of events in the calendar), `source` and `url`.
 
 </details>
 
+### FX rates and interest rates
+
+Key-free financial rates on a *Finance* device:
+
+- **FX rates (ECB)**: Updated every **4 hours** from the [European Central Bank daily reference rates](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html) (published each working day around 16:00 CET). Derives SGD crosses for USD, EUR, GBP, JPY (per 100), MYR, CNY, AUD and HKD by default; choose any of the 29 ECB currencies under **Configure → FX currencies**.
+- **Interest rates (MAS/SingStat)**: Updated every **12 hours** from [SingStat TableBuilder table M700071](https://tablebuilder.singstat.gov.sg/api/table/tabledata/M700071) (republishing monthly end-of-period MAS data). Includes SORA, 3-Month Compounded SORA, 1-Year T-Bill Yield, and 2/5/10/15/20-Year SGS Bond Yields. (SIBOR was discontinued at the end of 2024 and replaced by SORA.)
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.finance_usd_sgd` (and other selected currencies) | Finance USD/SGD (or `100 JPY/SGD` for small-unit currencies) | SGD | SGD price per 1 unit (or 100 units); attributes `currency`, `quote_units`, `rate_date`, `source` |
+| `sensor.finance_sora` | Finance SORA | % | Monthly end-of-period SORA; attributes `period`, `series`, `data_last_updated`, `source` |
+| `sensor.finance_3_month_compounded_sora` | Finance 3-Month Compounded SORA | % | Monthly 3-Month Compounded SORA |
+| `sensor.finance_1_year_t_bill_yield` | Finance 1-Year T-Bill Yield | % | 1-Year Singapore Treasury Bill yield |
+| `sensor.finance_2_year_sgs_bond_yield` … `20_year` | Finance 2/5/10/15/20-Year SGS Bond Yield | % | Singapore Government Securities benchmark bond yields |
+
+</details>
+
 ## Example sensor states
 
 <details>

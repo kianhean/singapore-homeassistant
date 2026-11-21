@@ -27,8 +27,10 @@ from .const import (
     SOURCE_COE,
     SOURCE_DENGUE,
     SOURCE_FLOOD,
+    SOURCE_FX,
     SOURCE_HAWKER,
     SOURCE_HOLIDAY,
+    SOURCE_INTEREST,
     SOURCE_LIGHTNING,
     SOURCE_PSI,
     SOURCE_RADAR,
@@ -47,6 +49,7 @@ from .const import (
     carpark_numbers,
     enabled_school_events,
     enabled_sources,
+    fx_currencies,
 )
 from .coordinator import SPGroupCoordinator
 from .dengue_coordinator import DengueClusterCoordinator
@@ -57,9 +60,11 @@ from .entity import (
     school_translation_key,
 )
 from .flood_coordinator import FloodAlertCoordinator
+from .fx_coordinator import FxCoordinator
 from .hawker_coordinator import HawkerClosureCoordinator
 from .health import async_clear_source_issues, async_setup_source_health
 from .holiday_coordinator import PublicHolidayCoordinator
+from .interest_coordinator import InterestRateCoordinator
 from .lightning_coordinator import LightningCoordinator
 from .psi_coordinator import PsiCoordinator
 from .radar_coordinator import RadarCoordinator
@@ -123,6 +128,8 @@ class SingaporeData:
     tides: TideCoordinator | None
     hawker: HawkerClosureCoordinator | None
     traffic_incidents: TrafficIncidentsCoordinator | None
+    fx: FxCoordinator | None
+    interest: InterestRateCoordinator | None
     carpark: CarparkCoordinator | None
     taxi: TaxiAvailabilityCoordinator | None
     capitaland: CapitaLandCarparkCoordinator | None
@@ -162,6 +169,8 @@ _COORDINATORS: dict[str, type[DataUpdateCoordinator]] = {
     SOURCE_TIDES: TideCoordinator,
     SOURCE_HAWKER: HawkerClosureCoordinator,
     SOURCE_TRAFFIC_INCIDENTS: TrafficIncidentsCoordinator,
+    SOURCE_FX: FxCoordinator,
+    SOURCE_INTEREST: InterestRateCoordinator,
     SOURCE_CARPARK: CarparkCoordinator,
     SOURCE_TAXI: TaxiAvailabilityCoordinator,
     SOURCE_CAPITALAND: CapitaLandCarparkCoordinator,
@@ -301,6 +310,7 @@ def async_remove_stale(
         f"{entry.entry_id}_carpark_{number.lower()}"
         for number in carpark_numbers(entry)
     }
+    chosen_fx = {f"{entry.entry_id}_fx_{code.lower()}" for code in fx_currencies(entry)}
     entity_registry = er.async_get(hass)
     for reg_entry in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
         if getattr(reg_entry, "config_subentry_id", None) is not None:
@@ -315,6 +325,10 @@ def async_remove_stale(
                 reg_entry.translation_key == "carpark"
                 and chosen_carparks
                 and reg_entry.unique_id not in chosen_carparks
+            )
+            or (
+                reg_entry.translation_key == "fx_rate"
+                and reg_entry.unique_id not in chosen_fx
             )
         ):
             _LOGGER.debug("Removing %s: its source is turned off", reg_entry.entity_id)
@@ -373,6 +387,8 @@ _BACKGROUND_LABELS = {
     SOURCE_TIDES: "tide timings",
     SOURCE_HAWKER: "hawker closure",
     SOURCE_TRAFFIC_INCIDENTS: "traffic incidents",
+    SOURCE_FX: "FX rates",
+    SOURCE_INTEREST: "interest rates",
     SOURCE_CARPARK: "carpark availability",
     SOURCE_TAXI: "taxi availability",
     SOURCE_CAPITALAND: "CapitaLand carpark",

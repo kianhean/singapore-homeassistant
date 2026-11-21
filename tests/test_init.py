@@ -225,6 +225,8 @@ async def test_unload_stops_sp_imports_and_remove_clears_issues():
                 "tides",
                 "hawker",
                 "traffic_incidents",
+                "fx",
+                "interest",
                 "carpark",
                 "taxi",
                 "capitaland",

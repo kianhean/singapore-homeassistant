@@ -343,6 +343,33 @@
       },
       "capitaland_carpark": {
         "name": "{mall}"
+      },
+      "fx_rate": {
+        "name": "{pair}"
+      },
+      "interest_sora": {
+        "name": "SORA"
+      },
+      "interest_sora_3m": {
+        "name": "SORA Terkompaun 3 Bulan"
+      },
+      "interest_tbill_1y": {
+        "name": "Hasil Bil Perbendaharaan 1 Tahun"
+      },
+      "interest_sgs_2y": {
+        "name": "Hasil Bon SGS 2 Tahun"
+      },
+      "interest_sgs_5y": {
+        "name": "Hasil Bon SGS 5 Tahun"
+      },
+      "interest_sgs_10y": {
+        "name": "Hasil Bon SGS 10 Tahun"
+      },
+      "interest_sgs_15y": {
+        "name": "Hasil Bon SGS 15 Tahun"
+      },
+      "interest_sgs_20y": {
+        "name": "Hasil Bon SGS 20 Tahun"
       }
     },
     "camera": {
@@ -472,20 +499,23 @@
           "school_events": "Kalendar sekolah",
           "api_key": "Kunci API data.gov.sg",
           "carparks": "Tempat letak kereta HDB",
-          "polling": "Pengundian"
+          "polling": "Pengundian",
+          "fx_currencies": "Mata wang FX"
         },
         "data_description": {
           "sources": "Mematikan tarif SP Group juga menyebabkan statistik kos akaun SP tidak berharga. Ketersediaan tempat letak kereta HDB, ketersediaan teksi dan tempat letak kereta pusat beli-belah CapitaLand dimatikan sehingga anda menandakannya: dua yang pertama memuat turun data seluruh pulau pada setiap pengundian; lot CapitaLand datang dari laman web JustPark.",
           "school_events": "Kalendar sekolah MOE yang hendak dicipta apabila sumber kalendar sekolah MOE dihidupkan.",
           "api_key": "Pilihan. Kunci percuma daripada data.gov.sg memberikan had kadar yang lebih tinggi (kurang ralat HTTP 429). Biarkan kosong untuk menggunakan had awam.",
           "carparks": "Nombor tempat letak kereta untuk dijejaki apabila ketersediaan tempat letak kereta HDB dihidupkan, dipisahkan dengan koma (cth. BJ55, TM24; ditunjukkan pada senarai tempat letak kereta HDB dan data.gov.sg). Biarkan kosong untuk 3 tempat letak kereta terdekat dengan lokasi rumah anda.",
-          "polling": "Dikurangkan mengundi sumber pantas (amaran banjir, kilat, kamera trafik, radar, kereta api, cuaca, PSI, UV, tekanan haba, tempat letak kereta, teksi, tempat letak kereta CapitaLand) tiga kali kurang kerap."
+          "polling": "Dikurangkan mengundi sumber pantas (amaran banjir, kilat, kamera trafik, radar, kereta api, cuaca, PSI, UV, tekanan haba, tempat letak kereta, teksi, tempat letak kereta CapitaLand) tiga kali kurang kerap.",
+          "fx_currencies": "Mata wang yang disebut dalam SGD apabila kadar FX (ECB) dihidupkan."
         }
       }
     },
     "error": {
       "no_sources": "Hidupkan sekurang-kurangnya satu sumber data, atau tambah akaun SP terlebih dahulu.",
-      "no_school_events": "Pilih sekurang-kurangnya satu kalendar sekolah, atau matikan sumber kalendar sekolah MOE."
+      "no_school_events": "Pilih sekurang-kurangnya satu kalendar sekolah, atau matikan sumber kalendar sekolah MOE.",
+      "no_fx_currencies": "Pilih sekurang-kurangnya satu mata wang, atau matikan sumber kadar FX."
     }
   },
   "selector": {
@@ -511,7 +541,9 @@
         "traffic_incidents": "Insiden trafik LTA",
         "carpark": "Ketersediaan tempat letak kereta HDB",
         "taxi": "Ketersediaan teksi",
-        "capitaland": "Tempat letak kereta pusat beli-belah CapitaLand"
+        "capitaland": "Tempat letak kereta pusat beli-belah CapitaLand",
+        "fx": "Kadar FX (ECB)",
+        "interest": "Kadar faedah (MAS/SingStat)"
       }
     },
     "school_events": {

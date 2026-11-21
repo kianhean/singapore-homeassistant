@@ -33,8 +33,10 @@ from custom_components.singapore.coe_coordinator import COE_API_URL
 from custom_components.singapore.coordinator import TARIFF_URL
 from custom_components.singapore.dengue_coordinator import POLL_DOWNLOAD_URL
 from custom_components.singapore.flood_coordinator import FLOOD_ALERTS_URL
+from custom_components.singapore.fx_coordinator import ECB_URL
 from custom_components.singapore.hawker_coordinator import HAWKER_URL
 from custom_components.singapore.holiday_coordinator import PUBLIC_HOLIDAYS_URL
+from custom_components.singapore.interest_coordinator import SINGSTAT_URL
 from custom_components.singapore.lightning_coordinator import LIGHTNING_URL
 from custom_components.singapore.psi_coordinator import PM25_URL, PSI_URL
 from custom_components.singapore.radar_coordinator import RADAR_URL
@@ -630,6 +632,18 @@ def mock_sources(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
     aioclient_mock.get(WARNINGS_URL, json=_WARNINGS_PAYLOAD)
     aioclient_mock.get(TIDES_URL, text=_TIDES_HTML)
     aioclient_mock.get(HAWKER_URL, json=_hawker_payload())
+    aioclient_mock.get(
+        ECB_URL,
+        text=(
+            Path(__file__).parents[1] / "tests" / "fixtures" / "ecb_eurofxref_daily.xml"
+        ).read_text(),
+    )
+    aioclient_mock.get(
+        SINGSTAT_URL,
+        text=(
+            Path(__file__).parents[1] / "tests" / "fixtures" / "singstat_m700071.json"
+        ).read_text(),
+    )
     aioclient_mock.get(CARPARK_INFO_URL, json=_CARPARK_INFO_PAYLOAD)
     aioclient_mock.get(CARPARK_AVAILABILITY_URL, json=_CARPARK_AVAILABILITY_PAYLOAD)
     aioclient_mock.get(TAXI_AVAILABILITY_URL, json=_TAXI_PAYLOAD)

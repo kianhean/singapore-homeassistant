@@ -33,19 +33,24 @@ from .const import (
     CONF_DISABLED_SCHOOL_EVENTS,
     CONF_DISABLED_SOURCES,
     CONF_ENABLED_SOURCES,
+    CONF_FX_CURRENCIES,
     CONF_POLLING,
     CONF_SCHOOL_EVENTS,
     CONF_SOURCES,
+    DEFAULT_FX_CURRENCIES,
     DOMAIN,
+    FX_CURRENCIES,
     OPT_IN_SOURCES,
     POLLING_NORMAL,
     POLLING_OPTIONS,
     SCHOOL_EVENT_KINDS,
+    SOURCE_FX,
     SOURCE_SCHOOL,
     SOURCES,
     carpark_numbers,
     enabled_school_events,
     enabled_sources,
+    fx_currencies,
 )
 from .sp_account.client import (
     AuthError,
@@ -210,6 +215,16 @@ def options_schema(options: dict[str, Any]) -> vol.Schema:
                 CONF_CARPARKS,
                 description={"suggested_value": options.get(CONF_CARPARKS) or ""},
             ): TextSelector(),
+            vol.Optional(
+                CONF_FX_CURRENCIES,
+                default=fx_currencies(options),
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=list(FX_CURRENCIES),
+                    multiple=True,
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            ),
             vol.Required(
                 CONF_POLLING, default=options.get(CONF_POLLING, POLLING_NORMAL)
             ): SelectSelector(
@@ -243,6 +258,11 @@ def options_from_input(user_input: dict[str, Any]) -> dict[str, Any]:
         options[CONF_API_KEY] = api_key
     if carparks := carpark_numbers(user_input):
         options[CONF_CARPARKS] = ", ".join(carparks)
+    currencies = user_input.get(CONF_FX_CURRENCIES)
+    if currencies is not None:
+        valid = [c for c in currencies if c in FX_CURRENCIES]
+        if valid and tuple(valid) != DEFAULT_FX_CURRENCIES:
+            options[CONF_FX_CURRENCIES] = valid
     # Absent from the form (an older frontend) means "keep them all".
     school = user_input.get(CONF_SCHOOL_EVENTS)
     if school is not None and (
@@ -267,6 +287,10 @@ class SingaporeOptionsFlow(OptionsFlow):
             ):
                 # The school calendar is on but would have no calendars.
                 errors[CONF_SCHOOL_EVENTS] = "no_school_events"
+            elif SOURCE_FX in user_input.get(CONF_SOURCES, ()) and (
+                user_input.get(CONF_FX_CURRENCIES) == []
+            ):
+                errors[CONF_FX_CURRENCIES] = "no_fx_currencies"
             else:
                 # Saving the options reloads the entry (see _async_entry_updated).
                 return self.async_create_entry(data=options_from_input(user_input))

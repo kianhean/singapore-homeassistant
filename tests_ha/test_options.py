@@ -63,6 +63,7 @@ async def test_options_form_serializes_over_http(
         "school_events",
         "api_key",
         "carparks",
+        "fx_currencies",
         "polling",
     ]
 

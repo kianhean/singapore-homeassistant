@@ -343,6 +343,33 @@
       },
       "capitaland_carpark": {
         "name": "{mall}"
+      },
+      "fx_rate": {
+        "name": "{pair}"
+      },
+      "interest_sora": {
+        "name": "SORA 隔夜利率"
+      },
+      "interest_sora_3m": {
+        "name": "3个月复利 SORA"
+      },
+      "interest_tbill_1y": {
+        "name": "1年期国库券收益率"
+      },
+      "interest_sgs_2y": {
+        "name": "2年期新加坡政府债券收益率"
+      },
+      "interest_sgs_5y": {
+        "name": "5年期新加坡政府债券收益率"
+      },
+      "interest_sgs_10y": {
+        "name": "10年期新加坡政府债券收益率"
+      },
+      "interest_sgs_15y": {
+        "name": "15年期新加坡政府债券收益率"
+      },
+      "interest_sgs_20y": {
+        "name": "20年期新加坡政府债券收益率"
       }
     },
     "camera": {
@@ -472,20 +499,23 @@
           "school_events": "校历",
           "api_key": "data.gov.sg API 密钥",
           "carparks": "建屋局停车场",
-          "polling": "轮询频率"
+          "polling": "轮询频率",
+          "fx_currencies": "外汇货币"
         },
         "data_description": {
           "sources": "关闭 SP Group 电价后，SP 账户的费用统计也将不再计价。建屋局停车场空位、空车德士和 CapitaLand 商场停车位默认关闭，需勾选才会开启：前两者每次轮询都会下载全岛数据；CapitaLand 的空位来自其 JustPark 网站。",
           "school_events": "开启教育部校历数据源时要创建哪些校历。",
           "api_key": "可选。data.gov.sg 的免费密钥可提供更高的速率限制（减少 HTTP 429 错误）。留空则使用公共限制。",
           "carparks": "开启建屋局停车场空位时要追踪的停车场编号，用逗号分隔（例如 BJ55, TM24；可在建屋局或 data.gov.sg 的停车场列表中找到）。留空则使用离您家位置最近的 3 个停车场。",
-          "polling": "“降低”会将快速数据源（淹水警报、雷击、交通摄像头、雷达、列车、天气、PSI、紫外线、热压力、停车场、德士、CapitaLand 停车场）的轮询频率降低为三分之一。"
+          "polling": "“降低”会将快速数据源（淹水警报、雷击、交通摄像头、雷达、列车、天气、PSI、紫外线、热压力、停车场、德士、CapitaLand 停车场）的轮询频率降低为三分之一。",
+          "fx_currencies": "启用汇率 (ECB) 时要以新元报价的货币。"
         }
       }
     },
     "error": {
       "no_sources": "请至少开启一个数据源，或先添加一个 SP 账户。",
-      "no_school_events": "请至少选择一个校历，或关闭教育部校历数据源。"
+      "no_school_events": "请至少选择一个校历，或关闭教育部校历数据源。",
+      "no_fx_currencies": "请至少选择一种货币，或关闭汇率数据源。"
     }
   },
   "selector": {
@@ -511,7 +541,9 @@
         "traffic_incidents": "陆交局交通事故",
         "carpark": "建屋局停车场空位",
         "taxi": "空车德士",
-        "capitaland": "CapitaLand 商场停车位"
+        "capitaland": "CapitaLand 商场停车位",
+        "fx": "汇率 (ECB)",
+        "interest": "利率 (MAS/SingStat)"
       }
     },
     "school_events": {

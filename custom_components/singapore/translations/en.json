@@ -343,6 +343,33 @@
       },
       "capitaland_carpark": {
         "name": "{mall}"
+      },
+      "fx_rate": {
+        "name": "{pair}"
+      },
+      "interest_sora": {
+        "name": "SORA"
+      },
+      "interest_sora_3m": {
+        "name": "3-Month Compounded SORA"
+      },
+      "interest_tbill_1y": {
+        "name": "1-Year T-Bill Yield"
+      },
+      "interest_sgs_2y": {
+        "name": "2-Year SGS Bond Yield"
+      },
+      "interest_sgs_5y": {
+        "name": "5-Year SGS Bond Yield"
+      },
+      "interest_sgs_10y": {
+        "name": "10-Year SGS Bond Yield"
+      },
+      "interest_sgs_15y": {
+        "name": "15-Year SGS Bond Yield"
+      },
+      "interest_sgs_20y": {
+        "name": "20-Year SGS Bond Yield"
       }
     },
     "camera": {
@@ -472,6 +499,7 @@
           "school_events": "School calendars",
           "api_key": "data.gov.sg API key",
           "carparks": "HDB carparks",
+          "fx_currencies": "FX currencies",
           "polling": "Polling"
         },
         "data_description": {
@@ -479,13 +507,15 @@
           "school_events": "Which MOE school calendars to create when the MOE school calendar source is on.",
           "api_key": "Optional. A free key from data.gov.sg gives higher rate limits (fewer HTTP 429 errors). Leave empty to use the public limits.",
           "carparks": "Carpark numbers to track when HDB carpark availability is on, separated by commas (e.g. BJ55, TM24; shown on HDB's and data.gov.sg's carpark lists). Leave empty for the 3 carparks nearest your home location.",
+          "fx_currencies": "Currencies to quote against SGD when FX rates (ECB) is on.",
           "polling": "Reduced polls the fast sources (flood alerts, lightning, traffic cameras, radar, trains, weather, PSI, UV, heat stress, carparks, taxis, CapitaLand carparks) three times less often."
         }
       }
     },
     "error": {
       "no_sources": "Turn on at least one data source, or add an SP account first.",
-      "no_school_events": "Choose at least one school calendar, or turn off the MOE school calendar source."
+      "no_school_events": "Choose at least one school calendar, or turn off the MOE school calendar source.",
+      "no_fx_currencies": "Choose at least one currency, or turn off the FX rates source."
     }
   },
   "selector": {
@@ -509,6 +539,8 @@
         "tides": "NEA tide timings",
         "hawker": "Hawker centre closures",
         "traffic_incidents": "LTA traffic incidents",
+        "fx": "FX rates (ECB)",
+        "interest": "Interest rates (MAS/SingStat)",
         "carpark": "HDB carpark availability",
         "taxi": "Taxi availability",
         "capitaland": "CapitaLand mall carparks"
