@@ -59,13 +59,23 @@ views:
             color: deep-orange
             grid_options: { columns: 6 }
           - type: tile
+            entity: binary_sensor.nea_heavy_rain_warning
+            name: Heavy rain
+            color: blue
+            grid_options: { columns: 6 }
+          - type: tile
             entity: sensor.nea_weather_advisories
-            name: Weather advisories
+            name: Advisories
             color: amber
             grid_options: { columns: 6 }
           - type: tile
             entity: sensor.nea_next_tide
             name: Next tide
+            color: cyan
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.nea_next_tide_level
+            name: Tide level
             color: cyan
             grid_options: { columns: 6 }
           - type: heading
