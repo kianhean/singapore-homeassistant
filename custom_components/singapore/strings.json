@@ -383,6 +383,9 @@
     "geo_location": {
       "taxi": {
         "name": "Free taxi {number}"
+      },
+      "traffic_incident": {
+        "name": "Traffic incident {number}"
       }
     }
   },
