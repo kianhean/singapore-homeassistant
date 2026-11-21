@@ -328,6 +328,9 @@
     "geo_location": {
       "taxi": {
         "default": "mdi:taxi"
+      },
+      "traffic_incident": {
+        "default": "mdi:car-emergency"
       }
     }
   }

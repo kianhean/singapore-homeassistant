@@ -383,6 +383,9 @@
     "geo_location": {
       "taxi": {
         "name": "காலி டாக்சி {number}"
+      },
+      "traffic_incident": {
+        "name": "போக்குவரத்து சம்பவம் {number}"
       }
     }
   },

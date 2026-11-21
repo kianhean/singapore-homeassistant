@@ -179,3 +179,63 @@ def test_traffic_incidents_sensors():
     assert count_sensor.extra_state_attributes == {}
     assert nearest_sensor.native_value is None
     assert nearest_sensor.extra_state_attributes == {}
+
+
+def test_traffic_incident_geo_location_markers():
+    """Geo-location markers plot active incidents nearest-first on HA's Map."""
+    from custom_components.singapore.geo_location import (
+        TRAFFIC_GEO_SOURCE,
+        SingaporeTrafficIncidentMarker,
+        async_setup_traffic_incident_markers,
+    )
+
+    incidents = [
+        TrafficIncident(
+            type="Roadwork",
+            message="(21/11)10:05 Road Works on KJE.",
+            latitude=1.39,
+            longitude=103.77,
+        ),
+        TrafficIncident(
+            type="Accident",
+            message="(21/11)10:09 Accident on PIE.",
+            latitude=1.355,
+            longitude=103.82,
+        ),
+        TrafficIncident(
+            type="Obstacle",
+            message="(21/11)10:00 No coords obstacle.",
+            latitude=None,
+            longitude=None,
+        ),
+    ]
+    coord = MagicMock()
+    coord.data = TrafficIncidentsData(incidents=incidents)
+    listeners = []
+    coord.async_add_listener = lambda cb: listeners.append(cb) or (lambda: None)
+    hass = SimpleNamespace(config=SimpleNamespace(latitude=_HOME[0], longitude=_HOME[1]))
+
+    added: list[SingaporeTrafficIncidentMarker] = []
+    async_setup_traffic_incident_markers(hass, coord, added.extend)
+    assert len(added) == 2  # skips incident without coordinates
+
+    first, second = added
+    assert first.source == TRAFFIC_GEO_SOURCE
+    assert first.latitude == 1.355
+    assert first.longitude == 103.82
+    assert first.icon == "mdi:car-emergency"
+    assert first.extra_state_attributes == {
+        "type": "Accident",
+        "message": "(21/11)10:09 Accident on PIE.",
+    }
+    assert first.distance is not None and second.distance is not None
+    assert first.distance < second.distance
+    assert second.icon == "mdi:road-variant"
+
+    # Shrinking the feed removes surplus markers cleanly.
+    for m in added:
+        m.hass = MagicMock()
+        m.async_remove = MagicMock()
+    coord.data = TrafficIncidentsData(incidents=[incidents[1]])
+    listeners[0]()
+    assert added[1].hass.async_create_task.called

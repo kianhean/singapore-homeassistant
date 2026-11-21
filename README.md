@@ -917,6 +917,19 @@ Singapore and around your Home Assistant home location, on a *Traffic* device.
 | `sensor.traffic_incidents` | Traffic Incidents | — | Active traffic incidents island-wide; attributes `counts_by_type` and `incidents` (newest 50: type, message, latitude, longitude) |
 | `sensor.traffic_nearest_incident` | Traffic Nearest incident | km | Distance from your HA home location to the nearest active incident (unknown when none); attributes `type`, `message`, `latitude`, `longitude` |
 | `binary_sensor.traffic_incident_nearby` | Traffic Incident nearby | — | `on` when an active traffic incident is within 5 km of home (`problem`); attributes `radius_km`, `nearest_km`, `nearest_type`, `nearby_incidents` |
+| `geo_location.traffic_incident_<n>` | Traffic incident 1, 2, … | km | One per active incident with coordinates, nearest first (at most 50); state = distance from home, `latitude` / `longitude`, `type`, `message`, `source: singapore_traffic` (Map card) |
+
+Plot active incidents alongside the checkpoint cameras on a Map card:
+
+```yaml
+type: map
+geo_location_sources:
+  - singapore_traffic
+entities:
+  - zone.home
+  - camera.traffic_cameras_woodlands_causeway
+  - camera.traffic_cameras_tuas_second_link
+```
 
 </details>
 
