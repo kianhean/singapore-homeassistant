@@ -15,6 +15,12 @@
       },
       "in_dengue_cluster": {
         "default": "mdi:bug"
+      },
+      "heavy_rain_warning": {
+        "default": "mdi:weather-pouring"
+      },
+      "traffic_incident_nearby": {
+        "default": "mdi:car-emergency"
       }
     },
     "calendar": {
@@ -144,6 +150,28 @@
           "moderate": "mdi:sun-thermometer-outline",
           "high": "mdi:alert"
         }
+      },
+      "weather_advisories": {
+        "default": "mdi:alert-outline"
+      },
+      "latest_earthquake": {
+        "default": "mdi:pulse"
+      },
+      "next_tide": {
+        "default": "mdi:waves",
+        "state": {
+          "high": "mdi:wave-arrow-up",
+          "low": "mdi:wave-arrow-down"
+        }
+      },
+      "next_tide_level": {
+        "default": "mdi:waves-arrow-up"
+      },
+      "traffic_incidents": {
+        "default": "mdi:car-emergency"
+      },
+      "nearest_traffic_incident": {
+        "default": "mdi:map-marker-distance"
       },
       "carpark": {
         "default": "mdi:parking"

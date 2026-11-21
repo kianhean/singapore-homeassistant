@@ -35,9 +35,12 @@ from .const import (
     SOURCE_SCHOOL,
     SOURCE_TARIFF,
     SOURCE_TAXI,
+    SOURCE_TIDES,
     SOURCE_TRAFFIC,
+    SOURCE_TRAFFIC_INCIDENTS,
     SOURCE_TRAIN,
     SOURCE_UV,
+    SOURCE_WARNINGS,
     SOURCE_WBGT,
     SOURCE_WEATHER,
     SOURCES,
@@ -67,9 +70,12 @@ from .sp_account_coordinator import (
     auth_issue_id,
 )
 from .taxi_coordinator import TaxiAvailabilityCoordinator
+from .tide_coordinator import TideCoordinator
 from .traffic_coordinator import TrafficImagesCoordinator
+from .traffic_incidents_coordinator import TrafficIncidentsCoordinator
 from .train_coordinator import TrainStatusCoordinator
 from .uv_coordinator import UvCoordinator
+from .warning_coordinator import WeatherWarningsCoordinator
 from .wbgt_coordinator import WbgtCoordinator
 from .weather_coordinator import SingaporeWeatherCoordinator
 
@@ -113,7 +119,10 @@ class SingaporeData:
     radar: RadarCoordinator | None
     school: SchoolCalendarCoordinator | None
     wbgt: WbgtCoordinator | None
+    warnings: WeatherWarningsCoordinator | None
+    tides: TideCoordinator | None
     hawker: HawkerClosureCoordinator | None
+    traffic_incidents: TrafficIncidentsCoordinator | None
     carpark: CarparkCoordinator | None
     taxi: TaxiAvailabilityCoordinator | None
     capitaland: CapitaLandCarparkCoordinator | None
@@ -149,7 +158,10 @@ _COORDINATORS: dict[str, type[DataUpdateCoordinator]] = {
     SOURCE_RADAR: RadarCoordinator,
     SOURCE_SCHOOL: SchoolCalendarCoordinator,
     SOURCE_WBGT: WbgtCoordinator,
+    SOURCE_WARNINGS: WeatherWarningsCoordinator,
+    SOURCE_TIDES: TideCoordinator,
     SOURCE_HAWKER: HawkerClosureCoordinator,
+    SOURCE_TRAFFIC_INCIDENTS: TrafficIncidentsCoordinator,
     SOURCE_CARPARK: CarparkCoordinator,
     SOURCE_TAXI: TaxiAvailabilityCoordinator,
     SOURCE_CAPITALAND: CapitaLandCarparkCoordinator,
@@ -357,7 +369,10 @@ _BACKGROUND_LABELS = {
     SOURCE_RADAR: "rain radar",
     SOURCE_SCHOOL: "MOE school calendar",
     SOURCE_WBGT: "heat stress",
+    SOURCE_WARNINGS: "weather warnings",
+    SOURCE_TIDES: "tide timings",
     SOURCE_HAWKER: "hawker closure",
+    SOURCE_TRAFFIC_INCIDENTS: "traffic incidents",
     SOURCE_CARPARK: "carpark availability",
     SOURCE_TAXI: "taxi availability",
     SOURCE_CAPITALAND: "CapitaLand carpark",

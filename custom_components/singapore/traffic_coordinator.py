@@ -23,13 +23,29 @@ TRAFFIC_IMAGES_URL = "https://api.data.gov.sg/v1/transport/traffic-images"
 # LTA refreshes camera stills roughly every 1-5 minutes.
 UPDATE_INTERVAL = timedelta(minutes=2)
 
-# Only the causeway / second-link checkpoint cameras are exposed.
+# Only the causeway / second-link / Sentosa gateway cameras are exposed.
 # camera_id -> (entity name, checkpoint, LTA description)
 CHECKPOINT_CAMERAS: Final[dict[str, tuple[str, str, str]]] = {
     "2701": ("Woodlands Causeway", "Woodlands", "Woodlands Causeway (Towards Johor)"),
     "2702": ("Woodlands Checkpoint", "Woodlands", "Woodlands Checkpoint (Towards BKE)"),
+    "2704": (
+        "Woodlands Flyover",
+        "Woodlands",
+        "Woodlands Flyover (Towards Checkpoint)",
+    ),
     "4703": ("Tuas Second Link", "Tuas", "Tuas Second Link"),
+    "4712": ("Tuas West Road", "Tuas", "After Tuas West Road"),
     "4713": ("Tuas Checkpoint", "Tuas", "Tuas Checkpoint"),
+    "4798": (
+        "Sentosa Gateway (Outbound)",
+        "Sentosa",
+        "Sentosa Gateway (Towards Telok Blangah)",
+    ),
+    "4799": (
+        "Sentosa Gateway (Inbound)",
+        "Sentosa",
+        "Sentosa Gateway (Towards Sentosa)",
+    ),
 }
 
 

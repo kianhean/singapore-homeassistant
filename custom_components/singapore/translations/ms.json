@@ -34,6 +34,12 @@
       },
       "in_dengue_cluster": {
         "name": "Dalam kelompok denggi"
+      },
+      "heavy_rain_warning": {
+        "name": "Amaran hujan lebat"
+      },
+      "traffic_incident_nearby": {
+        "name": "Insiden berdekatan"
       }
     },
     "calendar": {
@@ -168,6 +174,28 @@
           "moderate": "Sederhana",
           "high": "Tinggi"
         }
+      },
+      "weather_advisories": {
+        "name": "Nasihat cuaca"
+      },
+      "latest_earthquake": {
+        "name": "Gempa bumi terkini"
+      },
+      "next_tide": {
+        "name": "Pasang surut seterusnya",
+        "state": {
+          "high": "Air pasang",
+          "low": "Air surut"
+        }
+      },
+      "next_tide_level": {
+        "name": "Paras pasang surut seterusnya"
+      },
+      "traffic_incidents": {
+        "name": "Insiden"
+      },
+      "nearest_traffic_incident": {
+        "name": "Insiden terdekat"
       },
       "carpark": {
         "name": "{number}"
@@ -477,7 +505,10 @@
         "uv": "Indeks UV NEA",
         "radar": "Radar hujan NEA",
         "wbgt": "Tekanan haba NEA (WBGT)",
+        "warnings": "Amaran cuaca NEA",
+        "tides": "Waktu pasang surut NEA",
         "hawker": "Penutupan pusat penjaja",
+        "traffic_incidents": "Insiden trafik LTA",
         "carpark": "Ketersediaan tempat letak kereta HDB",
         "taxi": "Ketersediaan teksi",
         "capitaland": "Tempat letak kereta pusat beli-belah CapitaLand"

@@ -16,6 +16,7 @@ from custom_components.singapore.binary_sensor import (
     SingaporeLightningNearbyBinarySensor,
     SingaporePublicHolidayTodayBinarySensor,
     SingaporeSchoolHolidayTodayBinarySensor,
+    SingaporeTrafficIncidentNearbyBinarySensor,
     async_setup_entry,
 )
 from custom_components.singapore.const import (
@@ -34,6 +35,10 @@ from custom_components.singapore.lightning_coordinator import (
     LightningStrike,
 )
 from custom_components.singapore.school_coordinator import SchoolEvent
+from custom_components.singapore.traffic_incidents_coordinator import (
+    TrafficIncident,
+    TrafficIncidentsData,
+)
 
 
 def _coord(data):
@@ -233,6 +238,43 @@ def test_in_dengue_cluster_binary_sensor():
     assert outside.extra_state_attributes["nearest_km"] > 0.0
 
     empty = SingaporeInDengueClusterBinarySensor(_coord(None), "e1")
+    _attach_home(empty)
+    assert empty.is_on is None
+    assert empty.extra_state_attributes == {}
+
+
+def test_traffic_incident_nearby_binary_sensor():
+    near = TrafficIncident(
+        type="Accident",
+        message="Accident on PIE",
+        latitude=1.355,
+        longitude=103.82,
+    )
+    far = TrafficIncident(
+        type="Roadwork",
+        message="Road Works on TPE",
+        latitude=1.395,
+        longitude=103.96,
+    )
+    sensor = SingaporeTrafficIncidentNearbyBinarySensor(
+        _coord(TrafficIncidentsData(incidents=[far, near])), "e1"
+    )
+    _attach_home(sensor, 1.3521, 103.8198)
+    assert sensor.device_class == BinarySensorDeviceClass.PROBLEM
+    assert sensor.is_on is True
+    attrs = sensor.extra_state_attributes
+    assert attrs["nearby_incidents"] == ["Accident on PIE"]
+    assert attrs["nearest_type"] == "Accident"
+    assert attrs["nearest_km"] < 1.0
+
+    far_sensor = SingaporeTrafficIncidentNearbyBinarySensor(
+        _coord(TrafficIncidentsData(incidents=[far])), "e1"
+    )
+    _attach_home(far_sensor, 1.3521, 103.8198)
+    assert far_sensor.is_on is False
+    assert far_sensor.extra_state_attributes["nearby_incidents"] == []
+
+    empty = SingaporeTrafficIncidentNearbyBinarySensor(_coord(None), "e1")
     _attach_home(empty)
     assert empty.is_on is None
     assert empty.extra_state_attributes == {}

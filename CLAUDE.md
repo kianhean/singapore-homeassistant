@@ -22,11 +22,14 @@ custom_components/singapore/
 ├── train_coordinator.py    # TrainStatusCoordinator: scrapes mytransport.sg MRT/LRT status
 ├── psi_coordinator.py      # PsiCoordinator: NEA PSI + pollutant readings per region
 ├── flood_coordinator.py    # FloodAlertCoordinator: PUB flash-flood alerts from data.gov.sg
-├── traffic_coordinator.py  # TrafficImagesCoordinator: LTA checkpoint camera stills (Woodlands/Tuas)
+├── traffic_coordinator.py  # TrafficImagesCoordinator: LTA checkpoint/gateway camera stills (Woodlands/Tuas/Sentosa)
+├── traffic_incidents_coordinator.py # TrafficIncidentsCoordinator: LTA traffic incidents from mytransport.sg
 ├── dengue_coordinator.py   # DengueClusterCoordinator: NEA dengue cluster GeoJSON + distance helpers
 ├── lightning_coordinator.py # LightningCoordinator: NEA lightning strikes, 30-min rolling window
 ├── uv_coordinator.py       # UvCoordinator: NEA hourly UV index + exposure bands
 ├── wbgt_coordinator.py     # WbgtCoordinator: NEA WBGT heat stress per station (nearest home)
+├── warning_coordinator.py  # WeatherWarningsCoordinator: NEA heavy rain warnings & regional advisories
+├── tide_coordinator.py     # TideCoordinator: NEA high/low tide timings from nea.gov.sg
 ├── hawker_coordinator.py   # HawkerClosureCoordinator: NEA hawker centre cleaning/works dates
 ├── carpark_coordinator.py  # CarparkCoordinator: HDB lot availability + carpark info (SVY21→WGS84)
 ├── taxi_coordinator.py     # TaxiAvailabilityCoordinator: free taxis island-wide, counted near home

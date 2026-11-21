@@ -25,6 +25,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from . import SingaporeConfigEntry
 from .capitaland_coordinator import CapitaLandCarparkCoordinator
@@ -50,6 +51,7 @@ from .entity import (
     DEVICE_FLOOD,
     DEVICE_NEA,
     DEVICE_TAXI,
+    DEVICE_TRAFFIC_INCIDENTS,
     DEVICE_TRAIN,
     DEVICE_WEATHER,
     SingaporeEntity,
@@ -70,8 +72,16 @@ from .psi_coordinator import (
 )
 from .sp_account_sensor import async_setup_sp_account_sensors
 from .taxi_coordinator import NEARBY_KM, TaxiAvailabilityCoordinator
+from .tide_coordinator import (
+    TIDE_STATE_HIGH,
+    TIDE_STATE_LOW,
+    TIDE_STATE_OPTIONS,
+    TideCoordinator,
+)
+from .traffic_incidents_coordinator import TrafficIncidentsCoordinator
 from .train_coordinator import TRAIN_LINES, TrainStatusCoordinator
 from .uv_coordinator import UV_EXPOSURE_OPTIONS, UvCoordinator, uv_exposure
+from .warning_coordinator import WeatherWarningsCoordinator
 from .wbgt_coordinator import HEAT_STRESS_OPTIONS, WbgtCoordinator
 from .weather_coordinator import SingaporeWeatherCoordinator
 
@@ -200,6 +210,21 @@ async def async_setup_entry(
         entities += [
             SingaporeWbgtSensor(wbgt, eid),
             SingaporeHeatStressSensor(wbgt, eid),
+        ]
+    if (warnings := data.warnings) is not None:
+        entities += [
+            SingaporeWeatherAdvisoriesSensor(warnings, eid),
+            SingaporeLatestEarthquakeSensor(warnings, eid),
+        ]
+    if (tides := data.tides) is not None:
+        entities += [
+            SingaporeNextTideSensor(tides, eid),
+            SingaporeNextTideLevelSensor(tides, eid),
+        ]
+    if (traffic_incidents := data.traffic_incidents) is not None:
+        entities += [
+            SingaporeTrafficIncidentsSensor(traffic_incidents, eid),
+            SingaporeNearestTrafficIncidentSensor(traffic_incidents, eid),
         ]
     if (taxi := data.taxi) is not None:
         entities += [
@@ -1005,6 +1030,228 @@ class SingaporeHeatStressSensor(_BaseWbgtSensor):
     def native_value(self) -> str | None:
         nearest = self._nearest()
         return None if nearest is None else nearest[0].heat_stress
+
+
+class _BaseWeatherWarningsSensor(
+    SingaporeEntity[WeatherWarningsCoordinator], SensorEntity
+):
+    """Shared base for NEA weather warnings and regional advisory sensors."""
+
+    _device = DEVICE_NEA
+    _attr_attribution = "Data provided by NEA"
+
+
+class SingaporeWeatherAdvisoriesSensor(_BaseWeatherWarningsSensor):
+    """Count of active NEA weather warnings and regional advisories."""
+
+    _attr_translation_key = "weather_advisories"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator: WeatherWarningsCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "weather_advisories")
+
+    @property
+    def native_value(self) -> int | None:
+        if self.coordinator.data is None:
+            return None
+        return len(self.coordinator.data.active_advisories)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        if self.coordinator.data is None:
+            return {}
+        data = self.coordinator.data
+        active = data.active_advisories
+        return {
+            "active_categories": [a.category for a in active],
+            "advisories": {cat: a.as_dict() for cat, a in data.advisories.items()},
+            "source": "NEA",
+        }
+
+
+class SingaporeLatestEarthquakeSensor(_BaseWeatherWarningsSensor):
+    """Magnitude of the latest regional earthquake reported by NEA (MSS)."""
+
+    _attr_translation_key = "latest_earthquake"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 1
+
+    def __init__(self, coordinator: WeatherWarningsCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "latest_earthquake")
+
+    @property
+    def native_value(self) -> float | None:
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.earthquake_magnitude
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        if self.coordinator.data is None:
+            return {}
+        eq = self.coordinator.data.earthquake
+        if eq is None:
+            return {"source": "NEA"}
+        return {
+            "advisory": eq.text,
+            "issued": eq.issued.isoformat() if eq.issued else None,
+            "expires": eq.expires.isoformat() if eq.expires else None,
+            "url": eq.link,
+            "source": "NEA",
+        }
+
+
+class _BaseTideSensor(SingaporeEntity[TideCoordinator], SensorEntity):
+    """Shared base for NEA tide timing sensors."""
+
+    _device = DEVICE_NEA
+    _attr_attribution = "Data provided by NEA"
+
+    def _next(self):
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.next_tide(dt_util.now())
+
+
+class SingaporeNextTideSensor(_BaseTideSensor):
+    """Next tide type (high or low) and upcoming schedule."""
+
+    _attr_translation_key = "next_tide"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = TIDE_STATE_OPTIONS
+
+    def __init__(self, coordinator: TideCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "next_tide")
+
+    @property
+    def native_value(self) -> str | None:
+        nxt = self._next()
+        return None if nxt is None else nxt.state
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        data = self.coordinator.data
+        nxt = self._next()
+        if data is None or nxt is None:
+            return {}
+        now = dt_util.now()
+        next_high = data.next_of_state(now, TIDE_STATE_HIGH)
+        next_low = data.next_of_state(now, TIDE_STATE_LOW)
+        upcoming = [t.as_dict() for t in data.tides if t.time >= now][:8]
+        return {
+            "time": nxt.time.isoformat(),
+            "height_m": nxt.height,
+            "next_high_tide": next_high.time.isoformat() if next_high else None,
+            "next_high_height_m": next_high.height if next_high else None,
+            "next_low_tide": next_low.time.isoformat() if next_low else None,
+            "next_low_height_m": next_low.height if next_low else None,
+            "upcoming": upcoming,
+            "source": "NEA",
+        }
+
+
+class SingaporeNextTideLevelSensor(_BaseTideSensor):
+    """Predicted height (m) of the next tide."""
+
+    _attr_translation_key = "next_tide_level"
+    _attr_device_class = SensorDeviceClass.DISTANCE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfLength.METERS
+    _attr_suggested_display_precision = 1
+
+    def __init__(self, coordinator: TideCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "next_tide_level")
+
+    @property
+    def native_value(self) -> float | None:
+        nxt = self._next()
+        return None if nxt is None else nxt.height
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        nxt = self._next()
+        if nxt is None:
+            return {}
+        return {
+            "tide": nxt.state,
+            "time": nxt.time.isoformat(),
+            "source": "NEA",
+        }
+
+
+class _BaseTrafficIncidentsSensor(
+    SingaporeEntity[TrafficIncidentsCoordinator], SensorEntity
+):
+    """Shared base for LTA traffic incident sensors."""
+
+    _device = DEVICE_TRAFFIC_INCIDENTS
+    _attr_attribution = "Data provided by LTA via mytransport.sg"
+
+
+class SingaporeTrafficIncidentsSensor(_BaseTrafficIncidentsSensor):
+    """Number of active LTA traffic incidents island-wide."""
+
+    _attr_translation_key = "traffic_incidents"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator: TrafficIncidentsCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "traffic_incidents")
+
+    @property
+    def native_value(self) -> int | None:
+        if self.coordinator.data is None:
+            return None
+        return len(self.coordinator.data.incidents)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        if self.coordinator.data is None:
+            return {}
+        data = self.coordinator.data
+        return {
+            "counts_by_type": data.counts_by_type,
+            "incidents": [i.as_dict() for i in data.incidents[:50]],
+            "source": "LTA via mytransport.sg",
+        }
+
+
+class SingaporeNearestTrafficIncidentSensor(_BaseTrafficIncidentsSensor):
+    """Distance from the Home Assistant home location to the nearest traffic incident."""
+
+    _attr_translation_key = "nearest_traffic_incident"
+    _attr_device_class = SensorDeviceClass.DISTANCE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfLength.KILOMETERS
+    _attr_suggested_display_precision = 2
+
+    def __init__(self, coordinator: TrafficIncidentsCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "nearest_traffic_incident")
+
+    def _nearest(self):
+        if self.coordinator.data is None:
+            return None
+        return self.coordinator.data.nearest(
+            self.hass.config.latitude, self.hass.config.longitude
+        )
+
+    @property
+    def native_value(self) -> float | None:
+        nearest = self._nearest()
+        return None if nearest is None else round(nearest[1], 3)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        nearest = self._nearest()
+        if nearest is None:
+            return {}
+        incident, _ = nearest
+        return {
+            "type": incident.type,
+            "message": incident.message,
+            ATTR_LATITUDE: incident.latitude,
+            ATTR_LONGITUDE: incident.longitude,
+            "source": "LTA via mytransport.sg",
+        }
 
 
 class _BaseTaxiSensor(SingaporeEntity[TaxiAvailabilityCoordinator], SensorEntity):

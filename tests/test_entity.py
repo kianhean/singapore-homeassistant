@@ -219,7 +219,16 @@ def test_cleanup_removes_turned_off_sources_only():
 
 def test_cleanup_removes_shared_device_when_all_its_sources_are_off():
     devices = [_device("nea"), _device("weather")]
-    enabled = set(SOURCES) - {"dengue", "lightning", "uv", "wbgt", "weather", "radar"}
+    enabled = set(SOURCES) - {
+        "dengue",
+        "lightning",
+        "uv",
+        "wbgt",
+        "warnings",
+        "tides",
+        "weather",
+        "radar",
+    }
     _removed, removed_devices = _run_cleanup(enabled, [], devices)
     assert sorted(removed_devices) == ["dev_nea", "dev_weather"]
 
@@ -265,9 +274,13 @@ def test_cleanup_leaves_other_devices_alone():
     [
         ("entry1_air_quality", [], False),
         ("entry1_air_quality", ["psi"], True),
-        # NEA stays while any of dengue/lightning/UV/WBGT is on.
+        # NEA stays while any of dengue/lightning/UV/WBGT/warnings/tides is on.
         ("entry1_nea", ["uv", "lightning", "dengue"], False),
-        ("entry1_nea", ["uv", "lightning", "dengue", "wbgt"], True),
+        (
+            "entry1_nea",
+            ["uv", "lightning", "dengue", "wbgt", "warnings", "tides"],
+            True,
+        ),
         ("entry1_sp_P1", [], False),
         ("entry1_sp_GONE", [], True),
         ("entry1_something_old", [], True),

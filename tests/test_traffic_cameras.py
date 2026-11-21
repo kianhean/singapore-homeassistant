@@ -35,7 +35,7 @@ def test_parse_keeps_only_checkpoint_cameras():
     data = _parse_traffic_images(
         _payload(_cam("2701"), _cam("4713"), _cam("1001"), _cam("4798"))
     )
-    assert set(data.cameras) == {"2701", "4713"}
+    assert set(data.cameras) == {"2701", "4713", "4798"}
     cam = data.cameras["2701"]
     assert cam.image_url == "https://images.data.gov.sg/x.jpg"
     assert cam.latitude == pytest.approx(1.447)
@@ -47,8 +47,12 @@ def test_parse_bad_payload_raises():
         _parse_traffic_images({"items": []})
 
 
-def test_checkpoint_cameras_cover_woodlands_and_tuas():
-    assert {v[1] for v in CHECKPOINT_CAMERAS.values()} == {"Woodlands", "Tuas"}
+def test_checkpoint_cameras_cover_woodlands_tuas_and_sentosa():
+    assert {v[1] for v in CHECKPOINT_CAMERAS.values()} == {
+        "Woodlands",
+        "Tuas",
+        "Sentosa",
+    }
 
 
 def _session(status: int = 200, json_payload=None, body: bytes = b"jpeg"):

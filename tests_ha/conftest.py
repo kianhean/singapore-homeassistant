@@ -43,9 +43,14 @@ from custom_components.singapore.school_coordinator import SCHOOL_CALENDAR_URL
 from custom_components.singapore.sp_account import client as client_module
 from custom_components.singapore.sp_account.client import SpGroupClient
 from custom_components.singapore.taxi_coordinator import TAXI_AVAILABILITY_URL
+from custom_components.singapore.tide_coordinator import TIDES_URL
 from custom_components.singapore.traffic_coordinator import TRAFFIC_IMAGES_URL
+from custom_components.singapore.traffic_incidents_coordinator import (
+    TRAFFIC_INCIDENTS_URL,
+)
 from custom_components.singapore.train_coordinator import TRAIN_STATUS_URL
 from custom_components.singapore.uv_coordinator import UV_URL
+from custom_components.singapore.warning_coordinator import WARNINGS_URL
 from custom_components.singapore.wbgt_coordinator import WBGT_URL
 from custom_components.singapore.weather_coordinator import (
     _READINGS_ENDPOINTS,
@@ -153,6 +158,25 @@ _TRAIN_PAYLOAD = {
     }
 }
 
+_TRAFFIC_INCIDENTS_PAYLOAD = {
+    "odata.metadata": "https://datamall2.mytransport.sg/ltaodataservice/TrafficIncidents",
+    "value": [
+        {
+            "Type": "Accident",
+            # ~1.1 km north of the harness home location (32.87336, -117.22743)
+            "Latitude": 32.88336,
+            "Longitude": -117.22743,
+            "Message": "(21/11)10:09 Accident on PIE (towards Tuas) after Bedok North.",
+        },
+        {
+            "Type": "Roadwork",
+            "Latitude": 1.38248,
+            "Longitude": 103.91455,
+            "Message": "(21/11)10:05 Road Works on KPE (towards TPE) at TPE(SLE) Exit.",
+        },
+    ],
+}
+
 
 _PSI_PAYLOAD = {
     "code": 0,
@@ -250,6 +274,42 @@ _WBGT_PAYLOAD = {
         ]
     },
 }
+
+_WARNINGS_PAYLOAD = [
+    {
+        "title": "Heavy Rain",
+        "warning": "NIL",
+        "link": "/weather/rain-areas",
+        "issuedDateTime": "2026-11-18T16:37:00",
+        "expiryDateTime": "2026-11-18T18:37:00",
+    },
+    {
+        "title": "Earthquake",
+        "warning": (
+            "[Updated at 12.10 pm 18 Nov 2026]\n"
+            "A 6.0 magnitude earthquake was detected in Papua New Guinea Region."
+        ),
+        "link": "/weather/regional-earthquake-and-tsunami-alert",
+        "issuedDateTime": "2026-11-18T12:10:00",
+        "expiryDateTime": "2026-11-18T18:10:00",
+    },
+]
+
+_TIDES_HTML = """
+<html><body>
+<div class="tab__nav forecast-widget__tab">
+  <button type="button" id="NovBtn" data-box="Nov" class="tab__nav-item">Nov 2099</button>
+</div>
+<div id="Nov" data-box="Nov" class="forecast-widget__content tab__item">
+  <table class="table surveillance-table two-row-head">
+    <tbody>
+      <tr><td rowspan="2">1</td><td>0418</td><td>2.6</td><td>H</td></tr>
+      <tr><td>0905</td><td>1.1</td><td>L</td></tr>
+    </tbody>
+  </table>
+</div>
+</body></html>
+"""
 
 
 def _hawker_payload() -> dict:
@@ -396,7 +456,16 @@ _TRAFFIC_PAYLOAD = {
                     "location": {"latitude": 1.447, "longitude": 103.771},
                 }
                 # 2702 deliberately absent: its entity must go unavailable.
-                for cam_id in ("2701", "4703", "4713", "1001")
+                for cam_id in (
+                    "2701",
+                    "2704",
+                    "4703",
+                    "4712",
+                    "4713",
+                    "4798",
+                    "4799",
+                    "1001",
+                )
             ],
         }
     ]
@@ -553,10 +622,13 @@ def mock_sources(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
         )
     aioclient_mock.get(PUBLIC_HOLIDAYS_URL, text=_holiday_html())
     aioclient_mock.get(SCHOOL_CALENDAR_URL, text=_MOE_CALENDAR_HTML)
+    aioclient_mock.post(TRAFFIC_INCIDENTS_URL, json=_TRAFFIC_INCIDENTS_PAYLOAD)
     aioclient_mock.post(TRAIN_STATUS_URL, json=_TRAIN_PAYLOAD)
     aioclient_mock.get(PSI_URL, json=_PSI_PAYLOAD)
     aioclient_mock.get(PM25_URL, json=_PM25_PAYLOAD)
     aioclient_mock.get(WBGT_URL, json=_WBGT_PAYLOAD)
+    aioclient_mock.get(WARNINGS_URL, json=_WARNINGS_PAYLOAD)
+    aioclient_mock.get(TIDES_URL, text=_TIDES_HTML)
     aioclient_mock.get(HAWKER_URL, json=_hawker_payload())
     aioclient_mock.get(CARPARK_INFO_URL, json=_CARPARK_INFO_PAYLOAD)
     aioclient_mock.get(CARPARK_AVAILABILITY_URL, json=_CARPARK_AVAILABILITY_PAYLOAD)
