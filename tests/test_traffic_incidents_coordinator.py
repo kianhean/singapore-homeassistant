@@ -213,7 +213,9 @@ def test_traffic_incident_geo_location_markers():
     coord.data = TrafficIncidentsData(incidents=incidents)
     listeners = []
     coord.async_add_listener = lambda cb: listeners.append(cb) or (lambda: None)
-    hass = SimpleNamespace(config=SimpleNamespace(latitude=_HOME[0], longitude=_HOME[1]))
+    hass = SimpleNamespace(
+        config=SimpleNamespace(latitude=_HOME[0], longitude=_HOME[1])
+    )
 
     added: list[SingaporeTrafficIncidentMarker] = []
     async_setup_traffic_incident_markers(hass, coord, added.extend)
