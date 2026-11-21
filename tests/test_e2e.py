@@ -301,6 +301,36 @@ def test_e2e_train_status_page_fetch_and_parse():
     assert set(data.line_statuses) == set(TRAIN_LINES), "Per-line status keys mismatch"
 
 
+def test_e2e_traffic_incidents_fetch_and_parse():
+    """Fetch live LTA traffic incidents via mytransport.sg and assert parser works."""
+    from custom_components.singapore.traffic_incidents_coordinator import (
+        _TRAFFIC_INCIDENTS_REFERER,
+        TRAFFIC_INCIDENTS_URL,
+        _parse_traffic_incidents,
+    )
+
+    try:
+        payload = asyncio.run(
+            _async_post_json(
+                TRAFFIC_INCIDENTS_URL,
+                data={"serviceName": "TrafficIncidents", "param": ""},
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    "Accept": "application/json, text/javascript, */*; q=0.01",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Referer": _TRAFFIC_INCIDENTS_REFERER,
+                },
+            )
+        )
+    except Exception as err:
+        pytest.skip(f"Skipping e2e due to network error: {err}")
+
+    data = _parse_traffic_incidents(payload)
+    for incident in data.incidents:
+        assert incident.type
+        assert incident.message
+
+
 def test_e2e_flood_alerts_fetch_and_parse():
     """Fetch live PUB flood alerts and assert the envelope still parses."""
     from custom_components.singapore.flood_coordinator import (
@@ -457,6 +487,31 @@ def test_e2e_wbgt_fetch_and_parse():
         assert 15 < reading.wbgt < 40, reading
         assert reading.heat_stress in HEAT_STRESS_OPTIONS
         assert 1.1 < reading.latitude < 1.5, reading
+
+
+def test_e2e_weather_warnings_fetch_and_parse():
+    """Fetch live NEA weather warnings and assert categories parse."""
+    from custom_components.singapore.warning_coordinator import (
+        WARNINGS_URL,
+        _parse_warnings,
+    )
+
+    data = _parse_warnings(_live_json(WARNINGS_URL))
+    assert "Heavy Rain" in data.advisories
+    assert "Earthquake" in data.advisories
+
+
+def test_e2e_tide_timings_fetch_and_parse():
+    """Fetch live NEA tide timings page and assert tides parse."""
+    from custom_components.singapore.tide_coordinator import (
+        TIDES_URL,
+        _parse_tide_html,
+    )
+
+    html = _fetch_url_html(TIDES_URL)
+    data = _parse_tide_html(html)
+    assert len(data.tides) > 50, len(data.tides)
+    assert all(t.state in ("high", "low") for t in data.tides)
 
 
 def test_e2e_hawker_closures_fetch_and_parse():

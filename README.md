@@ -81,8 +81,8 @@ minute; everything else works without it. Questions about it? See the [FAQ](#faq
 | | | |
 |---|---|---|
 | 🏠 **Your SP account** *(optional)*<br>Sign in once to get your own electricity, water and gas usage, down to the half hour on a smart meter | 📊 **Energy dashboard**<br>Hourly electricity with cost at the current SP tariff, plus monthly water, ready for [Home Assistant's Energy dashboard](#energy-dashboard-electricity-and-water) | 🧾 **Bills**<br>Last bill, amount due, meter readings and SP Green Goals, for [reminders and dashboards](#your-sp-account) |
-| 🌦️ **Weather**<br>A weather entity for every NEA forecast area, with hourly and 4-day forecasts, live temperature, humidity, wind and rain, plus NEA rain radar images and animated loops | 😷 **Air quality**<br>PSI, hourly PM2.5 and six pollutants, overall and per region, ready for a Map card | ☀️ **UV index**<br>NEA's hourly UV index and exposure level (low to extreme), with today's peak |
-| 🚇 **MRT/LRT**<br>Network and per-line status (normal, planned works, disruption) with LTA's message | 🛂 **Checkpoints**<br>Woodlands and Tuas traffic camera stills as camera entities | 🚗 **COE**<br>Category A–E premiums, refreshed after each bidding exercise |
+| 🌦️ **Weather**<br>A weather entity for every NEA forecast area, with hourly and 4-day forecasts, live temperature, humidity, wind and rain, NEA weather warnings & earthquake advisories, tide timings, plus NEA rain radar images and animated loops | 😷 **Air quality**<br>PSI, hourly PM2.5 and six pollutants, overall and per region, ready for a Map card | ☀️ **UV index**<br>NEA's hourly UV index and exposure level (low to extreme), with today's peak |
+| 🚇 **MRT/LRT**<br>Network and per-line status (normal, planned works, disruption) with LTA's message, plus live **LTA traffic incidents** | 🛂 **Checkpoints**<br>Woodlands, Tuas and Sentosa Gateway traffic camera stills as camera entities | 🚗 **COE**<br>Category A–E premiums, refreshed after each bidding exercise |
 | ⚡ **Lightning**<br>Live strikes and the distance to the nearest one from your home | 🦟 **Dengue**<br>Active NEA clusters and how far the nearest is from your home | 🌊 **Flash floods**<br>PUB flood alerts as they're issued and cancelled |
 | 🌡️ **Heat stress**<br>NEA's Wet Bulb Globe Temperature and heat stress level (low, moderate, high) at the station nearest your home | 🍜 **Hawker centres**<br>Cleaning and repair closures of the five hawker centres nearest your home, as a calendar | 🅿️ **Carparks and taxis** *(opt-in)*<br>Free lots at the HDB carparks you pick (or the nearest three) and at CapitaLand malls, and free taxis near your home |
 | 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🎉 **Holidays and school terms**<br>MOM's public holidays, plus MOE school holidays, terms and national exams, as calendars | 🧩 **Blueprints**<br>[One-click automations](#one-click-blueprints) for lightning, MRT disruptions, floods, haze, COE, rain, UV, dengue, holidays and SP bills |
@@ -94,6 +94,13 @@ that part is built on [maci0/home-assistant-sp](https://github.com/maci0/home-as
 
 ## What's new
 
+- **v0.19** [NEA weather warnings & regional advisories](#nea-weather-warnings-and-advisories)
+  (Heavy Rain warning binary sensor, active advisories count and latest regional earthquake
+  magnitude); [NEA tide timings](#nea-tide-timings) (next high/low tide and predicted height);
+  [LTA traffic incidents](#lta-traffic-incidents) (active island-wide count, breakdown
+  by type, nearest incident distance and a nearby binary sensor); four more
+  [checkpoint & gateway traffic cameras](#checkpoint-traffic-cameras) (Woodlands Flyover, Tuas West
+  Road and Sentosa Gateway inbound/outbound).
 - **v0.18** Nearest-station [realtime weather readings](#nea-realtime-weather-readings) (with
   station name, distance and island-wide average as attributes); new `binary_sensor` entities for
   [public holidays today](#public-holidays), [school holidays today](#moe-school-calendar),
@@ -488,12 +495,12 @@ carpark numbers (`B8B`, `B8`, `B6`) and malls for yours.
 **PSI by region:** the hero dashboard lists the 24-hour PSI for each region. Each regional sensor
 also carries `latitude`/`longitude`, so you can put them on a Map card instead ([YAML below](#psi-on-the-map)).
 
-**Checkpoint cameras:** a picture-entity card per camera gives you a quick look at the Causeway and Second Link queues.
+**Checkpoint cameras:** a picture-entity card per camera gives you a quick look at the Causeway, Second Link and Sentosa Gateway queues.
 
 <p align="center">
-  <img src="images/checkpoint-cameras.jpg" alt="Four picture-entity cards showing live LTA stills of Woodlands Causeway, Woodlands Checkpoint, Tuas Second Link and Tuas Checkpoint, with heavy traffic towards Johor" width="640">
+  <img src="images/checkpoint-cameras.jpg" alt="Eight picture-entity cards showing live LTA stills of Woodlands Causeway, Woodlands Checkpoint, Woodlands Flyover, Tuas Second Link, Tuas Checkpoint, Tuas West Road, and Sentosa Gateway Inbound and Outbound" width="640">
   <br>
-  <sub>Real LTA stills from data.gov.sg, Friday 13 November 2026, 16:50.</sub>
+  <sub>Real LTA stills from data.gov.sg.</sub>
 </p>
 
 **Rain radar:** a picture-entity card per radar range shows where it's raining right now,
@@ -876,7 +883,7 @@ See [Recipes](#recipes) for a notification automation.
 ### Checkpoint traffic cameras
 
 Updated every **2 minutes** from [LTA via data.gov.sg](https://data.gov.sg/datasets/d_6cdb6b405b25aaaacbaf7689bcc6fae0/view).
-Only the Woodlands and Tuas checkpoint cameras are exposed, as `camera` entities showing the latest still.
+The Woodlands, Tuas and Sentosa Gateway cameras in LTA's feed are exposed as `camera` entities showing the latest still.
 
 <details>
 <summary>Entities and attributes</summary>
@@ -885,10 +892,31 @@ Only the Woodlands and Tuas checkpoint cameras are exposed, as `camera` entities
 |-----------|-----------|------|
 | `camera.traffic_cameras_woodlands_causeway` | 2701 | Woodlands Causeway (towards Johor) |
 | `camera.traffic_cameras_woodlands_checkpoint` | 2702 | Woodlands Checkpoint (towards BKE) |
+| `camera.traffic_cameras_woodlands_flyover` | 2704 | Woodlands Flyover (towards Checkpoint) |
 | `camera.traffic_cameras_tuas_second_link` | 4703 | Tuas Second Link |
+| `camera.traffic_cameras_tuas_west_road` | 4712 | After Tuas West Road |
 | `camera.traffic_cameras_tuas_checkpoint` | 4713 | Tuas Checkpoint |
+| `camera.traffic_cameras_sentosa_gateway_outbound` | 4798 | Sentosa Gateway (towards Telok Blangah) |
+| `camera.traffic_cameras_sentosa_gateway_inbound` | 4799 | Sentosa Gateway (towards Sentosa) |
 
 A camera shows as unavailable while LTA leaves it out of the feed.
+
+</details>
+
+### LTA traffic incidents
+
+Updated every **5 minutes** from [mytransport.sg](https://www.mytransport.sg). Tracks live LTA
+traffic incidents (accidents, vehicle breakdowns, roadworks, heavy traffic, obstacles) across
+Singapore and around your Home Assistant home location, on a *Traffic* device.
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.traffic_incidents` | Traffic Incidents | — | Active traffic incidents island-wide; attributes `counts_by_type` and `incidents` (newest 50: type, message, latitude, longitude) |
+| `sensor.traffic_nearest_incident` | Traffic Nearest incident | km | Distance from your HA home location to the nearest active incident (unknown when none); attributes `type`, `message`, `latitude`, `longitude` |
+| `binary_sensor.traffic_incident_nearby` | Traffic Incident nearby | — | `on` when an active traffic incident is within 5 km of home (`problem`); attributes `radius_km`, `nearest_km`, `nearest_type`, `nearby_incidents` |
 
 </details>
 
@@ -1006,6 +1034,38 @@ sit on the *NEA* device.
 |-----------|------|------|-------------|
 | `sensor.nea_heat_stress_wbgt` | NEA Heat stress WBGT | °C | WBGT at the nearest station; attributes `heat_stress`, `station`, `town`, `distance_km`, `latitude` / `longitude`, `highest_wbgt` / `highest_station` (island-wide) and `reading_time` |
 | `sensor.nea_heat_stress` | NEA Heat stress | — | NEA's heat stress level at the nearest station: `low` (below 31 °C), `moderate` (31 to below 33 °C) or `high` (33 °C and above) |
+
+</details>
+
+### NEA weather warnings and advisories
+
+Updated every **5 minutes** from [NEA's weather warnings feed](https://www.nea.gov.sg/api/Warning/GetAllWarning/).
+Tracks NEA's Heavy Rain warnings along with regional earthquake & tsunami notices, volcanic ash
+advisories, haze advisories, and tropical cyclone warnings on the *NEA* device.
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `binary_sensor.nea_heavy_rain_warning` | NEA Heavy rain warning | — | `on` when NEA has an active Heavy Rain warning (`safety`); attributes `warning`, `issued`, `expires` |
+| `sensor.nea_weather_advisories` | NEA Weather advisories | — | Number of active NEA warnings/advisories across all 5 categories; attributes `active_categories` and `advisories` |
+| `sensor.nea_latest_earthquake` | NEA Latest earthquake | — | Magnitude of the latest regional earthquake reported by MSS/NEA; attributes `advisory`, `issued`, `expires`, `url` |
+
+</details>
+
+### NEA tide timings
+
+Updated every **24 hours** from [NEA's tide timings table](https://www.nea.gov.sg/corporate-functions/weather/tide-timings).
+Reports the next high or low tide and its predicted height in metres on the *NEA* device.
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.nea_next_tide` | NEA Next tide | — | Whether the next tide is `high` (*High tide*) or `low` (*Low tide*); attributes `time`, `height_m`, `next_high_tide`, `next_high_height_m`, `next_low_tide`, `next_low_height_m`, and `upcoming` (next 8 tides) |
+| `sensor.nea_next_tide_level` | NEA Next tide level | m | Predicted height of the next tide in metres; attributes `tide` and `time` |
 
 </details>
 
@@ -1378,13 +1438,16 @@ What the integration can't do, mostly because of what the sources publish:
 | [data.gov.sg / NEA (collection 1459)](https://data.gov.sg/collections/1459/view) | Realtime weather readings | Every 10 min |
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_fe37906a0182569d891506e815e819b7/view) | PSI and pollutant readings | Every 15 min |
 | [data.gov.sg / PUB](https://data.gov.sg/datasets/d_f1404e08587ce555b9ea3f565e2eb9a3/view) | Flash-flood alerts | Every 2 min |
-| [data.gov.sg / LTA](https://data.gov.sg/datasets/d_6cdb6b405b25aaaacbaf7689bcc6fae0/view) | Woodlands & Tuas checkpoint camera images | Every 2 min |
+| [data.gov.sg / LTA](https://data.gov.sg/datasets/d_6cdb6b405b25aaaacbaf7689bcc6fae0/view) | Woodlands, Tuas & Sentosa Gateway camera images | Every 2 min |
+| [mytransport.sg / LTA](https://www.mytransport.sg) | Live traffic incidents | Every 5 min |
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_dbfabf16158d1b0e1c420627c0819168/view) | Dengue clusters | Every 6 h |
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_08238953fe0f6dd13f10714ebfbcb9f9/view) | Lightning observations | Every 2 min |
 | [data.gov.sg / NEA](https://api-open.data.gov.sg/v2/real-time/api/uv) | Hourly UV index | Every 15 min |
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_418e9ac3414fd927b7405631e0a7bc82/view) | Rain radar images (70 / 240 / 480 km) | Every 5 min |
 | [data.gov.sg / NEA](https://api-open.data.gov.sg/v2/real-time/api/pm25) | Hourly PM2.5 | Every 15 min |
 | [data.gov.sg / NEA](https://api-open.data.gov.sg/v2/real-time/api/weather?api=wbgt) | Wet Bulb Globe Temperature (heat stress) | Every 15 min |
+| [NEA](https://www.nea.gov.sg/weather) | Weather warnings & regional earthquake/volcanic advisories | Every 5 min |
+| [NEA](https://www.nea.gov.sg/corporate-functions/weather/tide-timings) | Tide timings | Every 24 h |
 | [data.gov.sg / NEA](https://data.gov.sg/datasets/d_bda4baa634dd1cc7a6c7cad5f19e2d68/view) | Hawker centre closure dates | Every 24 h |
 | [data.gov.sg / HDB](https://data.gov.sg/datasets/d_ca933a644e55d34fe21f28b8052fac63/view) | Carpark availability (opt-in) | Every 5 min (carpark details daily) |
 | [data.gov.sg / LTA](https://data.gov.sg/datasets/d_e25662f1a062dd046453926aa284ba64/view) | Taxi availability (opt-in) | Every 5 min |

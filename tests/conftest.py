@@ -372,6 +372,7 @@ class UnitOfSpeed:
 
 class UnitOfLength:
     KILOMETERS = "km"
+    METERS = "m"
 
 
 class UnitOfPrecipitationDepth:

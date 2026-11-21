@@ -55,7 +55,10 @@ SOURCE_LIGHTNING: Final = "lightning"
 SOURCE_UV: Final = "uv"
 SOURCE_RADAR: Final = "radar"
 SOURCE_WBGT: Final = "wbgt"
+SOURCE_WARNINGS: Final = "warnings"
+SOURCE_TIDES: Final = "tides"
 SOURCE_HAWKER: Final = "hawker"
+SOURCE_TRAFFIC_INCIDENTS: Final = "traffic_incidents"
 SOURCE_CARPARK: Final = "carpark"
 SOURCE_TAXI: Final = "taxi"
 SOURCE_CAPITALAND: Final = "capitaland"
@@ -75,7 +78,10 @@ SOURCES: Final = (
     SOURCE_UV,
     SOURCE_RADAR,
     SOURCE_WBGT,
+    SOURCE_WARNINGS,
+    SOURCE_TIDES,
     SOURCE_HAWKER,
+    SOURCE_TRAFFIC_INCIDENTS,
     SOURCE_CARPARK,
     SOURCE_TAXI,
     SOURCE_CAPITALAND,
@@ -103,7 +109,10 @@ SOURCE_NAMES: Final = {
     SOURCE_UV: "NEA UV index",
     SOURCE_RADAR: "NEA rain radar",
     SOURCE_WBGT: "NEA heat stress (WBGT)",
+    SOURCE_WARNINGS: "NEA weather warnings",
+    SOURCE_TIDES: "NEA tide timings",
     SOURCE_HAWKER: "Hawker centre closures",
+    SOURCE_TRAFFIC_INCIDENTS: "LTA traffic incidents",
     SOURCE_CARPARK: "HDB carpark availability",
     SOURCE_TAXI: "Taxi availability",
     SOURCE_CAPITALAND: "CapitaLand mall carparks",

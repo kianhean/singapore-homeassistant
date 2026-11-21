@@ -113,9 +113,28 @@ async def test_setup_creates_entities_and_unloads(
     assert causeway.attributes["checkpoint"] == "Woodlands"
     missing = hass.states.get("camera.traffic_cameras_woodlands_checkpoint")
     assert missing is not None and missing.state == "unavailable"
+    assert hass.states.get("camera.traffic_cameras_woodlands_flyover").state == "idle"
     assert hass.states.get("camera.traffic_cameras_tuas_checkpoint").state == "idle"
+    assert hass.states.get("camera.traffic_cameras_tuas_west_road").state == "idle"
+    sentosa_in = hass.states.get("camera.traffic_cameras_sentosa_gateway_inbound")
+    assert sentosa_in is not None and sentosa_in.state == "idle"
+    assert sentosa_in.attributes["checkpoint"] == "Sentosa"
+    assert (
+        hass.states.get("camera.traffic_cameras_sentosa_gateway_outbound").state
+        == "idle"
+    )
     image = await async_get_image(hass, "camera.traffic_cameras_woodlands_causeway")
     assert image.content == b"jpeg-2701"
+
+    incidents = hass.states.get("sensor.traffic_incidents")
+    assert incidents is not None
+    assert incidents.state == "2"
+    assert incidents.attributes["counts_by_type"] == {"Accident": 1, "Roadwork": 1}
+    nearest_incident = hass.states.get("sensor.traffic_nearest_incident")
+    assert nearest_incident is not None
+    assert 1.0 < float(nearest_incident.state) < 1.2
+    assert nearest_incident.attributes["type"] == "Accident"
+    assert hass.states.get("binary_sensor.traffic_incident_nearby").state == "on"
 
     radar = hass.states.get("camera.weather_rain_radar_70_km")
     assert radar is not None
@@ -210,6 +229,23 @@ async def test_setup_creates_entities_and_unloads(
     assert stress is not None
     assert stress.state == "moderate"
     assert stress.attributes["options"] == ["low", "moderate", "high"]
+
+    advisories = hass.states.get("sensor.nea_weather_advisories")
+    assert advisories is not None
+    assert advisories.state == "1"
+    assert advisories.attributes["active_categories"] == ["Earthquake"]
+    earthquake = hass.states.get("sensor.nea_latest_earthquake")
+    assert earthquake is not None
+    assert earthquake.state == "6.0"
+    assert hass.states.get("binary_sensor.nea_heavy_rain_warning").state == "off"
+
+    next_tide = hass.states.get("sensor.nea_next_tide")
+    assert next_tide is not None
+    assert next_tide.state == "high"
+    assert next_tide.attributes["height_m"] == 2.6
+    tide_level = hass.states.get("sensor.nea_next_tide_level")
+    assert tide_level is not None
+    assert tide_level.state == "2.6"
 
     hawker = hass.states.get("calendar.hawker_centres_closures")
     assert hawker is not None

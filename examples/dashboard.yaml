@@ -58,6 +58,16 @@ views:
             name: Heat stress
             color: deep-orange
             grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.nea_weather_advisories
+            name: Weather advisories
+            color: amber
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.nea_next_tide
+            name: Next tide
+            color: cyan
+            grid_options: { columns: 6 }
           - type: heading
             heading: Air quality
             icon: mdi:air-filter
@@ -124,6 +134,16 @@ views:
                 name: Downtown Line
               - entity: sensor.mrt_lrt_thomson_east_coast_line_status
                 name: Thomson-East Coast Line
+          - type: tile
+            entity: sensor.traffic_incidents
+            name: Traffic incidents
+            color: red
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.traffic_nearest_incident
+            name: Nearest incident
+            color: orange
+            grid_options: { columns: 6 }
           - type: picture-entity
             entity: camera.traffic_cameras_woodlands_causeway
             name: Woodlands Causeway

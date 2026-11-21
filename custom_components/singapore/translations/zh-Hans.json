@@ -34,6 +34,12 @@
       },
       "in_dengue_cluster": {
         "name": "位于骨痛热症黑区"
+      },
+      "heavy_rain_warning": {
+        "name": "大雨警报"
+      },
+      "traffic_incident_nearby": {
+        "name": "附近有交通事故"
       }
     },
     "calendar": {
@@ -168,6 +174,28 @@
           "moderate": "中等",
           "high": "高"
         }
+      },
+      "weather_advisories": {
+        "name": "气象通告"
+      },
+      "latest_earthquake": {
+        "name": "最近地震"
+      },
+      "next_tide": {
+        "name": "下次潮汐",
+        "state": {
+          "high": "涨潮",
+          "low": "退潮"
+        }
+      },
+      "next_tide_level": {
+        "name": "下次潮位"
+      },
+      "traffic_incidents": {
+        "name": "交通事故"
+      },
+      "nearest_traffic_incident": {
+        "name": "最近的交通事故"
       },
       "carpark": {
         "name": "{number}"
@@ -477,7 +505,10 @@
         "uv": "NEA 紫外线指数",
         "radar": "NEA 降雨雷达",
         "wbgt": "NEA 热压力（WBGT）",
+        "warnings": "NEA 气象警报",
+        "tides": "NEA 潮汐时间",
         "hawker": "小贩中心休市",
+        "traffic_incidents": "陆交局交通事故",
         "carpark": "建屋局停车场空位",
         "taxi": "空车德士",
         "capitaland": "CapitaLand 商场停车位"

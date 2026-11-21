@@ -27,9 +27,14 @@ from custom_components.singapore.psi_coordinator import PsiData
 from custom_components.singapore.radar_coordinator import RadarData
 from custom_components.singapore.school_coordinator import SchoolEvent
 from custom_components.singapore.taxi_coordinator import TaxiData, TaxiPosition
+from custom_components.singapore.tide_coordinator import TideData
 from custom_components.singapore.traffic_coordinator import TrafficImagesData
+from custom_components.singapore.traffic_incidents_coordinator import (
+    TrafficIncidentsData,
+)
 from custom_components.singapore.train_coordinator import TrainStatusData
 from custom_components.singapore.uv_coordinator import UvData
+from custom_components.singapore.warning_coordinator import WeatherWarningsData
 from custom_components.singapore.wbgt_coordinator import WbgtData
 
 
@@ -62,7 +67,10 @@ async def test_diagnostics_serializes_all_coordinators():
             [SchoolEvent("Term 1", "terms", date(2026, 1, 2), date(2026, 3, 13))]
         ),
         wbgt=_coordinator(WbgtData()),
+        warnings=_coordinator(WeatherWarningsData()),
+        tides=_coordinator(TideData()),
         hawker=_coordinator(HawkerData()),
+        traffic_incidents=_coordinator(TrafficIncidentsData()),
         carpark=_coordinator(
             CarparkData(
                 tracked=["BJ55"],
@@ -99,7 +107,10 @@ async def test_diagnostics_serializes_all_coordinators():
         "radar",
         "school",
         "wbgt",
+        "warnings",
+        "tides",
         "hawker",
+        "traffic_incidents",
         "carpark",
         "taxi",
         "capitaland",

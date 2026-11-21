@@ -33,9 +33,12 @@ from .const import (
     SOURCE_SCHOOL,
     SOURCE_TARIFF,
     SOURCE_TAXI,
+    SOURCE_TIDES,
     SOURCE_TRAFFIC,
+    SOURCE_TRAFFIC_INCIDENTS,
     SOURCE_TRAIN,
     SOURCE_UV,
+    SOURCE_WARNINGS,
     SOURCE_WBGT,
     SOURCE_WEATHER,
 )
@@ -53,6 +56,7 @@ DEVICE_FLOOD = "flood"
 DEVICE_TRAFFIC = "traffic_cameras"
 DEVICE_NEA = "nea"
 DEVICE_HAWKER = "hawker"
+DEVICE_TRAFFIC_INCIDENTS = "traffic_incidents"
 DEVICE_CARPARK = "carparks"
 DEVICE_TAXI = "taxis"
 DEVICE_CAPITALAND = "capitaland_carparks"
@@ -128,7 +132,14 @@ DEVICES: dict[str, SingaporeDevice] = {
     DEVICE_NEA: SingaporeDevice(
         "NEA",
         "NEA via data.gov.sg",
-        (SOURCE_DENGUE, SOURCE_LIGHTNING, SOURCE_UV, SOURCE_WBGT),
+        (
+            SOURCE_DENGUE,
+            SOURCE_LIGHTNING,
+            SOURCE_UV,
+            SOURCE_WBGT,
+            SOURCE_WARNINGS,
+            SOURCE_TIDES,
+        ),
         "https://www.nea.gov.sg",
     ),
     DEVICE_HAWKER: SingaporeDevice(
@@ -136,6 +147,12 @@ DEVICES: dict[str, SingaporeDevice] = {
         "NEA Hawker Centres",
         (SOURCE_HAWKER,),
         "https://data.gov.sg/datasets/d_bda4baa634dd1cc7a6c7cad5f19e2d68/view",
+    ),
+    DEVICE_TRAFFIC_INCIDENTS: SingaporeDevice(
+        "Traffic",
+        "LTA Traffic Incidents",
+        (SOURCE_TRAFFIC_INCIDENTS,),
+        "https://www.mytransport.sg",
     ),
     DEVICE_CARPARK: SingaporeDevice(
         "HDB Carparks",
@@ -203,7 +220,20 @@ ENTITY_SOURCES: dict[str, str] = {
     **dict.fromkeys(("uv_index", "uv_exposure"), SOURCE_UV),
     **dict.fromkeys(("rain_radar", "rain_radar_animation"), SOURCE_RADAR),
     **dict.fromkeys(("wbgt", "heat_stress"), SOURCE_WBGT),
+    **dict.fromkeys(
+        ("weather_advisories", "latest_earthquake", "heavy_rain_warning"),
+        SOURCE_WARNINGS,
+    ),
+    **dict.fromkeys(("next_tide", "next_tide_level"), SOURCE_TIDES),
     "hawker_closures": SOURCE_HAWKER,
+    **dict.fromkeys(
+        (
+            "traffic_incidents",
+            "nearest_traffic_incident",
+            "traffic_incident_nearby",
+        ),
+        SOURCE_TRAFFIC_INCIDENTS,
+    ),
     "carpark": SOURCE_CARPARK,
     **dict.fromkeys(("taxis_available", "taxis_nearby"), SOURCE_TAXI),
     "capitaland_carpark": SOURCE_CAPITALAND,

@@ -18,6 +18,7 @@ from .entity import (
     DEVICE_HOLIDAY,
     DEVICE_NEA,
     DEVICE_SCHOOL,
+    DEVICE_TRAFFIC_INCIDENTS,
     SingaporeEntity,
 )
 from .flood_coordinator import FloodAlertCoordinator
@@ -28,11 +29,14 @@ from .lightning_coordinator import (
     strike_distance_km,
 )
 from .school_coordinator import SchoolCalendarCoordinator
+from .traffic_incidents_coordinator import TrafficIncidentsCoordinator
+from .warning_coordinator import WeatherWarningsCoordinator
 
 PARALLEL_UPDATES = 0
 
 LIGHTNING_NEARBY_KM = 10.0
 FLOOD_NEARBY_KM = 5.0
+TRAFFIC_INCIDENT_NEARBY_KM = 5.0
 
 
 async def async_setup_entry(
@@ -57,6 +61,12 @@ async def async_setup_entry(
         entities.append(SingaporeFloodAlertNearbyBinarySensor(flood, eid))
     if (dengue := data.dengue) is not None:
         entities.append(SingaporeInDengueClusterBinarySensor(dengue, eid))
+    if (warnings := data.warnings) is not None:
+        entities.append(SingaporeHeavyRainWarningBinarySensor(warnings, eid))
+    if (traffic_incidents := data.traffic_incidents) is not None:
+        entities.append(
+            SingaporeTrafficIncidentNearbyBinarySensor(traffic_incidents, eid)
+        )
 
     async_add_entities(entities)
 
@@ -275,4 +285,91 @@ class SingaporeInDengueClusterBinarySensor(
             "locality": cluster.locality,
             "cases": cluster.case_size,
             "source": "NEA via data.gov.sg",
+        }
+
+
+class SingaporeHeavyRainWarningBinarySensor(
+    SingaporeEntity[WeatherWarningsCoordinator], BinarySensorEntity
+):
+    """On when NEA has an active Heavy Rain Warning."""
+
+    _device = DEVICE_NEA
+    _attr_translation_key = "heavy_rain_warning"
+    _attr_device_class = BinarySensorDeviceClass.SAFETY
+    _attr_attribution = "Data provided by NEA"
+
+    def __init__(self, coordinator: WeatherWarningsCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "heavy_rain_warning")
+
+    @property
+    def is_on(self) -> bool | None:
+        if self.coordinator.data is None:
+            return None
+        rain = self.coordinator.data.heavy_rain
+        return rain is not None and rain.active
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        if self.coordinator.data is None:
+            return {}
+        rain = self.coordinator.data.heavy_rain
+        return {
+            "warning": rain.text if rain else None,
+            "issued": rain.issued.isoformat() if rain and rain.issued else None,
+            "expires": rain.expires.isoformat() if rain and rain.expires else None,
+            "source": "NEA",
+        }
+
+
+class SingaporeTrafficIncidentNearbyBinarySensor(
+    SingaporeEntity[TrafficIncidentsCoordinator], BinarySensorEntity
+):
+    """On when an active LTA traffic incident is within 5 km of home."""
+
+    _device = DEVICE_TRAFFIC_INCIDENTS
+    _attr_translation_key = "traffic_incident_nearby"
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_attribution = "Data provided by LTA via mytransport.sg"
+
+    def __init__(self, coordinator: TrafficIncidentsCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "traffic_incident_nearby")
+
+    def _home(self) -> tuple[float, float]:
+        return self.hass.config.latitude, self.hass.config.longitude
+
+    def _distances(self) -> list[tuple[float, str, str]]:
+        data = self.coordinator.data
+        if data is None:
+            return []
+        lat, lon = self._home()
+        found: list[tuple[float, str, str]] = []
+        for incident in data.incidents:
+            if incident.latitude is None or incident.longitude is None:
+                continue
+            dist = _haversine_km(lat, lon, incident.latitude, incident.longitude)
+            found.append((dist, incident.type, incident.message))
+        found.sort(key=lambda item: item[0])
+        return found
+
+    @property
+    def is_on(self) -> bool | None:
+        if self.coordinator.data is None:
+            return None
+        distances = self._distances()
+        return bool(distances and distances[0][0] <= TRAFFIC_INCIDENT_NEARBY_KM)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        if self.coordinator.data is None:
+            return {}
+        distances = self._distances()
+        nearby = [
+            msg for dist, _itype, msg in distances if dist <= TRAFFIC_INCIDENT_NEARBY_KM
+        ]
+        return {
+            "radius_km": TRAFFIC_INCIDENT_NEARBY_KM,
+            "nearest_km": round(distances[0][0], 2) if distances else None,
+            "nearest_type": distances[0][1] if distances else None,
+            "nearby_incidents": nearby,
+            "source": "LTA via mytransport.sg",
         }

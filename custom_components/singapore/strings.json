@@ -34,6 +34,12 @@
       },
       "in_dengue_cluster": {
         "name": "In dengue cluster"
+      },
+      "heavy_rain_warning": {
+        "name": "Heavy rain warning"
+      },
+      "traffic_incident_nearby": {
+        "name": "Incident nearby"
       }
     },
     "calendar": {
@@ -168,6 +174,28 @@
           "moderate": "Moderate",
           "high": "High"
         }
+      },
+      "weather_advisories": {
+        "name": "Weather advisories"
+      },
+      "latest_earthquake": {
+        "name": "Latest earthquake"
+      },
+      "next_tide": {
+        "name": "Next tide",
+        "state": {
+          "high": "High tide",
+          "low": "Low tide"
+        }
+      },
+      "next_tide_level": {
+        "name": "Next tide level"
+      },
+      "traffic_incidents": {
+        "name": "Incidents"
+      },
+      "nearest_traffic_incident": {
+        "name": "Nearest incident"
       },
       "carpark": {
         "name": "{number}"
@@ -477,7 +505,10 @@
         "uv": "NEA UV index",
         "radar": "NEA rain radar",
         "wbgt": "NEA heat stress (WBGT)",
+        "warnings": "NEA weather warnings",
+        "tides": "NEA tide timings",
         "hawker": "Hawker centre closures",
+        "traffic_incidents": "LTA traffic incidents",
         "carpark": "HDB carpark availability",
         "taxi": "Taxi availability",
         "capitaland": "CapitaLand mall carparks"
