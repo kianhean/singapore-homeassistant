@@ -38,6 +38,7 @@ from .const import (
     CONF_EV_POSTAL_CODES,
     CONF_FX_CURRENCIES,
     CONF_LTA_API_KEY,
+    CONF_MALL_CARPARKS,
     CONF_POLLING,
     CONF_SCHOOL_EVENTS,
     CONF_SOURCES,
@@ -59,6 +60,7 @@ from .const import (
     enabled_sources,
     ev_postal_codes,
     fx_currencies,
+    mall_carpark_terms,
 )
 from .sp_account.client import (
     AuthError,
@@ -241,6 +243,10 @@ def options_schema(options: dict[str, Any]) -> vol.Schema:
                 },
             ): TextSelector(),
             vol.Optional(
+                CONF_MALL_CARPARKS,
+                description={"suggested_value": options.get(CONF_MALL_CARPARKS) or ""},
+            ): TextSelector(),
+            vol.Optional(
                 CONF_FX_CURRENCIES,
                 default=fx_currencies(options),
             ): SelectSelector(
@@ -292,6 +298,8 @@ def options_from_input(user_input: dict[str, Any]) -> dict[str, Any]:
                 stations.append(code)
         if stations:
             options[CONF_TRAIN_CROWD_STATIONS] = ", ".join(stations)
+    if malls := mall_carpark_terms(user_input):
+        options[CONF_MALL_CARPARKS] = ", ".join(malls)
     if postal_codes := ev_postal_codes(user_input):
         options[CONF_EV_POSTAL_CODES] = ", ".join(postal_codes)
     currencies = user_input.get(CONF_FX_CURRENCIES)

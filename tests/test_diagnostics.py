@@ -26,6 +26,8 @@ from custom_components.singapore.hawker_coordinator import HawkerData
 from custom_components.singapore.holiday_coordinator import PublicHoliday
 from custom_components.singapore.interest_coordinator import InterestData, InterestRate
 from custom_components.singapore.lightning_coordinator import LightningData
+from custom_components.singapore.mall_carpark_coordinator import MallCarparkData
+from custom_components.singapore.prayer_coordinator import PrayerData
 from custom_components.singapore.psi_coordinator import PsiData
 from custom_components.singapore.radar_coordinator import RadarData
 from custom_components.singapore.school_coordinator import SchoolEvent
@@ -100,6 +102,8 @@ async def test_diagnostics_serializes_all_coordinators():
         ),
         train_crowd=_coordinator(TrainCrowdData()),
         ev_chargers=_coordinator(EvChargerData()),
+        mall_carpark=_coordinator(MallCarparkData()),
+        prayer=_coordinator(PrayerData()),
     )
 
     result = await async_get_config_entry_diagnostics(MagicMock(), entry)
@@ -131,6 +135,8 @@ async def test_diagnostics_serializes_all_coordinators():
         "capitaland",
         "train_crowd",
         "ev_chargers",
+        "mall_carpark",
+        "prayer",
     }
     assert coordinators["tariff"]["last_update_success"] is False
     assert "boom" in coordinators["tariff"]["last_exception"]

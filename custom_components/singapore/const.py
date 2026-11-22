@@ -31,6 +31,9 @@ CONF_TRAIN_CROWD_STATIONS: Final = "train_crowd_stations"
 DEFAULT_TRAIN_CROWD_STATIONS: Final = ("EW13", "EW14", "NS24")
 # Optional 6-digit Singapore postal codes for EV charger lookup (empty: nearest home).
 CONF_EV_POSTAL_CODES: Final = "ev_postal_codes"
+# Malls / developments for LTA DataMall carpark availability: CarParkIDs or
+# parts of development names, comma separated (empty: the ones nearest home).
+CONF_MALL_CARPARKS: Final = "mall_carparks"
 # Foreign currencies to quote against SGD from ECB reference rates.
 CONF_FX_CURRENCIES: Final = "fx_currencies"
 
@@ -66,6 +69,11 @@ FX_CURRENCIES: Final = (
     "ILS",
     "ZAR",
 )
+
+# MUIS prayer timetable columns, in the day's order; each is a sensor
+# (translation key prayer_<key>). Syuruk is sunrise, not a prayer.
+PRAYER_TIMES: Final = ("subuh", "syuruk", "zohor", "asar", "maghrib", "isyak")
+PRAYER_SYURUK: Final = "syuruk"
 
 SCHOOL_HOLIDAYS: Final = "holidays"
 SCHOOL_TERMS: Final = "terms"
@@ -107,6 +115,8 @@ SOURCE_TAXI: Final = "taxi"
 SOURCE_CAPITALAND: Final = "capitaland"
 SOURCE_TRAIN_CROWD: Final = "train_crowd"
 SOURCE_EV_CHARGERS: Final = "ev_chargers"
+SOURCE_MALL_CARPARK: Final = "mall_carpark"
+SOURCE_PRAYER: Final = "prayer"
 
 SOURCES: Final = (
     SOURCE_TARIFF,
@@ -134,20 +144,29 @@ SOURCES: Final = (
     SOURCE_CAPITALAND,
     SOURCE_TRAIN_CROWD,
     SOURCE_EV_CHARGERS,
+    SOURCE_MALL_CARPARK,
+    SOURCE_PRAYER,
 )
 
 # Off until ticked in the options (stored in CONF_ENABLED_SOURCES): carparks and
 # taxis poll a large island-wide payload every few minutes for a few local
 # numbers; CapitaLand's carparks come from a mall operator's website; train
-# crowd density and EV chargers require an optional LTA DataMall AccountKey.
+# crowd density, EV chargers and mall carparks require an optional LTA DataMall
+# AccountKey; prayer times only suit some users (seven sensors).
 OPT_IN_SOURCES: Final = (
     SOURCE_CARPARK,
     SOURCE_TAXI,
     SOURCE_CAPITALAND,
     SOURCE_TRAIN_CROWD,
     SOURCE_EV_CHARGERS,
+    SOURCE_MALL_CARPARK,
+    SOURCE_PRAYER,
 )
-LTA_DATAMALL_SOURCES: Final = (SOURCE_TRAIN_CROWD, SOURCE_EV_CHARGERS)
+LTA_DATAMALL_SOURCES: Final = (
+    SOURCE_TRAIN_CROWD,
+    SOURCE_EV_CHARGERS,
+    SOURCE_MALL_CARPARK,
+)
 
 # English names for log lines and repair placeholders (UI labels for the
 # options form are translated under selector.sources in strings.json).
@@ -177,6 +196,8 @@ SOURCE_NAMES: Final = {
     SOURCE_CAPITALAND: "CapitaLand mall carparks",
     SOURCE_TRAIN_CROWD: "MRT/LRT crowd density (LTA DataMall)",
     SOURCE_EV_CHARGERS: "EV charger availability (LTA DataMall)",
+    SOURCE_MALL_CARPARK: "Mall carparks (LTA DataMall)",
+    SOURCE_PRAYER: "Prayer times (MUIS)",
 }
 
 # data.gov.sg reads an optional API key from this header (higher rate limits).
@@ -225,6 +246,20 @@ def carpark_numbers(entry: Any) -> list[str]:
         if (number := part.strip().upper()) and number not in numbers:
             numbers.append(number)
     return numbers
+
+
+def mall_carpark_terms(entry: Any) -> list[str]:
+    """Mall carparks chosen in the options: CarParkIDs or name parts, in order.
+
+    Only commas and semicolons separate them: development names have spaces.
+    """
+    raw = _options(entry).get(CONF_MALL_CARPARKS) or ""
+    terms: list[str] = []
+    for part in raw.replace(";", ",").split(","):
+        term = " ".join(part.split())
+        if term and term.casefold() not in {t.casefold() for t in terms}:
+            terms.append(term)
+    return terms
 
 
 def fx_currencies(entry: Any) -> list[str]:

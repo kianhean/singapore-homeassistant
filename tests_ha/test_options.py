@@ -66,6 +66,7 @@ async def test_options_form_serializes_over_http(
         "carparks",
         "train_crowd_stations",
         "ev_postal_codes",
+        "mall_carparks",
         "fx_currencies",
         "polling",
     ]
@@ -82,7 +83,8 @@ async def test_turning_sources_off_reloads_without_their_entities(
     enabled = [
         s
         for s in SOURCES
-        if s not in {"psi", "traffic", "radar", "train_crowd", "ev_chargers"}
+        if s
+        not in {"psi", "traffic", "radar", "train_crowd", "ev_chargers", "mall_carpark"}
     ]
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
@@ -91,7 +93,7 @@ async def test_turning_sources_off_reloads_without_their_entities(
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options == {
         CONF_DISABLED_SOURCES: ["psi", "traffic", "radar"],
-        CONF_ENABLED_SOURCES: ["carpark", "taxi", "capitaland"],
+        CONF_ENABLED_SOURCES: ["carpark", "taxi", "capitaland", "prayer"],
         CONF_POLLING: "reduced",
         CONF_API_KEY: "key-123",
     }
@@ -127,7 +129,11 @@ async def test_turning_sources_off_reloads_without_their_entities(
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {
-            "sources": [s for s in SOURCES if s not in {"train_crowd", "ev_chargers"}],
+            "sources": [
+                s
+                for s in SOURCES
+                if s not in {"train_crowd", "ev_chargers", "mall_carpark"}
+            ],
             "polling": "normal",
         },
     )
@@ -159,7 +165,11 @@ async def test_unticked_school_calendars_are_removed(
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {
-            "sources": [s for s in SOURCES if s not in {"train_crowd", "ev_chargers"}],
+            "sources": [
+                s
+                for s in SOURCES
+                if s not in {"train_crowd", "ev_chargers", "mall_carpark"}
+            ],
             "school_events": ["holidays", "exams"],
             "polling": "normal",
         },

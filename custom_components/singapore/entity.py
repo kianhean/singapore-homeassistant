@@ -19,6 +19,7 @@ from homeassistant.helpers.update_coordinator import (
 
 from .const import (
     DOMAIN,
+    PRAYER_TIMES,
     SCHOOL_EVENT_KINDS,
     SOURCE_CAPITALAND,
     SOURCE_CARPARK,
@@ -31,6 +32,8 @@ from .const import (
     SOURCE_HOLIDAY,
     SOURCE_INTEREST,
     SOURCE_LIGHTNING,
+    SOURCE_MALL_CARPARK,
+    SOURCE_PRAYER,
     SOURCE_PSI,
     SOURCE_RADAR,
     SOURCE_SCHOOL,
@@ -66,6 +69,8 @@ DEVICE_TAXI = "taxis"
 DEVICE_CAPITALAND = "capitaland_carparks"
 DEVICE_EV_CHARGERS = "ev_chargers"
 DEVICE_FINANCE = "finance"
+DEVICE_MALL_CARPARK = "mall_carparks"
+DEVICE_PRAYER = "prayer_times"
 
 
 @dataclass(frozen=True, slots=True)
@@ -190,6 +195,18 @@ DEVICES: dict[str, SingaporeDevice] = {
         (SOURCE_FX, SOURCE_INTEREST),
         "https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html",
     ),
+    DEVICE_MALL_CARPARK: SingaporeDevice(
+        "Mall Carparks",
+        "LTA DataMall Carpark Availability",
+        (SOURCE_MALL_CARPARK,),
+        "https://datamall.lta.gov.sg",
+    ),
+    DEVICE_PRAYER: SingaporeDevice(
+        "Prayer Times",
+        "MUIS Prayer Timetable",
+        (SOURCE_PRAYER,),
+        "https://data.gov.sg/datasets/d_a6a206cba471fe04b62dd886ef5eaf22/view",
+    ),
 }
 
 # Translation key -> data source, for every public-source entity. The weather
@@ -261,6 +278,11 @@ ENTITY_SOURCES: dict[str, str] = {
         SOURCE_EV_CHARGERS,
     ),
     "fx_rate": SOURCE_FX,
+    "mall_carpark": SOURCE_MALL_CARPARK,
+    **dict.fromkeys(
+        (*(f"prayer_{key}" for key in PRAYER_TIMES), "next_prayer"),
+        SOURCE_PRAYER,
+    ),
     **dict.fromkeys(
         (
             "interest_sora",

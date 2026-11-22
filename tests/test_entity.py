@@ -38,6 +38,10 @@ from custom_components.singapore.entity import (
     entity_source,
 )
 from custom_components.singapore.event import async_setup_entry as event_setup_entry
+from custom_components.singapore.mall_carpark_coordinator import (
+    MallCarpark,
+    MallCarparkData,
+)
 from custom_components.singapore.sensor import async_setup_entry as sensor_setup_entry
 from custom_components.singapore.weather import (
     async_setup_entry as weather_setup_entry,
@@ -76,6 +80,21 @@ def _runtime_data(enabled: set[str]) -> SingaporeData:
         if source == "capitaland":
             coordinator.data = CapitaLandData(
                 {"BM": CapitaLandSite("BM", "Bedok Mall", "Retail", 39, 264, False)}
+            )
+        if source == "mall_carpark":
+            coordinator.data = MallCarparkData(
+                {
+                    "lta_1": MallCarpark(
+                        "lta_1",
+                        "1",
+                        "LTA",
+                        "Suntec City",
+                        "Marina",
+                        1.29,
+                        103.86,
+                        {"C": 442},
+                    )
+                }
             )
         coordinators[source] = coordinator
     return SingaporeData(**coordinators, sp_accounts={}, options={})

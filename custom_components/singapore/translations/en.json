@@ -384,6 +384,30 @@
       },
       "nearest_ev_charger": {
         "name": "Nearest available"
+      },
+      "mall_carpark": {
+        "name": "{development}"
+      },
+      "prayer_subuh": {
+        "name": "Subuh"
+      },
+      "prayer_syuruk": {
+        "name": "Syuruk"
+      },
+      "prayer_zohor": {
+        "name": "Zohor"
+      },
+      "prayer_asar": {
+        "name": "Asar"
+      },
+      "prayer_maghrib": {
+        "name": "Maghrib"
+      },
+      "prayer_isyak": {
+        "name": "Isyak"
+      },
+      "next_prayer": {
+        "name": "Next prayer"
       }
     },
     "camera": {
@@ -520,18 +544,20 @@
           "polling": "Polling",
           "lta_api_key": "LTA DataMall AccountKey",
           "train_crowd_stations": "MRT/LRT crowd stations",
-          "ev_postal_codes": "EV charger postal codes"
+          "ev_postal_codes": "EV charger postal codes",
+          "mall_carparks": "Mall carparks"
         },
         "data_description": {
-          "sources": "Turning off SP Group tariffs also leaves SP account cost statistics unpriced. HDB carpark availability, taxi availability and CapitaLand mall carparks are off until you tick them: the first two download island-wide data on each poll; CapitaLand's lots come from its JustPark website. MRT/LRT crowd density and EV charger availability require an LTA DataMall AccountKey.",
+          "sources": "Turning off SP Group tariffs also leaves SP account cost statistics unpriced. HDB carpark availability, taxi availability and CapitaLand mall carparks are off until you tick them: the first two download island-wide data on each poll; CapitaLand's lots come from its JustPark website. MRT/LRT crowd density and EV charger availability require an LTA DataMall AccountKey. Mall carparks (LTA DataMall) also needs the AccountKey. Prayer times (MUIS) is off until you tick it.",
           "school_events": "Which MOE school calendars to create when the MOE school calendar source is on.",
           "api_key": "Optional. A free key from data.gov.sg gives higher rate limits (fewer HTTP 429 errors). Leave empty to use the public limits.",
           "carparks": "Carpark numbers to track when HDB carpark availability is on, separated by commas (e.g. BJ55, TM24; shown on HDB's and data.gov.sg's carpark lists). Leave empty for the 3 carparks nearest your home location.",
           "fx_currencies": "Currencies to quote against SGD when FX rates (ECB) is on.",
-          "polling": "Reduced polls the fast sources (flood alerts, lightning, traffic cameras, radar, trains, weather, PSI, UV, heat stress, carparks, taxis, CapitaLand carparks) three times less often.",
-          "lta_api_key": "Optional. A free AccountKey from LTA DataMall (datamall.lta.gov.sg) unlocks MRT/LRT platform crowd density and EV charger availability.",
+          "polling": "Reduced polls the fast sources (flood alerts, lightning, traffic cameras, radar, trains, weather, PSI, UV, heat stress, carparks, taxis, CapitaLand and mall carparks) three times less often.",
+          "lta_api_key": "Optional. A free AccountKey from LTA DataMall (datamall.lta.gov.sg) unlocks MRT/LRT platform crowd density and EV charger availability. It also unlocks mall carparks.",
           "train_crowd_stations": "MRT/LRT station codes to track when crowd density is on, separated by commas (e.g. EW13, NS24, CC1). Leave empty for EW13, EW14 and NS24.",
-          "ev_postal_codes": "Optional 6-digit Singapore postal codes to query for EV chargers, separated by commas (e.g. 529536, 238839). Leave empty to find EV chargers within 2 km of your home location."
+          "ev_postal_codes": "Optional 6-digit Singapore postal codes to query for EV chargers, separated by commas (e.g. 529536, 238839). Leave empty to find EV chargers within 2 km of your home location.",
+          "mall_carparks": "Malls and developments to track when Mall carparks (LTA DataMall) is on, separated by commas: part of the name (e.g. VivoCity, ION Orchard, Suntec) or LTA's CarParkID. Leave empty for the 5 nearest your home location."
         }
       }
     },
@@ -571,7 +597,9 @@
         "taxi": "Taxi availability",
         "capitaland": "CapitaLand mall carparks",
         "train_crowd": "MRT/LRT crowd density (LTA DataMall)",
-        "ev_chargers": "EV charger availability (LTA DataMall)"
+        "ev_chargers": "EV charger availability (LTA DataMall)",
+        "mall_carpark": "Mall carparks (LTA DataMall)",
+        "prayer": "Prayer times (MUIS)"
       }
     },
     "school_events": {

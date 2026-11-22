@@ -38,6 +38,8 @@ custom_components/singapore/
 ├── interest_coordinator.py # InterestRateCoordinator: MAS SORA/T-bill/SGS yields via SingStat M700071
 ├── train_crowd_coordinator.py # TrainCrowdCoordinator: LTA DataMall PCDRealTime (opt-in, LTA key)
 ├── ev_charger_coordinator.py # EvChargerCoordinator: LTA DataMall EV charger availability (opt-in, LTA key)
+├── mall_carpark_coordinator.py # MallCarparkCoordinator: LTA DataMall CarParkAvailabilityv2 malls (opt-in, LTA key)
+├── prayer_coordinator.py   # PrayerTimesCoordinator: MUIS prayer timetable via data.gov.sg CKAN (opt-in)
 ├── radar_coordinator.py    # RadarCoordinator: NEA rain radar PNGs (70/240/480 km)
 ├── radar_image.py          # Pure-Pillow compositing of radar onto NEA base maps (BASEMAPS) + GIF loops
 ├── sp_account_coordinator.py # SpAccountCoordinator: one per SP e-account subentry (usage, bills, stats)
@@ -90,6 +92,8 @@ tests/
 ├── test_carpark_coordinator.py  # SVY21 conversion, availability/info parsers, nearest/chosen, sensors
 ├── test_taxi_coordinator.py     # Taxi GeoJSON parser, counts around home, sensors
 ├── test_capitaland_coordinator.py # JustPark parser (tests/fixtures/capitaland_lots.json), token reuse, sensors
+├── test_mall_carpark_coordinator.py # DataMall carpark rows, name/ID matching, nearest, paging, sensors
+├── test_prayer_coordinator.py   # MUIS rows (12-hour pre-2026, 24-hour), next prayer, timer, sensors
 ├── test_sp_account.py           # SP account coordinator, sensors, flow helpers, reload listener
 ├── test_sp_account_insights.py  # Derived SP sensors, account calendar, peer (similar homes) statistics
 ├── sp_account/                  # Vendored upstream client/mapper/history tests + recorded fixtures
@@ -161,6 +165,8 @@ class SingaporeData:
     carpark: CarparkCoordinator | None   # opt-in (off by default)
     taxi: TaxiAvailabilityCoordinator | None  # opt-in (off by default)
     capitaland: CapitaLandCarparkCoordinator | None  # opt-in (off by default)
+    train_crowd / ev_chargers / mall_carpark: ... | None  # opt-in, need the LTA key
+    prayer: PrayerTimesCoordinator | None  # opt-in (off by default)
     sp_accounts: dict[str, SpAccountCoordinator]  # keyed by subentry id
     options: dict  # the options this setup used; a change reloads the entry
     def coordinators(self) -> dict[str, DataUpdateCoordinator]: ...  # enabled ones
@@ -785,6 +791,36 @@ token or `HasError` raise `UpdateFailed`. Sensors (`translation_key="capitaland_
 are added by `async_setup_capitaland_sensors` as malls with a lot count appear. Not a data.gov.sg
 host, so it doesn't go through `datagov.py`. `tests/fixtures/capitaland_lots.json` is a real
 answer trimmed to a few sites (unit tests + `tests_ha`).
+
+## How the Mall Carpark Coordinator Works (opt-in, LTA key)
+
+Frasers, Lendlease, Mapletree (VivoCity) and Changi/Jewel publish no live lot counts on their
+websites (checked 2026-11-22: Frasers' FRx API only has member carpark-wallet calls; the others
+are static rate pages), so other operators' malls come from LTA DataMall instead.
+`mall_carpark_coordinator.py` pages through `CarParkAvailabilityv2` (`$skip` in steps of 500,
+`MAX_PAGES` 20) every **5 minutes** with `lta_datamall_headers`. Rows (`CarParkID`, `Area`,
+`Development`, `Location` = `"lat lon"`, `AvailableLots`, `LotType` C/Y/H, `Agency`) are merged
+per `{agency}_{id}` (lower-case: the unique id suffix); HDB rows are skipped. `mall_carparks`
+(option, comma/semicolon separated, spaces kept) matches a CarParkID exactly or a part of the
+development name (casefolded), in the options' order; empty = the `NEAREST_MALL_CARPARKS` (5)
+LTA-agency carparks nearest home. Only tracked carparks are kept in `MallCarparkData`. Sensors
+(`translation_key="mall_carpark"`, name `{development}`, unique id `{entry_id}_mall_carpark_{key}`
+→ `sensor.mall_carparks_suntec_city`) are added by `async_setup_mall_carpark_sensors` as they
+appear. `tests/fixtures/lta_carpark_availability.json` follows DataMall's documented shape but its
+values are illustrative (no key was available to record a live answer).
+
+## How the Prayer Times Coordinator Works (opt-in)
+
+`prayer_coordinator.py` reads the *Muslim Prayer Timetable (consolidated)* CKAN dataset
+`d_a6a206cba471fe04b62dd886ef5eaf22` (2024 onwards, one row per day, published yearly) with
+`filters={"Date": [today, +1, +2]}` (Singapore dates) every **12 hours**, through `data_gov_get`.
+Rows before 2026 are 12-hour times **without am/pm** (Zohor `01:10`); `_parse_day` makes each time
+later than the previous one in `PRAYER_TIMES` order (+12 h), which reads both formats. No rows
+raises `UpdateFailed`. Sensors: `prayer_<key>` (TIMESTAMP, today's time; `date`, `next`
+attributes) for the six columns and `next_prayer` (Syuruk, sunrise, excluded; `prayer`
+attribute), on the *Prayer Times* device. `_PrayerSensor` schedules
+`async_track_point_in_utc_time` at `PrayerData.next_change()` (the next time in the table, or SGT
+midnight) so states roll over without a poll.
 
 ## How the Rain Radar Coordinator Works
 

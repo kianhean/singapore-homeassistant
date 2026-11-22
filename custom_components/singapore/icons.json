@@ -336,6 +336,30 @@
       },
       "nearest_ev_charger": {
         "default": "mdi:map-marker-distance"
+      },
+      "mall_carpark": {
+        "default": "mdi:parking"
+      },
+      "prayer_subuh": {
+        "default": "mdi:weather-sunset-up"
+      },
+      "prayer_syuruk": {
+        "default": "mdi:white-balance-sunny"
+      },
+      "prayer_zohor": {
+        "default": "mdi:weather-sunny"
+      },
+      "prayer_asar": {
+        "default": "mdi:weather-partly-cloudy"
+      },
+      "prayer_maghrib": {
+        "default": "mdi:weather-sunset-down"
+      },
+      "prayer_isyak": {
+        "default": "mdi:weather-night"
+      },
+      "next_prayer": {
+        "default": "mdi:mosque"
       }
     },
     "camera": {

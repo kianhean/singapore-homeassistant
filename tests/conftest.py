@@ -138,6 +138,7 @@ class SensorDeviceClass(str):
     NITROGEN_DIOXIDE = "nitrogen_dioxide"
     SULPHUR_DIOXIDE = "sulphur_dioxide"
     DISTANCE = "distance"
+    TIMESTAMP = "timestamp"
 
 
 class SensorStateClass(str):
@@ -444,7 +445,10 @@ def _mod(name: str, **attrs) -> ModuleType:
 _HA_MODULES: dict[str, ModuleType] = {
     "homeassistant": _mod("homeassistant"),
     "homeassistant.core": _mod(
-        "homeassistant.core", HomeAssistant=HomeAssistant, callback=lambda f: f
+        "homeassistant.core",
+        HomeAssistant=HomeAssistant,
+        callback=lambda f: f,
+        CALLBACK_TYPE=object,
     ),
     "homeassistant.const": _mod(
         "homeassistant.const",
@@ -490,6 +494,7 @@ _HA_MODULES: dict[str, ModuleType] = {
         "homeassistant.helpers.event",
         async_track_time_change=MagicMock(return_value=MagicMock()),
         async_track_time_interval=MagicMock(return_value=MagicMock()),
+        async_track_point_in_utc_time=MagicMock(return_value=MagicMock()),
     ),
     "homeassistant.helpers.issue_registry": _mod(
         "homeassistant.helpers.issue_registry",
