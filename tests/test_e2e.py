@@ -678,3 +678,65 @@ def test_e2e_prayer_times_fetch_and_parse():
     times = list(data.days[0].times.values())
     assert len(times) == 6 and times == sorted(times)
     assert set(PRAYERS) <= set(data.days[0].times)
+
+
+def test_e2e_pump_prices_fetch_and_parse():
+    """Caltex, SPC and Shell pages (and Shell's sheet) still parse."""
+    from custom_components.singapore.pump_coordinator import PumpPriceCoordinator
+
+    async def _fetch():
+        hass = MagicMock()
+
+        async def _executor(func, *args):
+            return func(*args)
+
+        hass.async_add_executor_job = _executor
+        async with aiohttp.ClientSession(trust_env=True) as session:
+            coordinator = PumpPriceCoordinator(hass)
+            with patch(
+                "custom_components.singapore.pump_coordinator.async_get_clientsession",
+                return_value=session,
+            ):
+                return await coordinator._async_update_data()
+
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+
+    try:
+        data = asyncio.run(_fetch())
+    except UpdateFailed as err:
+        if "ClientError" in str(err) or "Timeout" in str(err):
+            pytest.skip(f"Skipping e2e due to network error: {err}")
+        raise
+    # Every brand parses (one failing alone would be hidden by the others).
+    assert set(data.brands) == {"caltex", "spc", "shell"}, data.brands
+    for brand, prices in data.brands.items():
+        assert "95" in prices.prices, brand
+        assert 1 < prices.prices["95"].price < 10, (brand, prices)
+
+
+def test_e2e_beach_water_quality_fetch_and_parse():
+    """NEA's beach API answers and every area maps to a known beach."""
+    from custom_components.singapore.beach_coordinator import (
+        BEACHES,
+        BeachWaterQualityCoordinator,
+    )
+
+    async def _fetch():
+        async with aiohttp.ClientSession(trust_env=True) as session:
+            coordinator = BeachWaterQualityCoordinator(MagicMock())
+            with patch(
+                "custom_components.singapore.beach_coordinator.async_get_clientsession",
+                return_value=session,
+            ):
+                return await coordinator._async_update_data()
+
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+
+    try:
+        data = asyncio.run(_fetch())
+    except UpdateFailed as err:
+        if isinstance(err.__cause__, (aiohttp.ClientError, TimeoutError)):
+            pytest.skip(f"Skipping e2e due to network error: {err}")
+        raise
+    assert set(data.beaches) == set(BEACHES)
+    assert data.week_start is not None

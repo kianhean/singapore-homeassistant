@@ -360,6 +360,33 @@
       },
       "next_prayer": {
         "default": "mdi:mosque"
+      },
+      "pump_92": {
+        "default": "mdi:gas-station"
+      },
+      "pump_95": {
+        "default": "mdi:gas-station"
+      },
+      "pump_98": {
+        "default": "mdi:gas-station"
+      },
+      "pump_premium": {
+        "default": "mdi:gas-station"
+      },
+      "pump_premium_diesel": {
+        "default": "mdi:gas-station"
+      },
+      "pump_diesel": {
+        "default": "mdi:gas-station-outline"
+      },
+      "beach_water_quality": {
+        "default": "mdi:beach",
+        "state": {
+          "normal": "mdi:beach",
+          "elevated": "mdi:alert-circle-outline",
+          "high": "mdi:alert",
+          "advisory": "mdi:biohazard"
+        }
       }
     },
     "camera": {

@@ -71,6 +71,7 @@ def test_every_source_but_the_opt_in_ones_enabled_by_default():
         "ev_chargers",
         "mall_carpark",
         "prayer",
+        "pump_prices",
     } == set(OPT_IN_SOURCES)
     assert enabled_sources(_entry()) == default
     assert enabled_sources(None) == default
@@ -91,6 +92,7 @@ def test_opt_in_sources_are_on_once_ticked():
         "ev_chargers",
         "mall_carpark",
         "prayer",
+        "pump_prices",
     }
 
 
@@ -133,6 +135,7 @@ def test_options_from_input_stores_disabled_sources():
             "ev_chargers",
             "mall_carpark",
             "prayer",
+            "pump_prices",
         ],
         CONF_POLLING: "reduced",
         CONF_API_KEY: "k",

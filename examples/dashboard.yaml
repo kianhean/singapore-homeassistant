@@ -1,5 +1,6 @@
-# The dashboard in images/hero.jpg (and its second view, Carparks & taxis, in
-# images/carparks-taxis.png), built only from Home Assistant's built-in cards.
+# The dashboard in images/hero.jpg (its second view, Driving & parking, in
+# images/carparks-taxis.png, and its third, Daily life, in images/daily-life.png),
+# built only from Home Assistant's built-in cards.
 #
 # To use it: Settings → Dashboards → Add dashboard → New dashboard from scratch,
 # open it, ⋮ → Edit dashboard → ⋮ → Raw configuration editor, and paste this in.
@@ -8,10 +9,12 @@
 # sensor.singapore_* IDs instead (see the README). Swap weather.weather_bedok for
 # your own forecast area.
 #
-# The Carparks & taxis view needs the three opt-in sources: tick "HDB carpark
-# availability", "Taxi availability" and "CapitaLand mall carparks" under
-# Settings → Devices & services → Singapore → Configure, and swap the carpark
-# numbers (B8B, B8, B6) and malls for yours.
+# The Driving & parking view needs four opt-in sources: tick "HDB carpark
+# availability", "Taxi availability", "CapitaLand mall carparks" and "Pump
+# prices (Caltex, SPC, Shell)" under Settings → Devices & services → Singapore →
+# Configure, and swap the carpark numbers (B8B, B8, B6) and malls for yours.
+# The Daily life view needs "Prayer times (MUIS)" ticked too; beach water
+# quality is on by default.
 title: Singapore
 views:
   - title: Singapore
@@ -258,7 +261,7 @@ views:
               - entity: sensor.coe_category_e
                 name: Category E
 
-  - title: Carparks & taxis
+  - title: Driving & parking
     path: carparks-taxis
     type: sections
     max_columns: 3
@@ -361,3 +364,122 @@ views:
                 name: Nearest free taxi
                 suffix: km
                 icon: mdi:map-marker-distance
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Pump prices
+            icon: mdi:gas-station
+          - type: tile
+            entity: sensor.caltex_95
+            name: Caltex 95
+            color: red
+          - type: tile
+            entity: sensor.spc_95
+            name: SPC 95
+            color: red
+          - type: tile
+            entity: sensor.shell_95
+            name: Shell 95
+            color: red
+          - type: entities
+            title: 98 and diesel
+            entities:
+              - entity: sensor.caltex_98
+                name: Caltex 98
+              - entity: sensor.spc_98
+                name: SPC 98
+              - entity: sensor.shell_98
+                name: Shell 98
+              - entity: sensor.caltex_diesel
+                name: Caltex diesel
+              - entity: sensor.spc_diesel
+                name: SPC diesel
+              - entity: sensor.shell_diesel
+                name: Shell diesel
+          - type: entities
+            title: With discounts
+            entities:
+              - type: attribute
+                entity: sensor.caltex_95
+                attribute: discounted_price
+                name: Caltex 95
+                suffix: SGD/L
+              - type: attribute
+                entity: sensor.shell_95
+                attribute: discounted_price
+                name: Shell 95 (all discounts)
+                suffix: SGD/L
+
+  - title: Daily life
+    path: daily-life
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Prayer times
+            icon: mdi:mosque
+          - type: tile
+            entity: sensor.prayer_times_next_prayer
+            name: Next prayer
+            color: teal
+            state_content:
+              - prayer
+              - state
+          - type: entities
+            title: Today
+            entities:
+              - entity: sensor.prayer_times_subuh
+                name: Subuh
+                format: time
+              - entity: sensor.prayer_times_syuruk
+                name: Syuruk
+                format: time
+              - entity: sensor.prayer_times_zohor
+                name: Zohor
+                format: time
+              - entity: sensor.prayer_times_asar
+                name: Asar
+                format: time
+              - entity: sensor.prayer_times_maghrib
+                name: Maghrib
+                format: time
+              - entity: sensor.prayer_times_isyak
+                name: Isyak
+                format: time
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Beach water quality
+            icon: mdi:beach
+          - type: tile
+            entity: sensor.beaches_east_coast
+            name: East Coast
+            color: cyan
+            grid_options: { columns: 6 }
+          - type: tile
+            entity: sensor.beaches_sentosa
+            name: Sentosa
+            color: cyan
+            grid_options: { columns: 6 }
+          - type: entities
+            title: All beaches
+            entities:
+              - entity: sensor.beaches_changi
+                name: Changi
+              - entity: sensor.beaches_pasir_ris
+                name: Pasir Ris
+              - entity: sensor.beaches_punggol
+                name: Punggol
+              - entity: sensor.beaches_seletar
+                name: Seletar Island
+              - entity: sensor.beaches_sembawang
+                name: Sembawang Park
+          - type: markdown
+            content: >-
+              {{ state_attr('sensor.beaches_east_coast', 'advisory') }}:
+              {{ state_attr('sensor.beaches_east_coast', 'advice') }}
+              Week of {{ state_attr('sensor.beaches_east_coast', 'week_start') }}.

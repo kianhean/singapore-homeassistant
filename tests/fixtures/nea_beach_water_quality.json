@@ -1,0 +1,997 @@
+{
+ "areas": [
+  {
+   "Area": "Changi Beach 1",
+   "Points": [
+    {
+     "Lat": "1.3933882328936507",
+     "Lng": "103.98672223091125"
+    },
+    {
+     "Lat": "1.3899828322506116",
+     "Lng": "103.99545550346375"
+    },
+    {
+     "Lat": "1.3902831512451097",
+     "Lng": "103.99558424949646"
+    },
+    {
+     "Lat": "1.3937421797648513",
+     "Lng": "103.98693680763245"
+    }
+   ]
+  },
+  {
+   "Area": "Changi Beach 2",
+   "Points": [
+    {
+     "Lat": "1.3869742773598606",
+     "Lng": "104.00019764900208"
+    },
+    {
+     "Lat": "1.3852903430058046",
+     "Lng": "104.00083065032959"
+    },
+    {
+     "Lat": "1.3759375138944268",
+     "Lng": "104.00512218475342"
+    },
+    {
+     "Lat": "1.3741999429715686",
+     "Lng": "104.00620579719543"
+    },
+    {
+     "Lat": "1.3744949010877179",
+     "Lng": "104.00655448436737"
+    },
+    {
+     "Lat": "1.3761413029938356",
+     "Lng": "104.00550305843353"
+    },
+    {
+     "Lat": "1.3825445621298593",
+     "Lng": "104.00261163711546"
+    },
+    {
+     "Lat": "1.3838960015520103",
+     "Lng": "104.00246143341064"
+    },
+    {
+     "Lat": "1.3853654229069654",
+     "Lng": "104.00113105773926"
+    },
+    {
+     "Lat": "1.3871244370530127",
+     "Lng": "104.00048732757568"
+    }
+   ]
+  },
+  {
+   "Area": "East Coast Beach 1",
+   "Points": [
+    {
+     "Lat": "1.2972736458482568",
+     "Lng": "103.90398144721985"
+    },
+    {
+     "Lat": "1.2968446023667877",
+     "Lng": "103.90412092208862"
+    },
+    {
+     "Lat": "1.2937662132556718",
+     "Lng": "103.89695405960083"
+    },
+    {
+     "Lat": "1.2929295772415663",
+     "Lng": "103.89669656753539"
+    },
+    {
+     "Lat": "1.293069016596408",
+     "Lng": "103.8958704471588"
+    },
+    {
+     "Lat": "1.293551691227065",
+     "Lng": "103.89555931091309"
+    },
+    {
+     "Lat": "1.2927365073529995",
+     "Lng": "103.89397144317627"
+    },
+    {
+     "Lat": "1.293562417328935",
+     "Lng": "103.89337062835693"
+    },
+    {
+     "Lat": "1.2973380023641992",
+     "Lng": "103.90393853187561"
+    }
+   ]
+  },
+  {
+   "Area": "East Coast Beach 2",
+   "Points": [
+    {
+     "Lat": "1.2968446023667877",
+     "Lng": "103.9041155576706"
+    },
+    {
+     "Lat": "1.2991507102239348",
+     "Lng": "103.9122748374939"
+    },
+    {
+     "Lat": "1.2993384165848143",
+     "Lng": "103.91298294067383"
+    },
+    {
+     "Lat": "1.3017893240734677",
+     "Lng": "103.919677734375"
+    },
+    {
+     "Lat": "1.3021969145846324",
+     "Lng": "103.91958117485045"
+    },
+    {
+     "Lat": "1.300845430005195",
+     "Lng": "103.91461372375488"
+    },
+    {
+     "Lat": "1.2973433654071191",
+     "Lng": "103.9039546251297"
+    }
+   ]
+  },
+  {
+   "Area": "East Coast Beach 3",
+   "Points": [
+    {
+     "Lat": "1.303977440781352",
+     "Lng": "103.9294946193695"
+    },
+    {
+     "Lat": "1.3045030175505317",
+     "Lng": "103.92938733100891"
+    },
+    {
+     "Lat": "1.303580576617596",
+     "Lng": "103.92459154129028"
+    },
+    {
+     "Lat": "1.3022183667149776",
+     "Lng": "103.9195704460144"
+    }
+   ]
+  },
+  {
+   "Area": "East Coast Beach 4",
+   "Points": [
+    {
+     "Lat": "1.3045137436059147",
+     "Lng": "103.92939805984497"
+    },
+    {
+     "Lat": "1.3072167081007857",
+     "Lng": "103.93836736679077"
+    },
+    {
+     "Lat": "1.306723310036897",
+     "Lng": "103.93853902816772"
+    },
+    {
+     "Lat": "1.3048355252457735",
+     "Lng": "103.93341064453125"
+    },
+    {
+     "Lat": "1.3039828038101502",
+     "Lng": "103.92948925495148"
+    }
+   ]
+  },
+  {
+   "Area": "East Coast Beach 5",
+   "Points": [
+    {
+     "Lat": "1.306744762128643",
+     "Lng": "103.93853902816772"
+    },
+    {
+     "Lat": "1.3103808890304092",
+     "Lng": "103.94859194755554"
+    },
+    {
+     "Lat": "1.3100376560379268",
+     "Lng": "103.94912838935852"
+    },
+    {
+     "Lat": "1.3109493685707365",
+     "Lng": "103.95286202430725"
+    },
+    {
+     "Lat": "1.3113140534909118",
+     "Lng": "103.95272254943848"
+    },
+    {
+     "Lat": "1.3107455740333807",
+     "Lng": "103.94851684570312"
+    },
+    {
+     "Lat": "1.3072274341445786",
+     "Lng": "103.93837809562683"
+    }
+   ]
+  },
+  {
+   "Area": "East Coast Beach 6",
+   "Points": [
+    {
+     "Lat": "1.3136190803759291",
+     "Lng": "103.96362695922653"
+    },
+    {
+     "Lat": "1.3151702397053668",
+     "Lng": "103.96285901163651"
+    },
+    {
+     "Lat": "1.3141674701474955",
+     "Lng": "103.96111937525643"
+    },
+    {
+     "Lat": "1.3113941834944",
+     "Lng": "103.95224879696366"
+    },
+    {
+     "Lat": "1.3108144565179174",
+     "Lng": "103.95238984856184"
+    },
+    {
+     "Lat": "1.311174827356922",
+     "Lng": "103.95616689691673"
+    },
+    {
+     "Lat": "1.3136190803759291",
+     "Lng": "103.96362695922653"
+    }
+   ]
+  },
+  {
+   "Area": "East Coast Beach 7",
+   "Points": [
+    {
+     "Lat": "1.314614156332084",
+     "Lng": "103.9638023322538"
+    },
+    {
+     "Lat": "1.3138097052931528",
+     "Lng": "103.96416711267943"
+    },
+    {
+     "Lat": "1.3151611828908045",
+     "Lng": "103.9689521735628"
+    },
+    {
+     "Lat": "1.3158583734279716",
+     "Lng": "103.9760868495427"
+    },
+    {
+     "Lat": "1.316845165856023",
+     "Lng": "103.97611903605082"
+    },
+    {
+     "Lat": "1.3164804817436533",
+     "Lng": "103.97074388918475"
+    },
+    {
+     "Lat": "1.314614156332084",
+     "Lng": "103.9638023322538"
+    }
+   ]
+  },
+  {
+   "Area": "Palawan Beach",
+   "Points": [
+    {
+     "Lat": "1.2490379824389986",
+     "Lng": "103.81964206695557"
+    },
+    {
+     "Lat": "1.2501535160309574",
+     "Lng": "103.82065057754517"
+    },
+    {
+     "Lat": "1.247075071219067",
+     "Lng": "103.82454514503478"
+    },
+    {
+     "Lat": "1.2458308207257986",
+     "Lng": "103.82357954978943"
+    }
+   ]
+  },
+  {
+   "Area": "Pasir Ris Beach 1",
+   "Points": [
+    {
+     "Lat": "1.392696427491817",
+     "Lng": "103.93628597259521"
+    },
+    {
+     "Lat": "1.3898755754576104",
+     "Lng": "103.93780946731566"
+    },
+    {
+     "Lat": "1.3856550167891533",
+     "Lng": "103.9445149898529"
+    },
+    {
+     "Lat": "1.3860518676072382",
+     "Lng": "103.94477248191833"
+    },
+    {
+     "Lat": "1.390245611372879",
+     "Lng": "103.9382815361023"
+    },
+    {
+     "Lat": "1.3929377549806436",
+     "Lng": "103.93670439720154"
+    }
+   ]
+  },
+  {
+   "Area": "Pasir Ris Beach 2",
+   "Points": [
+    {
+     "Lat": "1.3856550167891533",
+     "Lng": "103.9445149898529"
+    },
+    {
+     "Lat": "1.3849578462720646",
+     "Lng": "103.94531965255737"
+    },
+    {
+     "Lat": "1.3827268992396562",
+     "Lng": "103.94941806793213"
+    },
+    {
+     "Lat": "1.3831666533880431",
+     "Lng": "103.94958972930908"
+    },
+    {
+     "Lat": "1.3852903430058046",
+     "Lng": "103.94549131393433"
+    },
+    {
+     "Lat": "1.3860518676072382",
+     "Lng": "103.94476175308228"
+    }
+   ]
+  },
+  {
+   "Area": "Pasir Ris Beach 3",
+   "Points": [
+    {
+     "Lat": "1.382619642117951",
+     "Lng": "103.94973993301392"
+    },
+    {
+     "Lat": "1.3816006992199796",
+     "Lng": "103.95399928092957"
+    },
+    {
+     "Lat": "1.3820619050068963",
+     "Lng": "103.95407438278198"
+    },
+    {
+     "Lat": "1.383080847706948",
+     "Lng": "103.94993305206299"
+    }
+   ]
+  },
+  {
+   "Area": "Pasir Ris Beach 4",
+   "Points": [
+    {
+     "Lat": "1.3814612648946636",
+     "Lng": "103.9542031288147"
+    },
+    {
+     "Lat": "1.3810107847108422",
+     "Lng": "103.96046876907349"
+    },
+    {
+     "Lat": "1.3813111048428848",
+     "Lng": "103.96634817123413"
+    },
+    {
+     "Lat": "1.3817615849697615",
+     "Lng": "103.96615505218506"
+    },
+    {
+     "Lat": "1.3824694821394012",
+     "Lng": "103.96450281143188"
+    },
+    {
+     "Lat": "1.381568522068695",
+     "Lng": "103.96051168441771"
+    },
+    {
+     "Lat": "1.3821048078662472",
+     "Lng": "103.95428895950316"
+    }
+   ]
+  },
+  {
+   "Area": "Punggol Beach",
+   "Points": [
+    {
+     "Lat": "1.4217057",
+     "Lng": "103.9093292"
+    },
+    {
+     "Lat": "1.4218504",
+     "Lng": "103.9112758"
+    },
+    {
+     "Lat": "1.4214513",
+     "Lng": "103.9112658"
+    },
+    {
+     "Lat": "1.4213315",
+     "Lng": "103.9093492"
+    }
+   ]
+  },
+  {
+   "Area": "Seletar Island Beach",
+   "Points": [
+    {
+     "Lat": "1.449506908629708",
+     "Lng": "103.85844022035599"
+    },
+    {
+     "Lat": "1.4497857690877787",
+     "Lng": "103.85868161916733"
+    },
+    {
+     "Lat": "1.4500136838597253",
+     "Lng": "103.85835438966751"
+    },
+    {
+     "Lat": "1.4501263005621003",
+     "Lng": "103.8580271601677"
+    },
+    {
+     "Lat": "1.450163839461641",
+     "Lng": "103.85783672332764"
+    },
+    {
+     "Lat": "1.4501745648614097",
+     "Lng": "103.85759800672531"
+    },
+    {
+     "Lat": "1.450163839461641",
+     "Lng": "103.85731369256973"
+    },
+    {
+     "Lat": "1.4501102124620973",
+     "Lng": "103.85710716247559"
+    },
+    {
+     "Lat": "1.450021727910083",
+     "Lng": "103.85686844587326"
+    },
+    {
+     "Lat": "1.4499037485020032",
+     "Lng": "103.85670751333237"
+    },
+    {
+     "Lat": "1.449705328574545",
+     "Lng": "103.85659217834471"
+    },
+    {
+     "Lat": "1.449557854292881",
+     "Lng": "103.8565868139267"
+    },
+    {
+     "Lat": "1.4493916105456586",
+     "Lng": "103.85669678449631"
+    },
+    {
+     "Lat": "1.44932457677317",
+     "Lng": "103.8568925857544"
+    },
+    {
+     "Lat": "1.4492709497537415",
+     "Lng": "103.85711789131165"
+    },
+    {
+     "Lat": "1.4492360921904444",
+     "Lng": "103.85740488767624"
+    },
+    {
+     "Lat": "1.4496141626560974",
+     "Lng": "103.8574880361557"
+    },
+    {
+     "Lat": "1.4496731523684576",
+     "Lng": "103.8571447134018"
+    },
+    {
+     "Lat": "1.4497160539764766",
+     "Lng": "103.85713666677474"
+    },
+    {
+     "Lat": "1.4497589555836812",
+     "Lng": "103.85718762874603"
+    },
+    {
+     "Lat": "1.4497857690877787",
+     "Lng": "103.85735392570496"
+    },
+    {
+     "Lat": "1.4498018571900717",
+     "Lng": "103.85750412940979"
+    },
+    {
+     "Lat": "1.4498018571900717",
+     "Lng": "103.8576677441597"
+    },
+    {
+     "Lat": "1.4497750436861778",
+     "Lng": "103.85784208774565"
+    },
+    {
+     "Lat": "1.4496972845230676",
+     "Lng": "103.85814517736435"
+    },
+    {
+     "Lat": "1.4495846677993576",
+     "Lng": "103.8583517074585"
+    }
+   ]
+  },
+  {
+   "Area": "Sembawang Park Beach",
+   "Points": [
+    {
+     "Lat": "1.463726066723812",
+     "Lng": "103.83708715438843"
+    },
+    {
+     "Lat": "1.4641443547580106",
+     "Lng": "103.83729100227356"
+    },
+    {
+     "Lat": "1.4591999707015473",
+     "Lng": "103.8447904586792"
+    },
+    {
+     "Lat": "1.458846033898418",
+     "Lng": "103.84452223777771"
+    },
+    {
+     "Lat": "1.4604119356963459",
+     "Lng": "103.84153962135315"
+    }
+   ]
+  },
+  {
+   "Area": "Siloso Beach",
+   "Points": [
+    {
+     "Lat": "1.2558384394647248",
+     "Lng": "103.80958914756775"
+    },
+    {
+     "Lat": "1.2567287188085503",
+     "Lng": "103.81054401397704"
+    },
+    {
+     "Lat": "1.2519126257319992",
+     "Lng": "103.81653070449829"
+    },
+    {
+     "Lat": "1.25100089219272",
+     "Lng": "103.81574749946594"
+    }
+   ]
+  },
+  {
+   "Area": "Tanjong Beach",
+   "Points": [
+    {
+     "Lat": "1.2424734867231522",
+     "Lng": "103.826744556427"
+    },
+    {
+     "Lat": "1.2395344751796924",
+     "Lng": "103.82989883422852"
+    },
+    {
+     "Lat": "1.2404247600430904",
+     "Lng": "103.83078932762145"
+    },
+    {
+     "Lat": "1.2433530442869598",
+     "Lng": "103.8278603553772"
+    }
+   ]
+  }
+ ],
+ "data": [
+  {
+   "Week": "09/11/2026 - 15/11/2026",
+   "Areas": [
+    {
+     "Area": "Changi Beach 1",
+     "Description": "Changi Coastal End &ndash; Changi Beach Carpark 4",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Changi Beach 2",
+     "Description": "SAF Changi ferry Terminal &ndash; Changi Ferry Terminal",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 1",
+     "Description": "Carpark B1 &ndash; Carpark B2 (East Coast Park Area B)",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 2",
+     "Description": "Carpark B2 &ndash; Siglap Canal (East Coast Park Area C)",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 3",
+     "Description": "Area D - Near Carpark D5",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 4",
+     "Description": "Canal beside Carpark E1 &ndash; Canal beside Carpark F1 (East Coast Park Area E)",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 5",
+     "Description": "Canal beside Carpark F1 &ndash; Canal beside Carpark F3 (East Coast Park Area F)",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 6",
+     "Description": "Canal beside Carpark F3 &ndash; Sungei Bedok (East Coast Park Area G)",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 7",
+     "Description": "Sungei Bedok &ndash; National Service Resort and Country Club (East Coast Park Area H)",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Palawan Beach",
+     "Description": "Palawan Beach",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Pasir Ris Beach 1",
+     "Description": "Pasir Ris Farmway 1 &ndash; Pasir Ris Carpark E",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Pasir Ris Beach 2",
+     "Description": "Pasir Ris Carpark E &ndash; Sungei Api Api",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Pasir Ris Beach 3",
+     "Description": "Sungei Api Api &ndash; Sungei Tampines",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Pasir Ris Beach 4",
+     "Description": "Sungei Tampines &ndash; CSC@Loyang",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Punggol Beach",
+     "Description": "Punggol Beach",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Seletar Island Beach",
+     "Description": "South tip &ndash; Northeast tip of Island",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Sembawang Park Beach",
+     "Description": "Sembawang Park Beach",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Siloso Beach",
+     "Description": "Siloso Beach",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Tanjong Beach",
+     "Description": "Tanjong Beach",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    }
+   ]
+  },
+  {
+   "Week": "02/11/2026 - 08/11/2026",
+   "Areas": [
+    {
+     "Area": "Changi Beach 1",
+     "Description": "Changi Coastal End &ndash; Changi Beach Carpark 4",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Changi Beach 2",
+     "Description": "SAF Changi ferry Terminal &ndash; Changi Ferry Terminal",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 1",
+     "Description": "Carpark B1 &ndash; Carpark B2 (East Coast Park Area B)",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 2",
+     "Description": "Carpark B2 &ndash; Siglap Canal (East Coast Park Area C)",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 3",
+     "Description": "Area D - Near Carpark D5",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 4",
+     "Description": "Canal beside Carpark E1 &ndash; Canal beside Carpark F1 (East Coast Park Area E)",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 5",
+     "Description": "Canal beside Carpark F1 &ndash; Canal beside Carpark F3 (East Coast Park Area F)",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 6",
+     "Description": "Canal beside Carpark F3 &ndash; Sungei Bedok (East Coast Park Area G)",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 7",
+     "Description": "Sungei Bedok &ndash; National Service Resort and Country Club (East Coast Park Area H)",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Palawan Beach",
+     "Description": "Palawan Beach",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Pasir Ris Beach 1",
+     "Description": "Pasir Ris Farmway 1 &ndash; Pasir Ris Carpark E",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Pasir Ris Beach 2",
+     "Description": "Pasir Ris Carpark E &ndash; Sungei Api Api",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Pasir Ris Beach 3",
+     "Description": "Sungei Api Api &ndash; Sungei Tampines",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Pasir Ris Beach 4",
+     "Description": "Sungei Tampines &ndash; CSC@Loyang",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Punggol Beach",
+     "Description": "Punggol Beach",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Seletar Island Beach",
+     "Description": "South tip &ndash; Northeast tip of Island",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Sembawang Park Beach",
+     "Description": "Sembawang Park Beach",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Siloso Beach",
+     "Description": "Siloso Beach",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Tanjong Beach",
+     "Description": "Tanjong Beach",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    }
+   ]
+  },
+  {
+   "Week": "26/10/2026 - 01/11/2026",
+   "Areas": [
+    {
+     "Area": "Changi Beach 1",
+     "Description": "Changi Coastal End &ndash; Changi Beach Carpark 4",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Changi Beach 2",
+     "Description": "SAF Changi ferry Terminal &ndash; Changi Ferry Terminal",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 1",
+     "Description": "Carpark B1 &ndash; Carpark B2 (East Coast Park Area B)",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 2",
+     "Description": "Carpark B2 &ndash; Siglap Canal (East Coast Park Area C)",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 3",
+     "Description": "Area D - Near Carpark D5",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 4",
+     "Description": "Canal beside Carpark E1 &ndash; Canal beside Carpark F1 (East Coast Park Area E)",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 5",
+     "Description": "Canal beside Carpark F1 &ndash; Canal beside Carpark F3 (East Coast Park Area F)",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 6",
+     "Description": "Canal beside Carpark F3 &ndash; Sungei Bedok (East Coast Park Area G)",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "East Coast Beach 7",
+     "Description": "Sungei Bedok &ndash; National Service Resort and Country Club (East Coast Park Area H)",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Palawan Beach",
+     "Description": "Palawan Beach",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Pasir Ris Beach 1",
+     "Description": "Pasir Ris Farmway 1 &ndash; Pasir Ris Carpark E",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Pasir Ris Beach 2",
+     "Description": "Pasir Ris Carpark E &ndash; Sungei Api Api",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Pasir Ris Beach 3",
+     "Description": "Sungei Api Api &ndash; Sungei Tampines",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Pasir Ris Beach 4",
+     "Description": "Sungei Tampines &ndash; CSC@Loyang",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Punggol Beach",
+     "Description": "Punggol Beach",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Seletar Island Beach",
+     "Description": "South tip &ndash; Northeast tip of Island",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Sembawang Park Beach",
+     "Description": "Sembawang Park Beach",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Siloso Beach",
+     "Description": "Siloso Beach",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    },
+    {
+     "Area": "Tanjong Beach",
+     "Description": "Tanjong Beach",
+     "AdvisoryOnMap": "",
+     "Banding": "1"
+    }
+   ]
+  }
+ ],
+ "banding": {
+  "Band1": {
+   "AdvisoryHeader": "Safe to Enter the Water",
+   "AdvisoryText": "All beachgoers can continue with water activities."
+  },
+  "Band2": {
+   "AdvisoryHeader": "Caution Advised For Primary Contact Activities<sup>2&nbsp;</sup>",
+   "AdvisoryText": "Children, the elderly, and immunocompromised<sup>3</sup>&nbsp;beach users should reduce* primary contact activities<sup>2&nbsp;</sup>"
+  },
+  "Band3": {
+   "AdvisoryHeader": "Primary Contact Activities<sup>2</sup>&nbsp;Not Advised",
+   "AdvisoryText": "All beachgoers should minimise* primary contact activities<sup>2</sup>"
+  },
+  "BandAdvisory": {
+   "AdvisoryHeader": "Bacteria",
+   "AdvisoryText": "Beach water quality is not suitable for swimming due to high bacteria levels"
+  }
+ },
+ "guide": "<div style=\"padding:24px;\"><h2 style=\"font-size:20px;font-weight:700;line-height:28px;margin-top:0px;\">Recreational Beach Water Quality Advisories</h2><p>Regardless of the water quality, beach users are advised to avoid entering the water immediately after heavy rainfall.</p><p>Beach users with open sores, skin infections, or who are unwell are also advised to refrain from water activities.</p><table style=\"border-collapse:collapse;width:100%;margin-bottom:24px;\"><tbody><tr><td style=\"padding:16px 24px;border:1px solid rgba(0, 0, 0, 0.24);font-size:18px;font-weight:500;\">Band 1, Normal (EC &le; 200)</td></tr><tr><td style=\"padding:16px 24px;border:1px solid rgba(0, 0, 0, 0.24);\"><div style=\"font-weight:600;margin-bottom:8px;\">Safe to enter the water</div><div><p>All beachgoers can continue with water activities.</p></div></td></tr></tbody></table><table style=\"border-collapse:collapse;width:100%;margin-bottom:24px;\"><tbody><tr><td style=\"padding:16px 24px;border:1px solid rgba(0, 0, 0, 0.24);font-size:18px;font-weight:500;\">Band 2, Elevated (200 &lt; EC &le; 500)</td></tr><tr><td style=\"padding:16px 24px;border:1px solid rgba(0, 0, 0, 0.24);\"><div style=\"font-weight:600;margin-bottom:8px;\">Caution Advised For Primary Contact Activities<sup>1</sup></div><div><p>Children, the elderly, and immunocompromised<sup>2</sup> beach users should reduce* primary contact activities<sup>1</sup></p></div></td></tr></tbody></table><table style=\"border-collapse:collapse;width:100%;margin-bottom:24px;\"><tbody><tr><td style=\"padding:16px 24px;border:1px solid rgba(0, 0, 0, 0.24);font-size:18px;font-weight:500;\">Band 3, High (EC &gt; 500 or 2 consecutive weeks of 200 &lt; EC &le; 500)\n                </td></tr><tr><td style=\"padding:16px 24px;border:1px solid rgba(0, 0, 0, 0.24);\"><div style=\"font-weight:600;margin-bottom:8px;\">Primary Contact Activities<sup>1</sup> Not Advised</div><div><p>All beachgoers should minimise* primary contact activities<sup>1</sup></p></div></td></tr></tbody></table><p>* Reduce - Do less; Minimise - Do as little as possible</p><p><sup>1</sup> Primary contact activities are those where<br />(a) the whole body or the face and trunk are frequently immersed and<br />(b) it is likely that\n        some water will be swallowed. Examples of primary contact activities include swimming, skiing, wakeboarding, diving, windsurfing, kite surfing, jet skiing\n        and water immersion training (such as capsize training for kayaking and canoeing).\n    </p><p><sup>2</sup> Immunocompromised beachgoers refer to those who have weakened immune systems.</p><p><strong>Enterococcus (EC) levels</strong><br />EC or Enterococcus is an indicator of faecal pollution in recreational waters. It is a type of bacteria\n        normally found in faeces of humans and warm-blooded animals.\n    </p><p>EC levels for the bandings are based on the WHO guidelines for safe recreational use.</p></div>"
+}

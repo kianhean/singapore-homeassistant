@@ -437,7 +437,13 @@ async def test_example_dashboard_matches_a_real_install(
         title="Singapore",
         data={"name": "Singapore"},
         options={
-            "enabled_sources": ["carpark", "taxi", "capitaland"],
+            "enabled_sources": [
+                "carpark",
+                "taxi",
+                "capitaland",
+                "pump_prices",
+                "prayer",
+            ],
             "carparks": "B8B, B8, B6",
         },
     )
@@ -537,3 +543,57 @@ async def test_opt_in_mall_carparks(
         "lta_31",
         "lta_1",
     }
+
+
+async def test_beach_water_quality(
+    hass: HomeAssistant, hass_client, mock_sources
+) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN, title="Singapore", data={"name": "Singapore"}
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    changi = hass.states.get("sensor.beaches_changi")
+    assert changi is not None
+    assert changi.state == "normal"
+    assert changi.attributes["device_class"] == "enum"
+    assert changi.attributes["week_start"] == "2026-11-09"
+    assert changi.attributes["advisory"] == "Safe to Enter the Water"
+    assert len(changi.attributes["areas"]) == 2
+    assert hass.states.get("sensor.beaches_sentosa") is not None
+
+    diagnostics = await get_diagnostics_for_config_entry(hass, hass_client, entry)
+    assert "changi" in diagnostics["coordinators"]["beaches"]["data"]["beaches"]
+
+
+async def test_opt_in_pump_prices(
+    hass: HomeAssistant, hass_client, mock_sources
+) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Singapore",
+        data={"name": "Singapore"},
+        options={"enabled_sources": ["pump_prices"]},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    caltex = hass.states.get("sensor.caltex_95")
+    assert caltex is not None
+    assert caltex.state == "3.6"
+    assert caltex.attributes["unit_of_measurement"] == "SGD/L"
+    assert caltex.attributes["discounted_price"] == 3.42
+    assert hass.states.get("sensor.spc_92").state == "3.54"
+    assert hass.states.get("sensor.shell_premium").state == "4.34"
+    assert hass.states.get("sensor.shell_diesel").attributes["product"] == (
+        "Shell FuelSave Diesel"
+    )
+    # SPC sells no V-Power-style premium grade: no sensor.
+    assert hass.states.get("sensor.spc_premium") is None
+
+    diagnostics = await get_diagnostics_for_config_entry(hass, hass_client, entry)
+    brands = diagnostics["coordinators"]["pump_prices"]["data"]["brands"]
+    assert set(brands) == {"caltex", "spc", "shell"}

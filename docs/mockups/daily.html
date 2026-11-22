@@ -1,0 +1,53 @@
+<!doctype html>
+<!-- Mirrors the "Daily life" view of examples/dashboard.yaml: only built-in Home Assistant
+     cards, with the states they display (live values, 2026-11-22 10:30: the MUIS timetable
+     for that day and NEA's beach bands for the week of 9 November 2026). Keep the two in sync. -->
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="ha.css">
+<style>
+  .view { grid-template-columns: repeat(3, 1fr); }
+  .md { font-size: 14px; line-height: 1.5; color: var(--text); }
+</style></head>
+<body><div class="app">
+  <nav class="sidebar">
+    <i m="mdiMenu"></i><span class="active"><i m="mdiViewDashboard"></i></span><i m="mdiChartBox"></i><i m="mdiFormatListBulletedType"></i><i m="mdiCalendar"></i><i m="mdiCog"></i>
+  </nav>
+  <div class="main">
+    <header class="topbar">
+      <div class="tabs"><span>Singapore</span><span>Driving &amp; parking</span><span class="on">Daily life</span></div>
+      <span class="spacer"></span><i m="mdiMagnify"></i><i m="mdiPencil"></i>
+    </header>
+    <div class="view">
+
+      <div class="section">
+        <div class="heading"><i m="mdiMosque"></i>Prayer times</div>
+        <div class="card tile"><span class="bubble" style="--c:var(--teal)"><i m="mdiMosque"></i></span><div><div class="name">Next prayer</div><div class="state">Zohor · in 2 hours</div></div></div>
+        <div class="card"><div class="card-title">Today</div><div class="rows">
+          <div class="row"><span class="ic"><i m="mdiWeatherSunsetUp"></i></span><span class="label">Subuh</span><span class="val">05:28</span></div>
+          <div class="row"><span class="ic"><i m="mdiWhiteBalanceSunny"></i></span><span class="label">Syuruk</span><span class="val">06:50</span></div>
+          <div class="row"><span class="ic"><i m="mdiWeatherSunny"></i></span><span class="label">Zohor</span><span class="val">12:53</span></div>
+          <div class="row"><span class="ic"><i m="mdiWeatherPartlyCloudy"></i></span><span class="label">Asar</span><span class="val">16:16</span></div>
+          <div class="row"><span class="ic"><i m="mdiWeatherSunsetDown"></i></span><span class="label">Maghrib</span><span class="val">18:53</span></div>
+          <div class="row"><span class="ic"><i m="mdiWeatherNight"></i></span><span class="label">Isyak</span><span class="val">20:07</span></div>
+        </div></div>
+      </div>
+
+      <div class="section">
+        <div class="heading"><i m="mdiBeach"></i>Beach water quality</div>
+        <div class="grid2">
+          <div class="card tile"><span class="bubble" style="--c:var(--cyan)"><i m="mdiBeach"></i></span><div><div class="name">East Coast</div><div class="state">Normal</div></div></div>
+          <div class="card tile"><span class="bubble" style="--c:var(--cyan)"><i m="mdiBeach"></i></span><div><div class="name">Sentosa</div><div class="state">Normal</div></div></div>
+        </div>
+        <div class="card"><div class="card-title">All beaches</div><div class="rows">
+          <div class="row"><span class="ic"><i m="mdiBeach"></i></span><span class="label">Changi</span><span class="val">Normal</span></div>
+          <div class="row"><span class="ic"><i m="mdiBeach"></i></span><span class="label">Pasir Ris</span><span class="val">Normal</span></div>
+          <div class="row"><span class="ic"><i m="mdiBeach"></i></span><span class="label">Punggol</span><span class="val">Normal</span></div>
+          <div class="row"><span class="ic"><i m="mdiBeach"></i></span><span class="label">Seletar Island</span><span class="val">Normal</span></div>
+          <div class="row"><span class="ic"><i m="mdiBeach"></i></span><span class="label">Sembawang Park</span><span class="val">Normal</span></div>
+        </div></div>
+        <div class="card card-pad md">Safe to Enter the Water: All beachgoers can continue with water activities. Week of 2026-11-09.</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</body></html>

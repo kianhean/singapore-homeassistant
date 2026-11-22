@@ -9,6 +9,7 @@ HTTP is still mocked so the suite stays offline and deterministic.
 from __future__ import annotations
 
 import io
+import re
 from collections.abc import Iterator
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -48,6 +49,11 @@ from custom_components.singapore.prayer_coordinator import (
 )
 from custom_components.singapore.prayer_coordinator import SGT as PRAYER_TZ
 from custom_components.singapore.psi_coordinator import PM25_URL, PSI_URL
+from custom_components.singapore.pump_coordinator import (
+    CALTEX_URL,
+    SHELL_MODEL_URL,
+    SPC_URL,
+)
 from custom_components.singapore.radar_coordinator import RADAR_URL
 from custom_components.singapore.radar_image import BASEMAPS
 from custom_components.singapore.school_coordinator import SCHOOL_CALENDAR_URL
@@ -686,6 +692,20 @@ def mock_sources(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
     aioclient_mock.post(CAPITALAND_API_URL, text=_CAPITALAND_LOTS)
     aioclient_mock.get(
         f"{PRAYER_URL}?resource_id={PRAYER_DATASET}", json=_prayer_payload()
+    )
+    fixtures = Path(__file__).parents[1] / "tests" / "fixtures"
+    aioclient_mock.get(
+        re.compile(r"^https://www\.nea\.gov\.sg/api/BeachWaterQuality/GetNeaData/\d+$"),
+        text=(fixtures / "nea_beach_water_quality.json").read_text(),
+    )
+    aioclient_mock.get(CALTEX_URL, text=(fixtures / "caltex_home.html").read_text())
+    aioclient_mock.get(SPC_URL, text=(fixtures / "spc_pump_price.html").read_text())
+    aioclient_mock.get(
+        SHELL_MODEL_URL, text=(fixtures / "shell_price_board.model.json").read_text()
+    )
+    aioclient_mock.get(
+        re.compile(r"^https://www\.shell\.com\.sg/.*\.xlsx$"),
+        content=(fixtures / "shell_fuel_prices.xlsx").read_bytes(),
     )
     aioclient_mock.get(
         MALL_CARPARK_URL,

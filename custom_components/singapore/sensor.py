@@ -1,6 +1,6 @@
 """Sensor platform: tariffs, COE, weather, PSI, trains, floods, dengue, lightning,
 UV, heat stress, HDB carparks, taxis, CapitaLand and LTA mall carparks, prayer
-times."""
+times, pump prices and beach water quality."""
 
 from __future__ import annotations
 
@@ -31,6 +31,7 @@ from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.util import dt as dt_util
 
 from . import SingaporeConfigEntry
+from .beach_coordinator import BAND_OPTIONS, BeachWaterQualityCoordinator
 from .capitaland_coordinator import CapitaLandCarparkCoordinator
 from .carpark_coordinator import (
     LOT_CAR,
@@ -48,6 +49,7 @@ from .coordinator import UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER, SPGroupCoordina
 from .dengue_coordinator import DengueClusterCoordinator, nearest_cluster
 from .entity import (
     DEVICE_AIR_QUALITY,
+    DEVICE_BEACHES,
     DEVICE_CAPITALAND,
     DEVICE_CARPARK,
     DEVICE_COE,
@@ -62,7 +64,9 @@ from .entity import (
     DEVICE_TRAFFIC_INCIDENTS,
     DEVICE_TRAIN,
     DEVICE_WEATHER,
+    PUMP_BRAND_NAMES,
     SingaporeEntity,
+    pump_device,
 )
 from .ev_charger_coordinator import EvChargerCoordinator
 from .flood_coordinator import FloodAlertCoordinator
@@ -88,6 +92,8 @@ from .psi_coordinator import (
     pm25_band,
     psi_band,
 )
+from .pump_coordinator import GRADES as PUMP_GRADES
+from .pump_coordinator import UNIT_PUMP_PRICE, PumpPriceCoordinator
 from .sp_account_sensor import async_setup_sp_account_sensors
 from .taxi_coordinator import NEARBY_KM, TaxiAvailabilityCoordinator
 from .tide_coordinator import (
@@ -288,6 +294,14 @@ async def async_setup_entry(
     if (mall_carpark := data.mall_carpark) is not None:
         entry.async_on_unload(
             async_setup_mall_carpark_sensors(mall_carpark, eid, async_add_entities)
+        )
+    if (pump_prices := data.pump_prices) is not None:
+        entry.async_on_unload(
+            async_setup_pump_price_sensors(pump_prices, eid, async_add_entities)
+        )
+    if (beaches := data.beaches) is not None:
+        entry.async_on_unload(
+            async_setup_beach_sensors(beaches, eid, async_add_entities)
         )
 
     for unsub in async_setup_sp_account_sensors(
@@ -1618,6 +1632,171 @@ class SingaporeMallCarparkSensor(SingaporeEntity[MallCarparkCoordinator], Sensor
             )
             if distance is not None:
                 attrs["distance_km"] = round(distance, 2)
+        return attrs
+
+
+@callback
+def async_setup_pump_price_sensors(
+    coordinator: PumpPriceCoordinator,
+    entry_id: str,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+):
+    """Add a sensor per brand and grade as prices appear; return the unsub."""
+    known: set[tuple[str, str]] = set()
+
+    @callback
+    def _add_new() -> None:
+        data = coordinator.data
+        if data is None:
+            return
+        fresh = [
+            (brand, grade)
+            for brand in PUMP_BRAND_NAMES
+            if (prices := data.brands.get(brand)) is not None
+            for grade in PUMP_GRADES
+            if grade in prices.prices and (brand, grade) not in known
+        ]
+        if not fresh:
+            return
+        known.update(fresh)
+        async_add_entities(
+            [
+                SingaporePumpPriceSensor(coordinator, entry_id, brand, grade)
+                for brand, grade in fresh
+            ]
+        )
+
+    _add_new()
+    return coordinator.async_add_listener(_add_new)
+
+
+class SingaporePumpPriceSensor(SingaporeEntity[PumpPriceCoordinator], SensorEntity):
+    """One brand's pump price for one grade (SGD per litre, before discounts)."""
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UNIT_PUMP_PRICE
+    _attr_suggested_display_precision = 2
+
+    def __init__(
+        self,
+        coordinator: PumpPriceCoordinator,
+        entry_id: str,
+        brand: str,
+        grade: str,
+    ) -> None:
+        super().__init__(coordinator, entry_id, f"pump_{brand}_{grade}")
+        self._brand = brand
+        self._grade = grade
+        self._device = pump_device(brand)
+        self._attr_translation_key = f"pump_{grade}"
+        self._attr_attribution = f"Data provided by {PUMP_BRAND_NAMES[brand]}"
+
+    def _brand_prices(self):
+        data = self.coordinator.data
+        return None if data is None else data.brands.get(self._brand)
+
+    def _price(self):
+        prices = self._brand_prices()
+        return None if prices is None else prices.prices.get(self._grade)
+
+    @property
+    def native_value(self) -> float | None:
+        price = self._price()
+        return None if price is None else price.price
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        price = self._price()
+        if price is None:
+            return {}
+        attrs: dict = {"product": price.product}
+        if price.discounted is not None:
+            attrs["discounted_price"] = price.discounted
+        if (prices := self._brand_prices()) is not None and prices.updated:
+            attrs["updated"] = prices.updated.isoformat()
+        return attrs
+
+
+@callback
+def async_setup_beach_sensors(
+    coordinator: BeachWaterQualityCoordinator,
+    entry_id: str,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+):
+    """Add a sensor per beach as NEA reports it; return the unsub."""
+    known: set[str] = set()
+
+    @callback
+    def _add_new() -> None:
+        data = coordinator.data
+        if data is None:
+            return
+        fresh = [beach for key, beach in data.beaches.items() if key not in known]
+        if not fresh:
+            return
+        known.update(beach.key for beach in fresh)
+        async_add_entities(
+            [
+                SingaporeBeachSensor(coordinator, entry_id, beach.key, beach.name)
+                for beach in fresh
+            ]
+        )
+
+    _add_new()
+    return coordinator.async_add_listener(_add_new)
+
+
+class SingaporeBeachSensor(SingaporeEntity[BeachWaterQualityCoordinator], SensorEntity):
+    """A beach's weekly water quality band (its worst sampling area)."""
+
+    _device = DEVICE_BEACHES
+    _attr_translation_key = "beach_water_quality"
+    _attr_attribution = "Data provided by NEA"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = BAND_OPTIONS
+
+    def __init__(
+        self,
+        coordinator: BeachWaterQualityCoordinator,
+        entry_id: str,
+        key: str,
+        name: str,
+    ) -> None:
+        super().__init__(coordinator, entry_id, f"beach_{key}")
+        self._key = key
+        self._attr_translation_placeholders = {"beach": name}
+
+    def _beach(self):
+        data = self.coordinator.data
+        return None if data is None else data.beaches.get(self._key)
+
+    @property
+    def native_value(self) -> str | None:
+        beach = self._beach()
+        return None if beach is None else beach.band
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        data = self.coordinator.data
+        beach = self._beach()
+        if data is None or beach is None:
+            return {}
+        attrs: dict = {
+            "areas": [
+                {"area": a.area, "description": a.description, "band": a.band}
+                for a in beach.areas
+            ],
+            "previous_weeks": list(beach.previous_bands),
+        }
+        if data.week_start is not None and data.week_end is not None:
+            attrs["week_start"] = data.week_start.isoformat()
+            attrs["week_end"] = data.week_end.isoformat()
+        if beach.band is not None and (advisory := data.advisories.get(beach.band)):
+            attrs["advisory"] = advisory[0]
+            attrs["advice"] = advisory[1]
+        if beach.latitude is not None and beach.longitude is not None:
+            attrs[ATTR_LATITUDE] = beach.latitude
+            attrs[ATTR_LONGITUDE] = beach.longitude
         return attrs
 
 

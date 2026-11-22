@@ -407,7 +407,46 @@
         "name": "宵礼"
       },
       "next_prayer": {
-        "name": "下次礼拜"
+        "name": "下次礼拜",
+        "state_attributes": {
+          "prayer": {
+            "name": "礼拜",
+            "state": {
+              "subuh": "晨礼",
+              "zohor": "晌礼",
+              "asar": "晡礼",
+              "maghrib": "昏礼",
+              "isyak": "宵礼"
+            }
+          }
+        }
+      },
+      "pump_92": {
+        "name": "92"
+      },
+      "pump_95": {
+        "name": "95"
+      },
+      "pump_98": {
+        "name": "98"
+      },
+      "pump_premium": {
+        "name": "高级"
+      },
+      "pump_diesel": {
+        "name": "柴油"
+      },
+      "pump_premium_diesel": {
+        "name": "高级柴油"
+      },
+      "beach_water_quality": {
+        "name": "{beach}",
+        "state": {
+          "normal": "正常",
+          "elevated": "偏高",
+          "high": "高",
+          "advisory": "细菌警示"
+        }
       }
     },
     "camera": {
@@ -548,7 +587,7 @@
           "mall_carparks": "商场停车场"
         },
         "data_description": {
-          "sources": "关闭 SP Group 电价后，SP 账户的费用统计也将不再计价。建屋局停车场空位、空车德士和 CapitaLand 商场停车位默认关闭，需勾选才会开启：前两者每次轮询都会下载全岛数据；CapitaLand 的空位来自其 JustPark 网站。商场停车场（LTA DataMall）同样需要 AccountKey。祈祷时间（MUIS）默认关闭，需勾选才会开启。",
+          "sources": "关闭 SP Group 电价后，SP 账户的费用统计也将不再计价。建屋局停车场空位、空车德士和 CapitaLand 商场停车位默认关闭，需勾选才会开启：前两者每次轮询都会下载全岛数据；CapitaLand 的空位来自其 JustPark 网站。商场停车场（LTA DataMall）同样需要 AccountKey。祈祷时间（MUIS）默认关闭，需勾选才会开启。油价（Caltex、SPC、Shell）默认关闭，需勾选才会开启：价格来自各公司的网站。",
           "school_events": "开启教育部校历数据源时要创建哪些校历。",
           "api_key": "可选。data.gov.sg 的免费密钥可提供更高的速率限制（减少 HTTP 429 错误）。留空则使用公共限制。",
           "carparks": "开启建屋局停车场空位时要追踪的停车场编号，用逗号分隔（例如 BJ55, TM24；可在建屋局或 data.gov.sg 的停车场列表中找到）。留空则使用离您家位置最近的 3 个停车场。",
@@ -599,7 +638,9 @@
         "train_crowd": "地铁/轻轨站台拥挤度 (LTA DataMall)",
         "ev_chargers": "电动车充电桩可用性 (LTA DataMall)",
         "mall_carpark": "商场停车场（LTA DataMall）",
-        "prayer": "祈祷时间（MUIS）"
+        "prayer": "祈祷时间（MUIS）",
+        "pump_prices": "油价（Caltex、SPC、Shell）",
+        "beaches": "NEA 海滩水质"
       }
     },
     "school_events": {
