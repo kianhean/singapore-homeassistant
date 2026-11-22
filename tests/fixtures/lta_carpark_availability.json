@@ -1,0 +1,77 @@
+{
+  "odata.metadata": "https://datamall2.mytransport.sg/ltaodataservice/$metadata#CarParkAvailability",
+  "value": [
+    {
+      "CarParkID": "1",
+      "Area": "Marina",
+      "Development": "Suntec City",
+      "Location": "1.29375 103.85718",
+      "AvailableLots": 442,
+      "LotType": "C",
+      "Agency": "LTA"
+    },
+    {
+      "CarParkID": "1",
+      "Area": "Marina",
+      "Development": "Suntec City",
+      "Location": "1.29375 103.85718",
+      "AvailableLots": 12,
+      "LotType": "Y",
+      "Agency": "LTA"
+    },
+    {
+      "CarParkID": "22",
+      "Area": "Orchard",
+      "Development": "ION Orchard",
+      "Location": "1.30395 103.83185",
+      "AvailableLots": 301,
+      "LotType": "C",
+      "Agency": "LTA"
+    },
+    {
+      "CarParkID": "30",
+      "Area": "Harbfront",
+      "Development": "VivoCity P2",
+      "Location": "1.26349 103.82252",
+      "AvailableLots": 510,
+      "LotType": "C",
+      "Agency": "LTA"
+    },
+    {
+      "CarParkID": "31",
+      "Area": "Harbfront",
+      "Development": "VivoCity P3",
+      "Location": "1.26405 103.82140",
+      "AvailableLots": 233,
+      "LotType": "C",
+      "Agency": "LTA"
+    },
+    {
+      "CarParkID": "50",
+      "Area": "JurongLakeDistrict",
+      "Development": "Jem",
+      "Location": "1.33372 103.74348",
+      "AvailableLots": 120,
+      "LotType": "C",
+      "Agency": "LTA"
+    },
+    {
+      "CarParkID": "A0007",
+      "Area": "",
+      "Development": "BEACH ROAD OFF STREET",
+      "Location": "1.29856 103.85681",
+      "AvailableLots": 40,
+      "LotType": "C",
+      "Agency": "URA"
+    },
+    {
+      "CarParkID": "BJ55",
+      "Area": "",
+      "Development": "BLK 101 BEDOK NORTH AVENUE 4",
+      "Location": "1.32968 103.94211",
+      "AvailableLots": 75,
+      "LotType": "C",
+      "Agency": "HDB"
+    }
+  ]
+}

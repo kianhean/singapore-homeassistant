@@ -647,3 +647,34 @@ def test_e2e_raw_html_debug(capsys):
                 print(src[:500])
 
         print("\n=== end of debug ===\n")
+
+
+def test_e2e_prayer_times_fetch_and_parse():
+    """MUIS timetable rows for today and the next days parse into six times."""
+    from custom_components.singapore.prayer_coordinator import (
+        PRAYERS,
+        PrayerTimesCoordinator,
+    )
+
+    async def _fetch():
+        hass = MagicMock()
+        async with aiohttp.ClientSession(trust_env=True) as session:
+            coordinator = PrayerTimesCoordinator(hass)
+            with patch(
+                "custom_components.singapore.prayer_coordinator.async_get_clientsession",
+                return_value=session,
+            ):
+                return await coordinator._async_update_data()
+
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+
+    try:
+        data = asyncio.run(_fetch())
+    except UpdateFailed as err:
+        if isinstance(err.__cause__, (aiohttp.ClientError, TimeoutError)):
+            pytest.skip(f"Skipping e2e due to network error: {err}")
+        raise
+    assert data.days, "no timetable rows"
+    times = list(data.days[0].times.values())
+    assert len(times) == 6 and times == sorted(times)
+    assert set(PRAYERS) <= set(data.days[0].times)

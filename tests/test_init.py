@@ -232,6 +232,8 @@ async def test_unload_stops_sp_imports_and_remove_clears_issues():
                 "capitaland",
                 "train_crowd",
                 "ev_chargers",
+                "mall_carpark",
+                "prayer",
             )
         ),
         sp_accounts={"sub1": account},

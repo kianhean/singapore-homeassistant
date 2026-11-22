@@ -384,6 +384,30 @@
       },
       "nearest_ev_charger": {
         "name": "Terdekat tersedia"
+      },
+      "mall_carpark": {
+        "name": "{development}"
+      },
+      "prayer_subuh": {
+        "name": "Subuh"
+      },
+      "prayer_syuruk": {
+        "name": "Syuruk"
+      },
+      "prayer_zohor": {
+        "name": "Zohor"
+      },
+      "prayer_asar": {
+        "name": "Asar"
+      },
+      "prayer_maghrib": {
+        "name": "Maghrib"
+      },
+      "prayer_isyak": {
+        "name": "Isyak"
+      },
+      "next_prayer": {
+        "name": "Waktu solat seterusnya"
       }
     },
     "camera": {
@@ -520,18 +544,20 @@
           "fx_currencies": "Mata wang FX",
           "lta_api_key": "LTA DataMall AccountKey",
           "train_crowd_stations": "Stesen kesesakan MRT/LRT",
-          "ev_postal_codes": "Poskod pengecas EV"
+          "ev_postal_codes": "Poskod pengecas EV",
+          "mall_carparks": "Tempat letak kereta pusat beli-belah"
         },
         "data_description": {
-          "sources": "Mematikan tarif SP Group juga menyebabkan statistik kos akaun SP tidak berharga. Ketersediaan tempat letak kereta HDB, ketersediaan teksi dan tempat letak kereta pusat beli-belah CapitaLand dimatikan sehingga anda menandakannya: dua yang pertama memuat turun data seluruh pulau pada setiap pengundian; lot CapitaLand datang dari laman web JustPark.",
+          "sources": "Mematikan tarif SP Group juga menyebabkan statistik kos akaun SP tidak berharga. Ketersediaan tempat letak kereta HDB, ketersediaan teksi dan tempat letak kereta pusat beli-belah CapitaLand dimatikan sehingga anda menandakannya: dua yang pertama memuat turun data seluruh pulau pada setiap pengundian; lot CapitaLand datang dari laman web JustPark. Tempat letak kereta pusat beli-belah (LTA DataMall) juga memerlukan AccountKey. Waktu solat (MUIS) dimatikan sehingga anda menandakannya.",
           "school_events": "Kalendar sekolah MOE yang hendak dicipta apabila sumber kalendar sekolah MOE dihidupkan.",
           "api_key": "Pilihan. Kunci percuma daripada data.gov.sg memberikan had kadar yang lebih tinggi (kurang ralat HTTP 429). Biarkan kosong untuk menggunakan had awam.",
           "carparks": "Nombor tempat letak kereta untuk dijejaki apabila ketersediaan tempat letak kereta HDB dihidupkan, dipisahkan dengan koma (cth. BJ55, TM24; ditunjukkan pada senarai tempat letak kereta HDB dan data.gov.sg). Biarkan kosong untuk 3 tempat letak kereta terdekat dengan lokasi rumah anda.",
-          "polling": "Dikurangkan mengundi sumber pantas (amaran banjir, kilat, kamera trafik, radar, kereta api, cuaca, PSI, UV, tekanan haba, tempat letak kereta, teksi, tempat letak kereta CapitaLand) tiga kali kurang kerap.",
+          "polling": "Dikurangkan mengundi sumber pantas (amaran banjir, kilat, kamera trafik, radar, kereta api, cuaca, PSI, UV, tekanan haba, tempat letak kereta, teksi, tempat letak kereta CapitaLand dan pusat beli-belah) tiga kali kurang kerap.",
           "fx_currencies": "Mata wang yang disebut dalam SGD apabila kadar FX (ECB) dihidupkan.",
-          "lta_api_key": "Pilihan. AccountKey percuma daripada LTA DataMall (datamall.lta.gov.sg) mengaktifkan kesesakan platform MRT/LRT dan ketersediaan pengecas EV.",
+          "lta_api_key": "Pilihan. AccountKey percuma daripada LTA DataMall (datamall.lta.gov.sg) mengaktifkan kesesakan platform MRT/LRT dan ketersediaan pengecas EV. Ia juga mengaktifkan tempat letak kereta pusat beli-belah.",
           "train_crowd_stations": "Kod stesen MRT/LRT untuk dijejaki apabila kesesakan dihidupkan, dipisahkan dengan koma (cth. EW13, NS24, CC1). Biarkan kosong untuk EW13, EW14 dan NS24.",
-          "ev_postal_codes": "Poskod Singapura 6 digit pilihan untuk menyemak pengecas EV, dipisahkan dengan koma (cth. 529536, 238839). Biarkan kosong untuk mencari pengecas EV dalam jarak 2 km dari rumah anda."
+          "ev_postal_codes": "Poskod Singapura 6 digit pilihan untuk menyemak pengecas EV, dipisahkan dengan koma (cth. 529536, 238839). Biarkan kosong untuk mencari pengecas EV dalam jarak 2 km dari rumah anda.",
+          "mall_carparks": "Pusat beli-belah dan pembangunan untuk dijejaki apabila Tempat letak kereta pusat beli-belah (LTA DataMall) dihidupkan, dipisahkan dengan koma: sebahagian nama (cth. VivoCity, ION Orchard, Suntec) atau CarParkID LTA. Biarkan kosong untuk 5 yang terdekat dengan lokasi rumah anda."
         }
       }
     },
@@ -571,7 +597,9 @@
         "fx": "Kadar FX (ECB)",
         "interest": "Kadar faedah (MAS/SingStat)",
         "train_crowd": "Kesesakan MRT/LRT (LTA DataMall)",
-        "ev_chargers": "Ketersediaan pengecas EV (LTA DataMall)"
+        "ev_chargers": "Ketersediaan pengecas EV (LTA DataMall)",
+        "mall_carpark": "Tempat letak kereta pusat beli-belah (LTA DataMall)",
+        "prayer": "Waktu solat (MUIS)"
       }
     },
     "school_events": {

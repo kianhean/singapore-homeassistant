@@ -63,9 +63,15 @@ def _entry(options: dict | None = None) -> ConfigEntry:
 
 def test_every_source_but_the_opt_in_ones_enabled_by_default():
     default = set(SOURCES) - set(OPT_IN_SOURCES)
-    assert {"carpark", "taxi", "capitaland", "train_crowd", "ev_chargers"} == set(
-        OPT_IN_SOURCES
-    )
+    assert {
+        "carpark",
+        "taxi",
+        "capitaland",
+        "train_crowd",
+        "ev_chargers",
+        "mall_carpark",
+        "prayer",
+    } == set(OPT_IN_SOURCES)
     assert enabled_sources(_entry()) == default
     assert enabled_sources(None) == default
 
@@ -83,6 +89,8 @@ def test_opt_in_sources_are_on_once_ticked():
         "capitaland",
         "train_crowd",
         "ev_chargers",
+        "mall_carpark",
+        "prayer",
     }
 
 
@@ -123,6 +131,8 @@ def test_options_from_input_stores_disabled_sources():
             "capitaland",
             "train_crowd",
             "ev_chargers",
+            "mall_carpark",
+            "prayer",
         ],
         CONF_POLLING: "reduced",
         CONF_API_KEY: "k",

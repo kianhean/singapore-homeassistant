@@ -94,6 +94,10 @@ that part is built on [maci0/home-assistant-sp](https://github.com/maci0/home-as
 
 ## What's new
 
+- **v0.21** Two opt-in sources: [mall carparks](#mall-carparks-lta-datamall) from LTA DataMall
+  (ION Orchard, VivoCity, Suntec City, Jem and the other malls LTA shows on its carpark signs,
+  whoever runs them; needs the LTA key) and [MUIS prayer times](#prayer-times) (today's six
+  times and the next prayer, as timestamps).
 - **v0.19** [NEA weather warnings & regional advisories](#nea-weather-warnings-and-advisories)
   (Heavy Rain warning binary sensor, active advisories count and latest regional earthquake
   magnitude); [NEA tide timings](#nea-tide-timings) (next high/low tide and predicted height);
@@ -173,9 +177,11 @@ Open **Settings → Devices & Services → Singapore → Configure** to change:
   cameras). A source you turn off stops polling data.gov.sg, and its entities and devices
   are removed; turn it back on and they come back. Everything is on by default, and sources
   added in later releases start out on, except **HDB carpark availability**, **taxi
-  availability** and **CapitaLand mall carparks**: they are off until you tick them. The first
-  two download data for the whole island on each poll (about 300 KB and 80 KB) to report a few
-  numbers near you; the CapitaLand lots come from its JustPark website rather than open data.
+  availability**, **CapitaLand mall carparks**, **Mall carparks (LTA DataMall)**, **Prayer
+  times (MUIS)** and the other LTA DataMall sources: they are off until you tick them. The
+  first two download data for the whole island on each poll (about 300 KB and 80 KB) to report a
+  few numbers near you; the CapitaLand lots come from its JustPark website rather than open data;
+  the LTA DataMall sources need a free AccountKey.
 - **School calendars:** which [MOE calendars](#moe-school-calendar) to create (school holidays,
   school terms, national exams). All three are on by default.
 - **data.gov.sg API key** (optional): a free key from
@@ -185,8 +191,11 @@ Open **Settings → Devices & Services → Singapore → Configure** to change:
   `BJ55, TM24`). The number is on the sign at the carpark entrance and in HDB's and
   data.gov.sg's carpark lists. Leave it empty to track the three carparks nearest your home
   location. Only used when HDB carpark availability is on.
+- **Mall carparks:** the malls to track when Mall carparks (LTA DataMall) is on, separated by
+  commas: part of the name (`VivoCity, ION Orchard, Suntec`) or LTA's CarParkID. Leave it empty
+  for the five nearest your home location.
 - **Polling:** *Reduced* polls the fast sources (flood alerts, lightning, traffic cameras,
-  radar, trains, weather, PSI, UV, heat stress, carparks, taxis, CapitaLand carparks) three times less often, for example lightning every
+  radar, trains, weather, PSI, UV, heat stress, carparks, taxis, CapitaLand and mall carparks) three times less often, for example lightning every
   6 minutes instead of 2.
 
 Saving reloads the integration. Turning off SP Group tariffs also leaves SP account cost
@@ -1182,6 +1191,46 @@ disable the ones you don't need from their entity settings.
 
 </details>
 
+### Mall carparks (LTA DataMall)
+
+*Opt-in: tick **Mall carparks (LTA DataMall)** under Configure and enter an LTA DataMall
+AccountKey.* Updated every **5 minutes** from DataMall's `CarParkAvailabilityv2`: the free lots
+LTA collects for its carpark signs in Orchard, Marina Bay, HarbourFront and Jurong Lake District
+(ION Orchard, Paragon, 313@somerset, Suntec City, Marina Square, VivoCity, Jem, Westgate and
+others), whichever company runs the mall, plus URA's public carparks. Frasers, Lendlease,
+Mapletree and Changi Airport don't publish live lots on their own websites, so this is how their
+malls in those areas are covered; HDB carparks have [their own source](#hdb-carpark-availability).
+One sensor per tracked carpark on a *Mall Carparks* device: the malls you list under
+**Configure → Mall carparks**, or the five LTA carparks nearest home. A mall with several
+carparks (VivoCity P2 and P3) matches all of them.
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.mall_carparks_<development>` | e.g. Mall Carparks Suntec City | lots | Car lots available; attributes `carpark_id`, `agency`, `development`, `area`, `car_lots_available` / `motorcycle_lots_available` / `heavy_vehicle_lots_available`, `latitude`, `longitude`, `distance_km` |
+
+</details>
+
+### Prayer times
+
+*Opt-in: tick **Prayer times (MUIS)** under Configure.* MUIS's official Muslim prayer timetable
+from [data.gov.sg](https://data.gov.sg/datasets/d_a6a206cba471fe04b62dd886ef5eaf22/view), read
+twice a day. Timestamp sensors on a *Prayer Times* device, so they work as time triggers in
+automations; they move on to the next day at midnight and to the next prayer as each one passes,
+without waiting for a poll.
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Name | Description |
+|-----------|------|-------------|
+| `sensor.prayer_times_subuh` … `_isyak` | Prayer Times Subuh, Syuruk, Zohor, Asar, Maghrib, Isyak | Today's time; attributes `date` and `next` (the next occurrence, today or tomorrow). Syuruk is sunrise |
+| `sensor.prayer_times_next_prayer` | Prayer Times Next prayer | Time of the next prayer (Syuruk excluded); attribute `prayer` (`subuh`, `zohor`, `asar`, `maghrib`, `isyak`) |
+
+</details>
+
 ### Public holidays
 
 Updated every 24 hours from [MOM](https://www.mom.gov.sg/employment-practices/public-holidays).
@@ -1502,6 +1551,8 @@ What the integration can't do, mostly because of what the sources publish:
 | [data.gov.sg / HDB](https://data.gov.sg/datasets/d_ca933a644e55d34fe21f28b8052fac63/view) | Carpark availability (opt-in) | Every 5 min (carpark details daily) |
 | [data.gov.sg / LTA](https://data.gov.sg/datasets/d_e25662f1a062dd046453926aa284ba64/view) | Taxi availability (opt-in) | Every 5 min |
 | [CapitaLand JustPark](https://justpark.capitaland.com/Lot-Availability) | CapitaLand mall carpark lots (opt-in) | Every 5 min |
+| [LTA DataMall](https://datamall.lta.gov.sg) | Mall and URA carpark lots (opt-in, LTA key) | Every 5 min |
+| [data.gov.sg / MUIS](https://data.gov.sg/datasets/d_a6a206cba471fe04b62dd886ef5eaf22/view) | Muslim prayer timetable (opt-in) | Every 12 h |
 | [MOM](https://www.mom.gov.sg/employment-practices/public-holidays) | Public holidays | Every 24 h |
 | [MOE](https://www.moe.gov.sg/calendar) | School holidays, terms and national exams | Every 24 h |
 | [mytransport.sg](https://www.mytransport.sg/trainstatus) | MRT/LRT train status | Every 5 min |

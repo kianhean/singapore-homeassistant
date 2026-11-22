@@ -1,9 +1,11 @@
 """Sensor platform: tariffs, COE, weather, PSI, trains, floods, dengue, lightning,
-UV, heat stress, HDB carparks, taxis and CapitaLand mall carparks."""
+UV, heat stress, HDB carparks, taxis, CapitaLand and LTA mall carparks, prayer
+times."""
 
 from __future__ import annotations
 
 import re
+from datetime import datetime
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -23,8 +25,9 @@ from homeassistant.const import (
     UnitOfSpeed,
     UnitOfTemperature,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.util import dt as dt_util
 
 from . import SingaporeConfigEntry
@@ -40,7 +43,7 @@ from .coe_coordinator import (
     UNIT_COE,
     CoeCoordinator,
 )
-from .const import fx_currencies, train_crowd_stations
+from .const import PRAYER_TIMES, fx_currencies, train_crowd_stations
 from .coordinator import UNIT_ELECTRICITY, UNIT_GAS, UNIT_WATER, SPGroupCoordinator
 from .dengue_coordinator import DengueClusterCoordinator, nearest_cluster
 from .entity import (
@@ -52,7 +55,9 @@ from .entity import (
     DEVICE_EV_CHARGERS,
     DEVICE_FINANCE,
     DEVICE_FLOOD,
+    DEVICE_MALL_CARPARK,
     DEVICE_NEA,
+    DEVICE_PRAYER,
     DEVICE_TAXI,
     DEVICE_TRAFFIC_INCIDENTS,
     DEVICE_TRAIN,
@@ -68,6 +73,13 @@ from .lightning_coordinator import (
     nearest_strike,
     strike_distance_km,
 )
+from .mall_carpark_coordinator import (
+    LOT_TYPE_NAMES as MALL_LOT_TYPE_NAMES,
+)
+from .mall_carpark_coordinator import (
+    MallCarparkCoordinator,
+)
+from .prayer_coordinator import PrayerTimesCoordinator
 from .psi_coordinator import (
     DEFAULT_REGION_LOCATIONS,
     PM25_ONE_HOUR_KEY,
@@ -257,6 +269,11 @@ async def async_setup_entry(
             SingaporeEvChargersAvailableSensor(ev_chargers, eid),
             SingaporeNearestEvChargerSensor(ev_chargers, eid),
         ]
+    if (prayer := data.prayer) is not None:
+        entities += [
+            SingaporePrayerTimeSensor(prayer, eid, key) for key in PRAYER_TIMES
+        ]
+        entities.append(SingaporeNextPrayerSensor(prayer, eid))
 
     async_add_entities(entities)
 
@@ -267,6 +284,10 @@ async def async_setup_entry(
     if (capitaland := data.capitaland) is not None:
         entry.async_on_unload(
             async_setup_capitaland_sensors(capitaland, eid, async_add_entities)
+        )
+    if (mall_carpark := data.mall_carpark) is not None:
+        entry.async_on_unload(
+            async_setup_mall_carpark_sensors(mall_carpark, eid, async_add_entities)
         )
 
     for unsub in async_setup_sp_account_sensors(
@@ -1508,6 +1529,204 @@ class SingaporeCapitaLandCarparkSensor(
             attrs["total_lots"] = site.total
             attrs["full"] = site.full
         return attrs
+
+
+@callback
+def async_setup_mall_carpark_sensors(
+    coordinator: MallCarparkCoordinator,
+    entry_id: str,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+):
+    """Add a sensor per tracked mall carpark as it appears; return the unsub.
+
+    The tracked set is only known once DataMall has answered (names in the
+    options are matched against its list, or the nearest are picked).
+    """
+    known: set[str] = set()
+
+    @callback
+    def _add_new() -> None:
+        data = coordinator.data
+        if data is None:
+            return
+        fresh = [cp for key, cp in data.carparks.items() if key not in known]
+        if not fresh:
+            return
+        known.update(cp.key for cp in fresh)
+        async_add_entities(
+            [
+                SingaporeMallCarparkSensor(
+                    coordinator, entry_id, cp.key, cp.development
+                )
+                for cp in fresh
+            ]
+        )
+
+    _add_new()
+    return coordinator.async_add_listener(_add_new)
+
+
+class SingaporeMallCarparkSensor(SingaporeEntity[MallCarparkCoordinator], SensorEntity):
+    """Car lots available at one mall or development (LTA DataMall)."""
+
+    _device = DEVICE_MALL_CARPARK
+    _attr_translation_key = "mall_carpark"
+    _attr_attribution = "Data provided by LTA DataMall"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = "lots"
+
+    def __init__(
+        self,
+        coordinator: MallCarparkCoordinator,
+        entry_id: str,
+        key: str,
+        development: str,
+    ) -> None:
+        super().__init__(coordinator, entry_id, f"mall_carpark_{key}")
+        self._key = key
+        self._attr_translation_placeholders = {"development": development}
+
+    def _carpark(self):
+        data = self.coordinator.data
+        return None if data is None else data.carparks.get(self._key)
+
+    @property
+    def native_value(self) -> int | None:
+        carpark = self._carpark()
+        return None if carpark is None else carpark.car_lots
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        carpark = self._carpark()
+        if carpark is None:
+            return {}
+        attrs: dict = {
+            "carpark_id": carpark.carpark_id,
+            "agency": carpark.agency,
+            "development": carpark.development,
+        }
+        if carpark.area is not None:
+            attrs["area"] = carpark.area
+        for lot_type, count in carpark.lots.items():
+            name = MALL_LOT_TYPE_NAMES.get(lot_type, lot_type.lower())
+            attrs[f"{name}_lots_available"] = count
+        if carpark.latitude is not None and carpark.longitude is not None:
+            attrs[ATTR_LATITUDE] = carpark.latitude
+            attrs[ATTR_LONGITUDE] = carpark.longitude
+            distance = carpark.distance_km(
+                self.hass.config.latitude, self.hass.config.longitude
+            )
+            if distance is not None:
+                attrs["distance_km"] = round(distance, 2)
+        return attrs
+
+
+class _PrayerSensor(SingaporeEntity[PrayerTimesCoordinator], SensorEntity):
+    """A prayer time sensor: its state moves on at each prayer and at midnight.
+
+    The timetable is fetched twice a day, but which row is "today" and which
+    prayer is next depend on the clock, so the state is rewritten at the next
+    time in the timetable (or midnight) without waiting for a poll.
+    """
+
+    _device = DEVICE_PRAYER
+    _attr_attribution = "Data provided by MUIS via data.gov.sg"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _unsub_timer: CALLBACK_TYPE | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self._schedule_next()
+        self.async_on_remove(self._cancel_timer)
+
+    @callback
+    def _cancel_timer(self) -> None:
+        if self._unsub_timer is not None:
+            self._unsub_timer()
+            self._unsub_timer = None
+
+    @callback
+    def _schedule_next(self) -> None:
+        self._cancel_timer()
+        if (data := self.coordinator.data) is None:
+            return
+        self._unsub_timer = async_track_point_in_utc_time(
+            self.hass, self._async_timer, data.next_change(dt_util.utcnow())
+        )
+
+    @callback
+    def _async_timer(self, _now: datetime) -> None:
+        self._unsub_timer = None
+        self._schedule_next()
+        self.async_write_ha_state()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        self._schedule_next()
+        super()._handle_coordinator_update()
+
+
+class SingaporePrayerTimeSensor(_PrayerSensor):
+    """Today's time of one prayer (or Syuruk, sunrise)."""
+
+    def __init__(
+        self, coordinator: PrayerTimesCoordinator, entry_id: str, key: str
+    ) -> None:
+        super().__init__(coordinator, entry_id, f"prayer_{key}")
+        self._key = key
+        self._attr_translation_key = f"prayer_{key}"
+
+    @property
+    def native_value(self) -> datetime | None:
+        data = self.coordinator.data
+        if data is None or (today := data.today(dt_util.utcnow())) is None:
+            return None
+        return today.times.get(self._key)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        data = self.coordinator.data
+        if data is None:
+            return {}
+        now = dt_util.utcnow()
+        today = data.today(now)
+        upcoming = next(
+            (
+                when
+                for day in data.days
+                if (when := day.times.get(self._key)) is not None and when > now
+            ),
+            None,
+        )
+        attrs: dict = {}
+        if today is not None:
+            attrs["date"] = today.day.isoformat()
+        if upcoming is not None:
+            attrs["next"] = upcoming.isoformat()
+        return attrs
+
+
+class SingaporeNextPrayerSensor(_PrayerSensor):
+    """The time of the next prayer; which one is the ``prayer`` attribute."""
+
+    _attr_translation_key = "next_prayer"
+
+    def __init__(self, coordinator: PrayerTimesCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id, "next_prayer")
+
+    def _next(self):
+        data = self.coordinator.data
+        return None if data is None else data.next_prayer(dt_util.utcnow())
+
+    @property
+    def native_value(self) -> datetime | None:
+        upcoming = self._next()
+        return None if upcoming is None else upcoming[1]
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        upcoming = self._next()
+        return {} if upcoming is None else {"prayer": upcoming[0]}
 
 
 class SingaporeTrainCrowdSensor(SingaporeEntity[TrainCrowdCoordinator], SensorEntity):

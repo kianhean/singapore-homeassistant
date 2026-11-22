@@ -1,0 +1,92 @@
+{
+  "success": true,
+  "result": {
+    "resource_id": "d_a6a206cba471fe04b62dd886ef5eaf22",
+    "fields": [
+      {
+        "type": "text",
+        "id": "Date"
+      },
+      {
+        "type": "text",
+        "id": "Day"
+      },
+      {
+        "type": "text",
+        "id": "Subuh"
+      },
+      {
+        "type": "text",
+        "id": "Syuruk"
+      },
+      {
+        "type": "text",
+        "id": "Zohor"
+      },
+      {
+        "type": "text",
+        "id": "Asar"
+      },
+      {
+        "type": "text",
+        "id": "Maghrib"
+      },
+      {
+        "type": "text",
+        "id": "Isyak"
+      },
+      {
+        "type": "int4",
+        "id": "_id"
+      }
+    ],
+    "records": [
+      {
+        "_id": 527,
+        "Date": "2025-06-10",
+        "Day": "Tuesday",
+        "Subuh": "05:35",
+        "Syuruk": "06:59",
+        "Zohor": "01:06",
+        "Asar": "04:30",
+        "Maghrib": "07:10",
+        "Isyak": "08:25"
+      },
+      {
+        "_id": 528,
+        "Date": "2025-06-11",
+        "Day": "Wednesday",
+        "Subuh": "05:35",
+        "Syuruk": "06:59",
+        "Zohor": "01:06",
+        "Asar": "04:31",
+        "Maghrib": "07:10",
+        "Isyak": "08:26"
+      },
+      {
+        "_id": 1057,
+        "Date": "2026-11-22",
+        "Day": "Sun",
+        "Subuh": "05:28",
+        "Syuruk": "06:50",
+        "Zohor": "12:53",
+        "Asar": "16:16",
+        "Maghrib": "18:53",
+        "Isyak": "20:07"
+      },
+      {
+        "_id": 1058,
+        "Date": "2026-11-23",
+        "Day": "Mon",
+        "Subuh": "05:28",
+        "Syuruk": "06:50",
+        "Zohor": "12:53",
+        "Asar": "16:16",
+        "Maghrib": "18:53",
+        "Isyak": "20:07"
+      }
+    ],
+    "total": 4,
+    "filters": "{\"Date\":[\"2025-06-10\",\"2025-06-11\",\"2026-11-22\",\"2026-11-23\"]}"
+  }
+}

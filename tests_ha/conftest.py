@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import io
 from collections.abc import Iterator
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -38,6 +39,14 @@ from custom_components.singapore.hawker_coordinator import HAWKER_URL
 from custom_components.singapore.holiday_coordinator import PUBLIC_HOLIDAYS_URL
 from custom_components.singapore.interest_coordinator import SINGSTAT_URL
 from custom_components.singapore.lightning_coordinator import LIGHTNING_URL
+from custom_components.singapore.mall_carpark_coordinator import (
+    CARPARK_AVAILABILITY_URL as MALL_CARPARK_URL,
+)
+from custom_components.singapore.prayer_coordinator import (
+    PRAYER_DATASET,
+    PRAYER_URL,
+)
+from custom_components.singapore.prayer_coordinator import SGT as PRAYER_TZ
 from custom_components.singapore.psi_coordinator import PM25_URL, PSI_URL
 from custom_components.singapore.radar_coordinator import RADAR_URL
 from custom_components.singapore.radar_image import BASEMAPS
@@ -411,6 +420,28 @@ _TAXI_PAYLOAD = {
 }
 
 
+def _prayer_payload() -> dict:
+    """Today's and the next two days' rows (24-hour, as from 2026)."""
+    today = datetime.now(PRAYER_TZ).date()
+    times = {
+        "Subuh": "05:28",
+        "Syuruk": "06:50",
+        "Zohor": "12:53",
+        "Asar": "16:16",
+        "Maghrib": "18:53",
+        "Isyak": "20:07",
+    }
+    return {
+        "success": True,
+        "result": {
+            "records": [
+                {"Date": (today + timedelta(days=n)).isoformat(), **times}
+                for n in range(3)
+            ]
+        },
+    }
+
+
 def _flood_payload() -> dict:
     # Issued "now" so the 3-hour safety expiry doesn't drop it.
     issued = dt_util.now().replace(microsecond=0).isoformat()
@@ -653,6 +684,18 @@ def mock_sources(aioclient_mock: AiohttpClientMocker) -> AiohttpClientMocker:
         cookies={"__RequestVerificationToken": "cookie"},
     )
     aioclient_mock.post(CAPITALAND_API_URL, text=_CAPITALAND_LOTS)
+    aioclient_mock.get(
+        f"{PRAYER_URL}?resource_id={PRAYER_DATASET}", json=_prayer_payload()
+    )
+    aioclient_mock.get(
+        MALL_CARPARK_URL,
+        text=(
+            Path(__file__).parents[1]
+            / "tests"
+            / "fixtures"
+            / "lta_carpark_availability.json"
+        ).read_text(),
+    )
     aioclient_mock.get(FLOOD_ALERTS_URL, json=_flood_payload())
     aioclient_mock.get(TRAFFIC_IMAGES_URL, json=_TRAFFIC_PAYLOAD)
     aioclient_mock.get(

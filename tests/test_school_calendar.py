@@ -293,7 +293,9 @@ async def test_options_flow_requires_a_school_calendar_when_the_source_is_on():
 
     # With the source off, an empty choice is fine.
     without_school = [
-        s for s in SOURCES if s not in {"school", "train_crowd", "ev_chargers"}
+        s
+        for s in SOURCES
+        if s not in {"school", "train_crowd", "ev_chargers", "mall_carpark"}
     ]
     result = await flow.async_step_init(
         {"sources": without_school, "school_events": [], "polling": "normal"}

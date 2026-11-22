@@ -384,6 +384,30 @@
       },
       "nearest_ev_charger": {
         "name": "最近可用充电桩"
+      },
+      "mall_carpark": {
+        "name": "{development}"
+      },
+      "prayer_subuh": {
+        "name": "晨礼"
+      },
+      "prayer_syuruk": {
+        "name": "日出"
+      },
+      "prayer_zohor": {
+        "name": "晌礼"
+      },
+      "prayer_asar": {
+        "name": "晡礼"
+      },
+      "prayer_maghrib": {
+        "name": "昏礼"
+      },
+      "prayer_isyak": {
+        "name": "宵礼"
+      },
+      "next_prayer": {
+        "name": "下次礼拜"
       }
     },
     "camera": {
@@ -520,18 +544,20 @@
           "fx_currencies": "外汇货币",
           "lta_api_key": "LTA DataMall AccountKey",
           "train_crowd_stations": "地铁/轻轨拥挤度站点",
-          "ev_postal_codes": "电动车充电桩邮编"
+          "ev_postal_codes": "电动车充电桩邮编",
+          "mall_carparks": "商场停车场"
         },
         "data_description": {
-          "sources": "关闭 SP Group 电价后，SP 账户的费用统计也将不再计价。建屋局停车场空位、空车德士和 CapitaLand 商场停车位默认关闭，需勾选才会开启：前两者每次轮询都会下载全岛数据；CapitaLand 的空位来自其 JustPark 网站。",
+          "sources": "关闭 SP Group 电价后，SP 账户的费用统计也将不再计价。建屋局停车场空位、空车德士和 CapitaLand 商场停车位默认关闭，需勾选才会开启：前两者每次轮询都会下载全岛数据；CapitaLand 的空位来自其 JustPark 网站。商场停车场（LTA DataMall）同样需要 AccountKey。祈祷时间（MUIS）默认关闭，需勾选才会开启。",
           "school_events": "开启教育部校历数据源时要创建哪些校历。",
           "api_key": "可选。data.gov.sg 的免费密钥可提供更高的速率限制（减少 HTTP 429 错误）。留空则使用公共限制。",
           "carparks": "开启建屋局停车场空位时要追踪的停车场编号，用逗号分隔（例如 BJ55, TM24；可在建屋局或 data.gov.sg 的停车场列表中找到）。留空则使用离您家位置最近的 3 个停车场。",
-          "polling": "“降低”会将快速数据源（淹水警报、雷击、交通摄像头、雷达、列车、天气、PSI、紫外线、热压力、停车场、德士、CapitaLand 停车场）的轮询频率降低为三分之一。",
+          "polling": "“降低”会将快速数据源（淹水警报、雷击、交通摄像头、雷达、列车、天气、PSI、紫外线、热压力、停车场、德士、CapitaLand 及商场停车场）的轮询频率降低为三分之一。",
           "fx_currencies": "启用汇率 (ECB) 时要以新元报价的货币。",
-          "lta_api_key": "可选。填写来自 LTA DataMall (datamall.lta.gov.sg) 的免费 AccountKey 以启用地铁/轻轨站台拥挤度和电动车充电桩可用性。",
+          "lta_api_key": "可选。填写来自 LTA DataMall (datamall.lta.gov.sg) 的免费 AccountKey 以启用地铁/轻轨站台拥挤度和电动车充电桩可用性。它还可启用商场停车场。",
           "train_crowd_stations": "启用站台拥挤度时要跟踪的地铁/轻轨站点代码，以逗号分隔（如 EW13, NS24, CC1）。留空则默认跟踪 EW13、EW14 和 NS24。",
-          "ev_postal_codes": "可选的 6 位新加坡邮政编码，以逗号分隔（如 529536, 238839）。留空则自动查找距离您家 2 公里内的充电桩。"
+          "ev_postal_codes": "可选的 6 位新加坡邮政编码，以逗号分隔（如 529536, 238839）。留空则自动查找距离您家 2 公里内的充电桩。",
+          "mall_carparks": "开启商场停车场（LTA DataMall）时要跟踪的商场和建筑，用逗号分隔：名称的一部分（如 VivoCity、ION Orchard、Suntec）或 LTA 的 CarParkID。留空则跟踪离您住家位置最近的 5 个。"
         }
       }
     },
@@ -571,7 +597,9 @@
         "fx": "汇率 (ECB)",
         "interest": "利率 (MAS/SingStat)",
         "train_crowd": "地铁/轻轨站台拥挤度 (LTA DataMall)",
-        "ev_chargers": "电动车充电桩可用性 (LTA DataMall)"
+        "ev_chargers": "电动车充电桩可用性 (LTA DataMall)",
+        "mall_carpark": "商场停车场（LTA DataMall）",
+        "prayer": "祈祷时间（MUIS）"
       }
     },
     "school_events": {

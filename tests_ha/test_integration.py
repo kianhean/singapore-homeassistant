@@ -471,3 +471,69 @@ async def test_example_dashboard_matches_a_real_install(
             assert content in state.attributes, (entity_id, content)
         checked += 1
     assert checked > 30
+
+
+async def test_opt_in_prayer_times(
+    hass: HomeAssistant, hass_client, mock_sources
+) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Singapore",
+        data={"name": "Singapore"},
+        options={"enabled_sources": ["prayer"]},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    maghrib = hass.states.get("sensor.prayer_times_maghrib")
+    assert maghrib is not None
+    assert maghrib.attributes["device_class"] == "timestamp"
+    assert maghrib.state.endswith("10:53:00+00:00")  # 18:53 SGT
+    for key in ("subuh", "syuruk", "zohor", "asar", "isyak"):
+        assert hass.states.get(f"sensor.prayer_times_{key}") is not None
+    next_prayer = hass.states.get("sensor.prayer_times_next_prayer")
+    assert next_prayer.attributes["prayer"] in {
+        "subuh",
+        "zohor",
+        "asar",
+        "maghrib",
+        "isyak",
+    }
+
+    diagnostics = await get_diagnostics_for_config_entry(hass, hass_client, entry)
+    assert len(diagnostics["coordinators"]["prayer"]["data"]["days"]) == 3
+
+
+async def test_opt_in_mall_carparks(
+    hass: HomeAssistant, hass_client, mock_sources
+) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Singapore",
+        data={"name": "Singapore"},
+        options={
+            "enabled_sources": ["mall_carpark"],
+            "lta_api_key": "key",
+            "mall_carparks": "VivoCity, Suntec",
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    suntec = hass.states.get("sensor.mall_carparks_suntec_city")
+    assert suntec is not None
+    assert suntec.state == "442"
+    assert suntec.attributes["unit_of_measurement"] == "lots"
+    assert suntec.attributes["motorcycle_lots_available"] == 12
+    assert "latitude" in suntec.attributes
+    assert hass.states.get("sensor.mall_carparks_vivocity_p2").state == "510"
+    assert hass.states.get("sensor.mall_carparks_ion_orchard") is None
+
+    diagnostics = await get_diagnostics_for_config_entry(hass, hass_client, entry)
+    assert set(diagnostics["coordinators"]["mall_carpark"]["data"]["carparks"]) == {
+        "lta_30",
+        "lta_31",
+        "lta_1",
+    }
