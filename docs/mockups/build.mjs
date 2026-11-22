@@ -32,6 +32,7 @@ const brand = [
 const pages = [
   { src: "hero.html", out: "hero.jpg", width: 1280 },
   { src: "carparks.html", out: "carparks-taxis.png", width: 1280 },
+  { src: "daily.html", out: "daily-life.png", width: 1280 },
   { src: "alerts.html", out: "alerts.png", width: 1200 },
   { src: "cameras.html", out: "checkpoint-cameras.jpg", width: 900 },
   { src: "sp_account.html", out: "sp-account-dashboard.png", width: 1280 },

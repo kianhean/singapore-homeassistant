@@ -117,6 +117,8 @@ SOURCE_TRAIN_CROWD: Final = "train_crowd"
 SOURCE_EV_CHARGERS: Final = "ev_chargers"
 SOURCE_MALL_CARPARK: Final = "mall_carpark"
 SOURCE_PRAYER: Final = "prayer"
+SOURCE_PUMP_PRICES: Final = "pump_prices"
+SOURCE_BEACHES: Final = "beaches"
 
 SOURCES: Final = (
     SOURCE_TARIFF,
@@ -146,13 +148,16 @@ SOURCES: Final = (
     SOURCE_EV_CHARGERS,
     SOURCE_MALL_CARPARK,
     SOURCE_PRAYER,
+    SOURCE_PUMP_PRICES,
+    SOURCE_BEACHES,
 )
 
 # Off until ticked in the options (stored in CONF_ENABLED_SOURCES): carparks and
 # taxis poll a large island-wide payload every few minutes for a few local
 # numbers; CapitaLand's carparks come from a mall operator's website; train
 # crowd density, EV chargers and mall carparks require an optional LTA DataMall
-# AccountKey; prayer times only suit some users (seven sensors).
+# AccountKey; prayer times only suit some users (seven sensors); pump prices
+# come from the fuel companies' websites, not open data.
 OPT_IN_SOURCES: Final = (
     SOURCE_CARPARK,
     SOURCE_TAXI,
@@ -161,6 +166,7 @@ OPT_IN_SOURCES: Final = (
     SOURCE_EV_CHARGERS,
     SOURCE_MALL_CARPARK,
     SOURCE_PRAYER,
+    SOURCE_PUMP_PRICES,
 )
 LTA_DATAMALL_SOURCES: Final = (
     SOURCE_TRAIN_CROWD,
@@ -198,6 +204,8 @@ SOURCE_NAMES: Final = {
     SOURCE_EV_CHARGERS: "EV charger availability (LTA DataMall)",
     SOURCE_MALL_CARPARK: "Mall carparks (LTA DataMall)",
     SOURCE_PRAYER: "Prayer times (MUIS)",
+    SOURCE_PUMP_PRICES: "Pump prices (Caltex, SPC, Shell)",
+    SOURCE_BEACHES: "NEA beach water quality",
 }
 
 # data.gov.sg reads an optional API key from this header (higher rate limits).

@@ -13,6 +13,7 @@ from custom_components.singapore import (
     async_remove_config_entry_device,
     async_remove_stale,
 )
+from custom_components.singapore.beach_coordinator import Beach, BeachData
 from custom_components.singapore.binary_sensor import (
     async_setup_entry as binary_sensor_setup_entry,
 )
@@ -33,6 +34,7 @@ from custom_components.singapore.const import (
 from custom_components.singapore.entity import (
     DEVICES,
     ENTITY_SOURCES,
+    PUMP_BRAND_NAMES,
     device_identifier,
     device_info,
     entity_source,
@@ -41,6 +43,12 @@ from custom_components.singapore.event import async_setup_entry as event_setup_e
 from custom_components.singapore.mall_carpark_coordinator import (
     MallCarpark,
     MallCarparkData,
+)
+from custom_components.singapore.pump_coordinator import (
+    GRADES,
+    BrandPrices,
+    PumpPrice,
+    PumpPriceData,
 )
 from custom_components.singapore.sensor import async_setup_entry as sensor_setup_entry
 from custom_components.singapore.weather import (
@@ -96,6 +104,23 @@ def _runtime_data(enabled: set[str]) -> SingaporeData:
                     )
                 }
             )
+        if source == "pump_prices":
+            coordinator.data = PumpPriceData(
+                {
+                    "caltex": BrandPrices(
+                        {
+                            grade: PumpPrice(grade, f"Caltex {grade}", 3.5)
+                            for grade in GRADES
+                        }
+                    )
+                }
+            )
+        if source == "beaches":
+            coordinator.data = BeachData(
+                None,
+                None,
+                {"changi": Beach("changi", "Changi", "normal", (), None, None)},
+            )
         coordinators[source] = coordinator
     return SingaporeData(**coordinators, sp_accounts={}, options={})
 
@@ -143,7 +168,11 @@ async def test_every_listed_translation_key_is_used():
 
 def test_every_source_has_a_device():
     owned = [source for device in DEVICES.values() for source in device.sources]
-    assert sorted(owned) == sorted(SOURCES)
+    assert set(owned) == set(SOURCES)
+    # Each source sits on one device, except pump prices: one per fuel brand.
+    repeated = {source for source in owned if owned.count(source) > 1}
+    assert repeated == {"pump_prices"}
+    assert owned.count("pump_prices") == len(PUMP_BRAND_NAMES)
 
 
 def test_device_info_shape():

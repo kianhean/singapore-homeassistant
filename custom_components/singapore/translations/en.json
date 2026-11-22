@@ -407,7 +407,46 @@
         "name": "Isyak"
       },
       "next_prayer": {
-        "name": "Next prayer"
+        "name": "Next prayer",
+        "state_attributes": {
+          "prayer": {
+            "name": "Prayer",
+            "state": {
+              "subuh": "Subuh",
+              "zohor": "Zohor",
+              "asar": "Asar",
+              "maghrib": "Maghrib",
+              "isyak": "Isyak"
+            }
+          }
+        }
+      },
+      "pump_92": {
+        "name": "92"
+      },
+      "pump_95": {
+        "name": "95"
+      },
+      "pump_98": {
+        "name": "98"
+      },
+      "pump_premium": {
+        "name": "Premium"
+      },
+      "pump_diesel": {
+        "name": "Diesel"
+      },
+      "pump_premium_diesel": {
+        "name": "Premium diesel"
+      },
+      "beach_water_quality": {
+        "name": "{beach}",
+        "state": {
+          "normal": "Normal",
+          "elevated": "Elevated",
+          "high": "High",
+          "advisory": "Bacteria advisory"
+        }
       }
     },
     "camera": {
@@ -548,7 +587,7 @@
           "mall_carparks": "Mall carparks"
         },
         "data_description": {
-          "sources": "Turning off SP Group tariffs also leaves SP account cost statistics unpriced. HDB carpark availability, taxi availability and CapitaLand mall carparks are off until you tick them: the first two download island-wide data on each poll; CapitaLand's lots come from its JustPark website. MRT/LRT crowd density and EV charger availability require an LTA DataMall AccountKey. Mall carparks (LTA DataMall) also needs the AccountKey. Prayer times (MUIS) is off until you tick it.",
+          "sources": "Turning off SP Group tariffs also leaves SP account cost statistics unpriced. HDB carpark availability, taxi availability and CapitaLand mall carparks are off until you tick them: the first two download island-wide data on each poll; CapitaLand's lots come from its JustPark website. MRT/LRT crowd density and EV charger availability require an LTA DataMall AccountKey. Mall carparks (LTA DataMall) also needs the AccountKey. Prayer times (MUIS) is off until you tick it. Pump prices (Caltex, SPC, Shell) is off until you tick it: the prices come from the companies' websites.",
           "school_events": "Which MOE school calendars to create when the MOE school calendar source is on.",
           "api_key": "Optional. A free key from data.gov.sg gives higher rate limits (fewer HTTP 429 errors). Leave empty to use the public limits.",
           "carparks": "Carpark numbers to track when HDB carpark availability is on, separated by commas (e.g. BJ55, TM24; shown on HDB's and data.gov.sg's carpark lists). Leave empty for the 3 carparks nearest your home location.",
@@ -599,7 +638,9 @@
         "train_crowd": "MRT/LRT crowd density (LTA DataMall)",
         "ev_chargers": "EV charger availability (LTA DataMall)",
         "mall_carpark": "Mall carparks (LTA DataMall)",
-        "prayer": "Prayer times (MUIS)"
+        "prayer": "Prayer times (MUIS)",
+        "pump_prices": "Pump prices (Caltex, SPC, Shell)",
+        "beaches": "NEA beach water quality"
       }
     },
     "school_events": {

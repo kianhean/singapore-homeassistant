@@ -16,6 +16,7 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
+from .beach_coordinator import BeachWaterQualityCoordinator
 from .capitaland_coordinator import CapitaLandCarparkCoordinator
 from .carpark_coordinator import CarparkCoordinator
 from .coe_coordinator import CoeCoordinator
@@ -23,6 +24,7 @@ from .const import (
     DOMAIN,
     LTA_DATAMALL_SOURCES,
     SCHOOL_EVENT_KINDS,
+    SOURCE_BEACHES,
     SOURCE_CAPITALAND,
     SOURCE_CARPARK,
     SOURCE_COE,
@@ -37,6 +39,7 @@ from .const import (
     SOURCE_MALL_CARPARK,
     SOURCE_PRAYER,
     SOURCE_PSI,
+    SOURCE_PUMP_PRICES,
     SOURCE_RADAR,
     SOURCE_SCHOOL,
     SOURCE_TARIFF,
@@ -77,6 +80,7 @@ from .lightning_coordinator import LightningCoordinator
 from .mall_carpark_coordinator import MallCarparkCoordinator
 from .prayer_coordinator import PrayerTimesCoordinator
 from .psi_coordinator import PsiCoordinator
+from .pump_coordinator import PumpPriceCoordinator
 from .radar_coordinator import RadarCoordinator
 from .school_coordinator import SchoolCalendarCoordinator
 from .sp_account_coordinator import (
@@ -148,6 +152,8 @@ class SingaporeData:
     ev_chargers: EvChargerCoordinator | None
     mall_carpark: MallCarparkCoordinator | None
     prayer: PrayerTimesCoordinator | None
+    pump_prices: PumpPriceCoordinator | None
+    beaches: BeachWaterQualityCoordinator | None
     # One per SP Group e-account subentry, keyed by subentry id.
     sp_accounts: dict[str, SpAccountCoordinator] = field(default_factory=dict)
     # The options this setup used; a change to them reloads the entry.
@@ -193,6 +199,8 @@ _COORDINATORS: dict[str, type[DataUpdateCoordinator]] = {
     SOURCE_EV_CHARGERS: EvChargerCoordinator,
     SOURCE_MALL_CARPARK: MallCarparkCoordinator,
     SOURCE_PRAYER: PrayerTimesCoordinator,
+    SOURCE_PUMP_PRICES: PumpPriceCoordinator,
+    SOURCE_BEACHES: BeachWaterQualityCoordinator,
 }
 
 # Weather, holidays and train status are the core sources: setup waits for
@@ -425,6 +433,8 @@ _BACKGROUND_LABELS = {
     SOURCE_EV_CHARGERS: "EV charger availability",
     SOURCE_MALL_CARPARK: "mall carpark",
     SOURCE_PRAYER: "prayer times",
+    SOURCE_PUMP_PRICES: "pump prices",
+    SOURCE_BEACHES: "beach water quality",
 }
 
 

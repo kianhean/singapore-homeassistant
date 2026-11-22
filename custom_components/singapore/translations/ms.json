@@ -407,7 +407,46 @@
         "name": "Isyak"
       },
       "next_prayer": {
-        "name": "Waktu solat seterusnya"
+        "name": "Waktu solat seterusnya",
+        "state_attributes": {
+          "prayer": {
+            "name": "Solat",
+            "state": {
+              "subuh": "Subuh",
+              "zohor": "Zohor",
+              "asar": "Asar",
+              "maghrib": "Maghrib",
+              "isyak": "Isyak"
+            }
+          }
+        }
+      },
+      "pump_92": {
+        "name": "92"
+      },
+      "pump_95": {
+        "name": "95"
+      },
+      "pump_98": {
+        "name": "98"
+      },
+      "pump_premium": {
+        "name": "Premium"
+      },
+      "pump_diesel": {
+        "name": "Diesel"
+      },
+      "pump_premium_diesel": {
+        "name": "Diesel premium"
+      },
+      "beach_water_quality": {
+        "name": "{beach}",
+        "state": {
+          "normal": "Normal",
+          "elevated": "Meningkat",
+          "high": "Tinggi",
+          "advisory": "Nasihat bakteria"
+        }
       }
     },
     "camera": {
@@ -548,7 +587,7 @@
           "mall_carparks": "Tempat letak kereta pusat beli-belah"
         },
         "data_description": {
-          "sources": "Mematikan tarif SP Group juga menyebabkan statistik kos akaun SP tidak berharga. Ketersediaan tempat letak kereta HDB, ketersediaan teksi dan tempat letak kereta pusat beli-belah CapitaLand dimatikan sehingga anda menandakannya: dua yang pertama memuat turun data seluruh pulau pada setiap pengundian; lot CapitaLand datang dari laman web JustPark. Tempat letak kereta pusat beli-belah (LTA DataMall) juga memerlukan AccountKey. Waktu solat (MUIS) dimatikan sehingga anda menandakannya.",
+          "sources": "Mematikan tarif SP Group juga menyebabkan statistik kos akaun SP tidak berharga. Ketersediaan tempat letak kereta HDB, ketersediaan teksi dan tempat letak kereta pusat beli-belah CapitaLand dimatikan sehingga anda menandakannya: dua yang pertama memuat turun data seluruh pulau pada setiap pengundian; lot CapitaLand datang dari laman web JustPark. Tempat letak kereta pusat beli-belah (LTA DataMall) juga memerlukan AccountKey. Waktu solat (MUIS) dimatikan sehingga anda menandakannya. Harga pam (Caltex, SPC, Shell) dimatikan sehingga anda menandakannya: harga datang dari laman web syarikat.",
           "school_events": "Kalendar sekolah MOE yang hendak dicipta apabila sumber kalendar sekolah MOE dihidupkan.",
           "api_key": "Pilihan. Kunci percuma daripada data.gov.sg memberikan had kadar yang lebih tinggi (kurang ralat HTTP 429). Biarkan kosong untuk menggunakan had awam.",
           "carparks": "Nombor tempat letak kereta untuk dijejaki apabila ketersediaan tempat letak kereta HDB dihidupkan, dipisahkan dengan koma (cth. BJ55, TM24; ditunjukkan pada senarai tempat letak kereta HDB dan data.gov.sg). Biarkan kosong untuk 3 tempat letak kereta terdekat dengan lokasi rumah anda.",
@@ -599,7 +638,9 @@
         "train_crowd": "Kesesakan MRT/LRT (LTA DataMall)",
         "ev_chargers": "Ketersediaan pengecas EV (LTA DataMall)",
         "mall_carpark": "Tempat letak kereta pusat beli-belah (LTA DataMall)",
-        "prayer": "Waktu solat (MUIS)"
+        "prayer": "Waktu solat (MUIS)",
+        "pump_prices": "Harga pam (Caltex, SPC, Shell)",
+        "beaches": "Kualiti air pantai NEA"
       }
     },
     "school_events": {

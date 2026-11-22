@@ -348,7 +348,7 @@ def _runtime(accounts: dict) -> SingaporeData:
         for name in (
             "tariff coe weather holiday train psi flood traffic dengue lightning uv radar school"
             " wbgt warnings tides hawker traffic_incidents fx interest carpark taxi capitaland train_crowd ev_chargers"
-            " mall_carpark prayer"
+            " mall_carpark prayer pump_prices beaches"
         ).split()
     }
     return SingaporeData(**others, sp_accounts=accounts)

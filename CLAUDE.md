@@ -40,6 +40,8 @@ custom_components/singapore/
 ├── ev_charger_coordinator.py # EvChargerCoordinator: LTA DataMall EV charger availability (opt-in, LTA key)
 ├── mall_carpark_coordinator.py # MallCarparkCoordinator: LTA DataMall CarParkAvailabilityv2 malls (opt-in, LTA key)
 ├── prayer_coordinator.py   # PrayerTimesCoordinator: MUIS prayer timetable via data.gov.sg CKAN (opt-in)
+├── pump_coordinator.py     # PumpPriceCoordinator: Caltex/SPC/Shell pump prices from their own sites (opt-in)
+├── beach_coordinator.py    # BeachWaterQualityCoordinator: NEA weekly beach Enterococcus bands
 ├── radar_coordinator.py    # RadarCoordinator: NEA rain radar PNGs (70/240/480 km)
 ├── radar_image.py          # Pure-Pillow compositing of radar onto NEA base maps (BASEMAPS) + GIF loops
 ├── sp_account_coordinator.py # SpAccountCoordinator: one per SP e-account subentry (usage, bills, stats)
@@ -94,6 +96,8 @@ tests/
 ├── test_capitaland_coordinator.py # JustPark parser (tests/fixtures/capitaland_lots.json), token reuse, sensors
 ├── test_mall_carpark_coordinator.py # DataMall carpark rows, name/ID matching, nearest, paging, sensors
 ├── test_prayer_coordinator.py   # MUIS rows (12-hour pre-2026, 24-hour), next prayer, timer, sensors
+├── test_pump_coordinator.py     # Caltex/SPC/Shell parsers (tests/fixtures: real trimmed pages + sheet), fallback
+├── test_beach_coordinator.py    # NEA beach API (tests/fixtures/nea_beach_water_quality.json), worst band, sensors
 ├── test_sp_account.py           # SP account coordinator, sensors, flow helpers, reload listener
 ├── test_sp_account_insights.py  # Derived SP sensors, account calendar, peer (similar homes) statistics
 ├── sp_account/                  # Vendored upstream client/mapper/history tests + recorded fixtures
@@ -125,8 +129,10 @@ tests_ha/                        # Runs against a REAL Home Assistant (no module
 blueprints/automation/singapore/  # Importable automation blueprints (README "Import" buttons)
 tests_ha/test_blueprints.py      # Runs every blueprint in real HA (one test per blueprint, required)
 examples/dashboard.yaml          # Built-in-cards dashboard: view 1 = images/hero.jpg (hero.html),
-                                 # view 2 "Carparks & taxis" (HDB, CapitaLand malls, taxis; opt-in) = images/carparks-taxis.png
-                                 # (carparks.html); tests_ha checks every entity/attribute in it exists
+                                 # view 2 "Driving & parking" (HDB, CapitaLand malls, taxis, pump prices; opt-in)
+                                 # = images/carparks-taxis.png (carparks.html), view 3 "Daily life" (prayer
+                                 # times, beaches) = images/daily-life.png (daily.html); tests_ha checks every
+                                 # entity/attribute in it exists
 examples/sp_account_dashboard.yaml # SP account dashboard (built-in cards); tests_ha checks every
                                  # entity/statistic in it exists (test_sp_account_statistics.py)
                                  # docs/mockups/sp_account.html mirrors it → images/sp-account-dashboard.png
@@ -137,7 +143,9 @@ docs/mockups/                    # HTML sources for the README images (node buil
 
 README images must only show what Home Assistant really renders from this integration's
 entities with built-in cards (no custom cards, invented attributes or reworded states), and
-`hero.html` / `carparks.html` must stay in sync with the two views of `examples/dashboard.yaml` (and `sp_account.html` with `examples/sp_account_dashboard.yaml`). Camera stills are real LTA images,
+`hero.html` / `carparks.html` / `daily.html` must stay in sync with the three views of
+`examples/dashboard.yaml` (mall carparks from LTA DataMall are left out: no live values without
+a key) (and `sp_account.html` with `examples/sp_account_dashboard.yaml`). Camera stills are real LTA images,
 not illustrations.
 
 Entry data is stored on `entry.runtime_data` as a `SingaporeData` dataclass (not
@@ -821,6 +829,37 @@ attributes) for the six columns and `next_prayer` (Syuruk, sunrise, excluded; `p
 attribute), on the *Prayer Times* device. `_PrayerSensor` schedules
 `async_track_point_in_utc_time` at `PrayerData.next_change()` (the next time in the table, or SGT
 midnight) so states roll over without a poll.
+
+## How the Pump Price Coordinator Works (opt-in)
+
+`pump_coordinator.py` reads three companies' own websites every **6 hours** (concurrently):
+Caltex's homepage `<fuelprice-content list="...">` (HTML-escaped JSON: `fuelName`, `fuelPrice`,
+`discountFuelPrice` as `"SGD 3.600"`; "Last updated: 04 Nov 2026, 1:00 PM"); SPC's
+latest-pump-price page (`data-price` after an icon named `pump-prices-levo-95.png` /
+`-diesel.png`; "Last updated on 16 Oct 2026 at 1130hrs"); Shell's price board `.model.json`,
+whose link to `fuel-price-update-singapore.xlsx` changes per update (sheet 1: A fuel, B listed,
+C/D nett prices; read with `zipfile` + ElementTree in the executor; `docProps/core.xml`
+modified = updated). `grade_of()` maps names to `GRADES` (`92`, `95`, `98`, `premium` = V-Power,
+`diesel`, `premium_diesel`). Per brand: a network error keeps its last prices, a parse failure
+drops it (sensors unavailable); no brand at all raises `UpdateFailed`. Esso refuses automated
+requests (Akamai 403) and must not be worked around; no official Sinopec site was found.
+Devices are one per brand (`pump_<brand>` in `DEVICES`, the only source on several devices;
+`test_every_source_has_a_device` allows it); sensors `pump_<grade>` added as they appear →
+`sensor.caltex_95`. The default aiohttp User-Agent works for all three. Fixtures are the real
+pages trimmed to the price sections; the Shell sheet fixture keeps only workbook parts (the
+original's metadata names a Shell employee).
+
+## How the Beach Water Quality Coordinator Works
+
+`beach_coordinator.py` GETs `https://www.nea.gov.sg/api/BeachWaterQuality/GetNeaData/<ts>`
+(`ts` = Unix seconds floored to 5 min, the page's cache buster; 400 without it) every **6 hours**.
+`data[]` = last three weeks, newest first (`Week` "dd/mm/yyyy - dd/mm/yyyy", `Areas[]` with
+`Area`, `Description` (HTML entities), `Banding` `1`/`2`/`3`/`Advisory`, or `Grey` = no result);
+`areas[]` = outline points; `banding` = advisory header/text per band. The 19 areas map to 7
+beaches via `BEACHES` patterns (Sentosa = Siloso/Palawan/Tanjong); each beach's state is its
+worst area (`BAND_OPTIONS` normal < elevated < high < advisory), centre = mean of its points.
+On by default (official NEA, one small request); sensors (`beach_water_quality`, name `{beach}`,
+unique id `{entry_id}_beach_<key>` → `sensor.beaches_east_coast`) added as beaches appear.
 
 ## How the Rain Radar Coordinator Works
 

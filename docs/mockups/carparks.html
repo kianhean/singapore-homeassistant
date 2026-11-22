@@ -1,7 +1,7 @@
 <!doctype html>
-<!-- Mirrors the "Carparks & taxis" view of examples/dashboard.yaml: only built-in Home
+<!-- Mirrors the "Driving & parking" view of examples/dashboard.yaml: only built-in Home
      Assistant cards, with the states they display (live values, 2026-11-19 19:45, Bedok;
-     CapitaLand malls 21:06).
+     CapitaLand malls 21:06; pump prices from the Caltex, SPC and Shell websites, 2026-11-22).
      Keep the two in sync. -->
 <html><head><meta charset="utf-8"><link rel="stylesheet" href="ha.css">
 <style>
@@ -13,7 +13,7 @@
   </nav>
   <div class="main">
     <header class="topbar">
-      <div class="tabs"><span>Singapore</span><span class="on">Carparks &amp; taxis</span></div>
+      <div class="tabs"><span>Singapore</span><span class="on">Driving &amp; parking</span><span>Daily life</span></div>
       <span class="spacer"></span><i m="mdiMagnify"></i><i m="mdiPencil"></i>
     </header>
     <div class="view">
@@ -50,6 +50,25 @@
           <div class="row"><span class="ic"><i m="mdiMapMarkerRadius"></i></span><span class="label">Within 500 m</span><span class="val">4</span></div>
           <div class="row"><span class="ic"><i m="mdiMapMarkerRadius"></i></span><span class="label">Within 2 km</span><span class="val">110</span></div>
           <div class="row"><span class="ic"><i m="mdiMapMarkerDistance"></i></span><span class="label">Nearest free taxi</span><span class="val">0.312 km</span></div>
+        </div></div>
+      </div>
+
+      <div class="section">
+        <div class="heading"><i m="mdiGasStation"></i>Pump prices</div>
+        <div class="card tile"><span class="bubble" style="--c:var(--red)"><i m="mdiGasStation"></i></span><div><div class="name">Caltex 95</div><div class="state">3.60 SGD/L</div></div></div>
+        <div class="card tile"><span class="bubble" style="--c:var(--red)"><i m="mdiGasStation"></i></span><div><div class="name">SPC 95</div><div class="state">3.56 SGD/L</div></div></div>
+        <div class="card tile"><span class="bubble" style="--c:var(--red)"><i m="mdiGasStation"></i></span><div><div class="name">Shell 95</div><div class="state">3.60 SGD/L</div></div></div>
+        <div class="card"><div class="card-title">98 and diesel</div><div class="rows">
+          <div class="row"><span class="ic"><i m="mdiGasStation"></i></span><span class="label">Caltex 98</span><span class="val">4.30 SGD/L</span></div>
+          <div class="row"><span class="ic"><i m="mdiGasStation"></i></span><span class="label">SPC 98</span><span class="val">4.08 SGD/L</span></div>
+          <div class="row"><span class="ic"><i m="mdiGasStation"></i></span><span class="label">Shell 98</span><span class="val">4.12 SGD/L</span></div>
+          <div class="row"><span class="ic"><i m="mdiGasStationOutline"></i></span><span class="label">Caltex diesel</span><span class="val">4.04 SGD/L</span></div>
+          <div class="row"><span class="ic"><i m="mdiGasStationOutline"></i></span><span class="label">SPC diesel</span><span class="val">4.00 SGD/L</span></div>
+          <div class="row"><span class="ic"><i m="mdiGasStationOutline"></i></span><span class="label">Shell diesel</span><span class="val">4.04 SGD/L</span></div>
+        </div></div>
+        <div class="card"><div class="card-title">With discounts</div><div class="rows">
+          <div class="row"><span class="ic"><i m="mdiGasStation"></i></span><span class="label">Caltex 95</span><span class="val">3.42 SGD/L</span></div>
+          <div class="row"><span class="ic"><i m="mdiGasStation"></i></span><span class="label">Shell 95 (all discounts)</span><span class="val">2.63 SGD/L</span></div>
         </div></div>
       </div>
 

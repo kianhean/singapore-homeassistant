@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 from homeassistant.config_entries import ConfigEntry
 
 from custom_components.singapore import SingaporeData
+from custom_components.singapore.beach_coordinator import BeachData
 from custom_components.singapore.capitaland_coordinator import (
     CapitaLandData,
     CapitaLandSite,
@@ -29,6 +30,7 @@ from custom_components.singapore.lightning_coordinator import LightningData
 from custom_components.singapore.mall_carpark_coordinator import MallCarparkData
 from custom_components.singapore.prayer_coordinator import PrayerData
 from custom_components.singapore.psi_coordinator import PsiData
+from custom_components.singapore.pump_coordinator import PumpPriceData
 from custom_components.singapore.radar_coordinator import RadarData
 from custom_components.singapore.school_coordinator import SchoolEvent
 from custom_components.singapore.taxi_coordinator import TaxiData, TaxiPosition
@@ -104,6 +106,8 @@ async def test_diagnostics_serializes_all_coordinators():
         ev_chargers=_coordinator(EvChargerData()),
         mall_carpark=_coordinator(MallCarparkData()),
         prayer=_coordinator(PrayerData()),
+        pump_prices=_coordinator(PumpPriceData()),
+        beaches=_coordinator(BeachData(None, None)),
     )
 
     result = await async_get_config_entry_diagnostics(MagicMock(), entry)
@@ -137,6 +141,8 @@ async def test_diagnostics_serializes_all_coordinators():
         "ev_chargers",
         "mall_carpark",
         "prayer",
+        "pump_prices",
+        "beaches",
     }
     assert coordinators["tariff"]["last_update_success"] is False
     assert "boom" in coordinators["tariff"]["last_exception"]

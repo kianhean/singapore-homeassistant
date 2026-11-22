@@ -86,6 +86,8 @@ minute; everything else works without it. Questions about it? See the [FAQ](#faq
 | ⚡ **Lightning**<br>Live strikes and the distance to the nearest one from your home | 🦟 **Dengue**<br>Active NEA clusters and how far the nearest is from your home | 🌊 **Flash floods**<br>PUB flood alerts as they're issued and cancelled |
 | 🌡️ **Heat stress**<br>NEA's Wet Bulb Globe Temperature and heat stress level (low, moderate, high) at the station nearest your home | 🍜 **Hawker centres**<br>Cleaning and repair closures of the five hawker centres nearest your home, as a calendar | 🅿️ **Carparks and taxis** *(opt-in)*<br>Free lots at the HDB carparks you pick (or the nearest three) and at CapitaLand malls, and free taxis near your home |
 | 🔌 **Utilities**<br>SP Group electricity, gas and water tariffs, plus your solar export price | 🎉 **Holidays and school terms**<br>MOM's public holidays, plus MOE school holidays, terms and national exams, as calendars | 🧩 **Blueprints**<br>[One-click automations](#one-click-blueprints) for lightning, MRT disruptions, floods, haze, COE, rain, UV, dengue, holidays and SP bills |
+| ⛽ **Pump prices** *(opt-in)*<br>92, 95, 98, premium and diesel prices from Caltex, SPC and Shell's own websites, with their discounted prices | 🏖️ **Beaches**<br>NEA's weekly water quality band for the seven beaches it monitors, with its advice | 🕌 **Prayer times** *(opt-in)*<br>MUIS's official timetable: today's six times and the next prayer, as timestamps for automations |
+| 🛍️ **Mall carparks** *(opt-in, LTA key)*<br>Free lots at ION Orchard, VivoCity, Suntec City, Jem and the other malls on LTA's carpark signs | 💱 **Finance**<br>ECB reference rates against SGD, plus SORA, T-bill and SGS bond yields | 🚉 **Crowds and EV chargers** *(LTA key)*<br>MRT/LRT platform crowd levels and EV charger availability near you |
 
 The public data needs no API keys and no account: one config entry, and a diagnostics download when
 something looks off. You choose which data sources run ([Options](#options)). Linking your SP Group e-account is optional ([how](#optional-link-your-sp-group-e-account));
@@ -94,6 +96,10 @@ that part is built on [maci0/home-assistant-sp](https://github.com/maci0/home-as
 
 ## What's new
 
+- **v0.22** [Pump prices](#pump-prices) (opt-in) from Caltex, SPC and Shell's own websites, and
+  [NEA beach water quality](#beach-water-quality) (weekly band per beach, on by default). The
+  example dashboard gains a *Daily life* view (prayer times and beaches) and pump prices on
+  *Driving & parking*.
 - **v0.21** Two opt-in sources: [mall carparks](#mall-carparks-lta-datamall) from LTA DataMall
   (ION Orchard, VivoCity, Suntec City, Jem and the other malls LTA shows on its carpark signs,
   whoever runs them; needs the LTA key) and [MUIS prayer times](#prayer-times) (today's six
@@ -178,7 +184,8 @@ Open **Settings → Devices & Services → Singapore → Configure** to change:
   are removed; turn it back on and they come back. Everything is on by default, and sources
   added in later releases start out on, except **HDB carpark availability**, **taxi
   availability**, **CapitaLand mall carparks**, **Mall carparks (LTA DataMall)**, **Prayer
-  times (MUIS)** and the other LTA DataMall sources: they are off until you tick them. The
+  times (MUIS)**, **Pump prices** and the other LTA DataMall sources: they are off until you
+  tick them. The
   first two download data for the whole island on each poll (about 300 KB and 80 KB) to report a
   few numbers near you; the CapitaLand lots come from its JustPark website rather than open data;
   the LTA DataMall sources need a free AccountKey.
@@ -491,14 +498,29 @@ actions:
 **Copy the whole dashboard:** [`examples/dashboard.yaml`](examples/dashboard.yaml) builds the dashboard
 at the top of this page. Paste it into a new dashboard's raw configuration editor.
 
-**Carparks and taxis:** the same YAML has a second view, *Carparks & taxis*, for the three
+**Driving and parking:** the same YAML has a second view, *Driving & parking*, for four
 opt-in sources: a tile per HDB carpark and per CapitaLand mall with its free lots, the total
-lots of each, and free taxis near home. Tick **HDB carpark availability**, **Taxi
-availability** and **CapitaLand mall carparks** under Configure first, and swap the example
-carpark numbers (`B8B`, `B8`, `B6`) and malls for yours.
+lots of each, free taxis near home, and pump prices at Caltex, SPC and Shell. Tick **HDB
+carpark availability**, **Taxi availability**, **CapitaLand mall carparks** and **Pump prices
+(Caltex, SPC, Shell)** under Configure first, and swap the example carpark numbers (`B8B`,
+`B8`, `B6`) and malls for yours. [Mall carparks from LTA DataMall](#mall-carparks-lta-datamall)
+work the same way (`sensor.mall_carparks_<mall>` tiles); they aren't in the picture because it
+only shows real readings and was made without an LTA key.
 
 <p align="center">
-  <img src="images/carparks-taxis.png" alt="Carparks and taxis dashboard view: three HDB carparks in Bedok with 82, 31 and 230 free car lots and their total lots, Bedok Mall, Tampines Mall and Plaza Singapura with 111, 336 and 415 free lots of 264, 637 and 650, 30 free taxis within 1 km, 4,105 island-wide, 4 within 500 m, 110 within 2 km and the nearest 0.312 km away" width="800">
+  <img src="images/carparks-taxis.png" alt="Driving and parking dashboard view: three HDB carparks in Bedok with 82, 31 and 230 free car lots and their total lots, Bedok Mall, Tampines Mall and Plaza Singapura with 111, 336 and 415 free lots of 264, 637 and 650, 30 free taxis within 1 km and 4,105 island-wide, and pump prices: 95 at 3.60 SGD/L at Caltex, 3.56 at SPC and 3.60 at Shell, 98 at 4.30, 4.08 and 4.12, diesel at 4.04, 4.00 and 4.04, and 95 after discounts at 3.42 (Caltex) and 2.63 (Shell)" width="800">
+  <br>
+  <sub>Pump prices from the companies' websites, 22 November 2026.</sub>
+</p>
+
+**Daily life:** a third view, *Daily life*, shows today's [prayer times](#prayer-times) with
+the next one, and [beach water quality](#beach-water-quality) with NEA's advice for the week.
+Prayer times are opt-in; beach water quality is on by default.
+
+<p align="center">
+  <img src="images/daily-life.png" alt="Daily life dashboard view: next prayer Zohor in 2 hours; today's times Subuh 05:28, Syuruk 06:50, Zohor 12:53, Asar 16:16, Maghrib 18:53 and Isyak 20:07; beach water quality Normal at East Coast, Sentosa, Changi, Pasir Ris, Punggol, Seletar Island and Sembawang Park, with NEA's advice: Safe to Enter the Water, week of 9 November 2026" width="800">
+  <br>
+  <sub>MUIS timetable and NEA bands for Sunday 22 November 2026, 10:30.</sub>
 </p>
 
 **PSI by region:** the hero dashboard lists the 24-hour PSI for each region. Each regional sensor
@@ -1231,6 +1253,46 @@ without waiting for a poll.
 
 </details>
 
+### Pump prices
+
+*Opt-in: tick **Pump prices (Caltex, SPC, Shell)** under Configure.* Read every **6 hours**
+from each company's own website: Caltex's [fuel prices](https://www.caltex.com/sg/motorists/fuel-prices.html),
+SPC's [latest pump prices](https://www.spc.com.sg/our-business/spc-service-station/latest-pump-price/)
+and the spreadsheet on Shell's [station price board](https://www.shell.com.sg/fuels-oils-and-coolants/shell-fuels/shell-station-price-board.html).
+One device per brand with a sensor per grade it sells, in SGD per litre before discounts. Esso's
+website refuses automated requests and no official Sinopec Singapore site publishes prices, so
+they aren't included. A brand whose site is down keeps its last prices; one whose page changes
+goes unavailable until it's fixed here.
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Name | Unit | Description |
+|-----------|------|------|-------------|
+| `sensor.caltex_92`, `_95`, `_98`, `_diesel` | Caltex 92, 95, 98, Diesel | SGD/L | Pump price; attributes `product` (e.g. Premium 95 with Techron®), `discounted_price`, `updated` |
+| `sensor.spc_92`, `_95`, `_98`, `_diesel` | SPC 92, 95, 98, Diesel | SGD/L | Pump price; attributes `product` (SPC LEVO 95), `updated` |
+| `sensor.shell_95`, `_98`, `_premium`, `_diesel` | Shell 95, 98, Premium, Diesel | SGD/L | Listed pump price; `premium` is V-Power. Attributes `product`, `discounted_price` (the nett price with every discount Shell lists), `updated` |
+
+</details>
+
+### Beach water quality
+
+*On by default.* NEA's weekly [beach water quality](https://www.nea.gov.sg/beach-water-quality)
+for the seven beaches it monitors (Changi, East Coast, Pasir Ris, Punggol, Seletar Island,
+Sembawang Park and Sentosa), read every **6 hours**. Each beach is one enum sensor on a *Beaches*
+device with the worst band among its sampling areas: `normal` (Enterococcus ≤ 200 per 100 ml),
+`elevated`, `high` or `advisory`. Lab results take about a week, so the band is for the week
+before.
+
+<details>
+<summary>Entities and attributes</summary>
+
+| Entity ID | Name | Description |
+|-----------|------|-------------|
+| `sensor.beaches_<beach>` | e.g. Beaches East Coast | Band (`normal` / `elevated` / `high` / `advisory`); attributes `advisory` and `advice` (NEA's text for the band), `areas` (each sampling area with its band), `previous_weeks`, `week_start`, `week_end`, `latitude`, `longitude` |
+
+</details>
+
 ### Public holidays
 
 Updated every 24 hours from [MOM](https://www.mom.gov.sg/employment-practices/public-holidays).
@@ -1552,6 +1614,8 @@ What the integration can't do, mostly because of what the sources publish:
 | [data.gov.sg / LTA](https://data.gov.sg/datasets/d_e25662f1a062dd046453926aa284ba64/view) | Taxi availability (opt-in) | Every 5 min |
 | [CapitaLand JustPark](https://justpark.capitaland.com/Lot-Availability) | CapitaLand mall carpark lots (opt-in) | Every 5 min |
 | [LTA DataMall](https://datamall.lta.gov.sg) | Mall and URA carpark lots (opt-in, LTA key) | Every 5 min |
+| [Caltex](https://www.caltex.com/sg/), [SPC](https://www.spc.com.sg/our-business/spc-service-station/latest-pump-price/), [Shell](https://www.shell.com.sg/fuels-oils-and-coolants/shell-fuels/shell-station-price-board.html) | Pump prices (opt-in) | Every 6 h |
+| [NEA](https://www.nea.gov.sg/beach-water-quality) | Beach water quality bands | Every 6 h |
 | [data.gov.sg / MUIS](https://data.gov.sg/datasets/d_a6a206cba471fe04b62dd886ef5eaf22/view) | Muslim prayer timetable (opt-in) | Every 12 h |
 | [MOM](https://www.mom.gov.sg/employment-practices/public-holidays) | Public holidays | Every 24 h |
 | [MOE](https://www.moe.gov.sg/calendar) | School holidays, terms and national exams | Every 24 h |

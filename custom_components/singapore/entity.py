@@ -21,6 +21,7 @@ from .const import (
     DOMAIN,
     PRAYER_TIMES,
     SCHOOL_EVENT_KINDS,
+    SOURCE_BEACHES,
     SOURCE_CAPITALAND,
     SOURCE_CARPARK,
     SOURCE_COE,
@@ -35,6 +36,7 @@ from .const import (
     SOURCE_MALL_CARPARK,
     SOURCE_PRAYER,
     SOURCE_PSI,
+    SOURCE_PUMP_PRICES,
     SOURCE_RADAR,
     SOURCE_SCHOOL,
     SOURCE_TARIFF,
@@ -71,6 +73,21 @@ DEVICE_EV_CHARGERS = "ev_chargers"
 DEVICE_FINANCE = "finance"
 DEVICE_MALL_CARPARK = "mall_carparks"
 DEVICE_PRAYER = "prayer_times"
+DEVICE_BEACHES = "beaches"
+# One device per fuel brand: pump_<brand> (Caltex, SPC, Shell).
+PUMP_BRAND_NAMES = {"caltex": "Caltex", "spc": "SPC", "shell": "Shell"}
+PUMP_BRAND_URLS = {
+    "caltex": "https://www.caltex.com/sg/motorists/fuel-prices.html",
+    "spc": "https://www.spc.com.sg/our-business/spc-service-station/latest-pump-price/",
+    "shell": "https://www.shell.com.sg/fuels-oils-and-coolants/shell-fuels/shell-station-price-board.html",
+}
+# Pump price grades: sensor translation keys pump_<grade>.
+PUMP_GRADES = ("92", "95", "98", "premium", "diesel", "premium_diesel")
+
+
+def pump_device(brand: str) -> str:
+    """The DEVICES key of a fuel brand."""
+    return f"pump_{brand}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -207,6 +224,18 @@ DEVICES: dict[str, SingaporeDevice] = {
         (SOURCE_PRAYER,),
         "https://data.gov.sg/datasets/d_a6a206cba471fe04b62dd886ef5eaf22/view",
     ),
+    DEVICE_BEACHES: SingaporeDevice(
+        "Beaches",
+        "NEA Beach Water Quality",
+        (SOURCE_BEACHES,),
+        "https://www.nea.gov.sg/beach-water-quality",
+    ),
+    **{
+        pump_device(brand): SingaporeDevice(
+            name, f"{name} Pump Prices", (SOURCE_PUMP_PRICES,), PUMP_BRAND_URLS[brand]
+        )
+        for brand, name in PUMP_BRAND_NAMES.items()
+    },
 }
 
 # Translation key -> data source, for every public-source entity. The weather
@@ -279,6 +308,8 @@ ENTITY_SOURCES: dict[str, str] = {
     ),
     "fx_rate": SOURCE_FX,
     "mall_carpark": SOURCE_MALL_CARPARK,
+    "beach_water_quality": SOURCE_BEACHES,
+    **{f"pump_{grade}": SOURCE_PUMP_PRICES for grade in PUMP_GRADES},
     **dict.fromkeys(
         (*(f"prayer_{key}" for key in PRAYER_TIMES), "next_prayer"),
         SOURCE_PRAYER,
