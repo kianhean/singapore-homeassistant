@@ -1,7 +1,7 @@
 <h1 align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="custom_components/singapore/brand/dark_logo@2x.png">
-    <img src="custom_components/singapore/brand/logo@2x.png" alt="Singapore for Home Assistant" height="96">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kianhean/singapore-homeassistant/main/custom_components/singapore/brand/dark_logo@2x.png">
+    <img src="https://raw.githubusercontent.com/kianhean/singapore-homeassistant/main/custom_components/singapore/brand/logo@2x.png" alt="Singapore for Home Assistant" height="96">
   </picture>
 </h1>
 
@@ -20,7 +20,7 @@
   <a href="https://analytics.home-assistant.io/custom_integrations.json"><img src="https://img.shields.io/badge/dynamic/json?label=active%20installs&color=41BDF5&query=%24.singapore.total&url=https%3A%2F%2Fanalytics.home-assistant.io%2Fcustom_integrations.json" alt="Active installs (Home Assistant analytics)"></a>
   <a href="https://github.com/kianhean/singapore-homeassistant/actions/workflows/tests.yml"><img src="https://github.com/kianhean/singapore-homeassistant/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <img src="https://img.shields.io/badge/Home%20Assistant-2025.4%2B-41BDF5?logo=home-assistant&logoColor=white" alt="Home Assistant 2025.4 or newer">
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/kianhean/singapore-homeassistant" alt="MIT License"></a>
+  <a href="https://github.com/kianhean/singapore-homeassistant/blob/main/LICENSE"><img src="https://img.shields.io/github/license/kianhean/singapore-homeassistant" alt="MIT License"></a>
 </p>
 
 <p align="center">
@@ -29,9 +29,9 @@
 </p>
 
 <p align="center">
-  <img src="images/hero.jpg" alt="Example Singapore dashboard: Bedok weather with a 4-day forecast, rainfall, wind, UV index and UV exposure, WBGT and heat stress, heavy rain warning, weather advisories, next tide and tide level, PSI gauge, 1-hour and 24-hour PM2.5, PM10, ozone and PSI by region, MRT/LRT line status, live LTA traffic incidents and nearest incident distance, live Woodlands Causeway and Tuas Checkpoint camera stills, nearest lightning and dengue cluster distances, flood alerts, the current hawker centre closure, SGD exchange rates for USD, EUR, 100 JPY and MYR, SORA, compounded SORA, T-bill and SGS bond yields, utility tariffs and COE prices" width="100%">
+  <img src="https://raw.githubusercontent.com/kianhean/singapore-homeassistant/main/images/hero.jpg" alt="Example Singapore dashboard: Bedok weather with a 4-day forecast, rainfall, wind, UV index and UV exposure, WBGT and heat stress, heavy rain warning, weather advisories, next tide and tide level, PSI gauge, 1-hour and 24-hour PM2.5, PM10, ozone and PSI by region, MRT/LRT line status, live LTA traffic incidents and nearest incident distance, live Woodlands Causeway and Tuas Checkpoint camera stills, nearest lightning and dengue cluster distances, flood alerts, the current hawker centre closure, SGD exchange rates for USD, EUR, 100 JPY and MYR, SORA, compounded SORA, T-bill and SGS bond yields, utility tariffs and COE prices" width="100%">
   <br>
-  <sub>An example dashboard built only from Home Assistant's built-in cards. The integration provides the entities; <a href="examples/dashboard.yaml">this YAML</a> builds the dashboard. Camera stills are real LTA images.</sub>
+  <sub>An example dashboard built only from Home Assistant's built-in cards. The integration provides the entities; <a href="https://github.com/kianhean/singapore-homeassistant/blob/main/examples/dashboard.yaml">this YAML</a> builds the dashboard. Camera stills are real LTA images.</sub>
 </p>
 
 ## Your SP Group account, in Home Assistant
@@ -47,9 +47,9 @@ the data comes from the meters SP already reads.
 > ([Credits](#credits))
 
 <p align="center">
-  <img src="images/sp-account-dashboard.png" alt="SP account dashboard: this month's electricity use (153.1 kWh) and estimated cost (45.50 SGD), last month's 371.4 kWh, the 29.72 cents/kWh tariff, today's usage, a projected 108.96 SGD for the month and 11.79 kWh yesterday; usage 7% below similar homes for electricity and 12% for water, 160 W always-on power, and a monthly bar chart of your usage against similar and efficient homes; daily and hourly electricity bar charts; amount due and last bill of 116.38 SGD, bill status due on November 17, 2026, the meter reading window upcoming, a bar chart of monthly bills, and Green Goals usage against a 350 kWh target with 203.7 kWh left" width="100%">
+  <img src="https://raw.githubusercontent.com/kianhean/singapore-homeassistant/main/images/sp-account-dashboard.png" alt="SP account dashboard: this month's electricity use (153.1 kWh) and estimated cost (45.50 SGD), last month's 371.4 kWh, the 29.72 cents/kWh tariff, today's usage, a projected 108.96 SGD for the month and 11.79 kWh yesterday; usage 7% below similar homes for electricity and 12% for water, 160 W always-on power, and a monthly bar chart of your usage against similar and efficient homes; daily and hourly electricity bar charts; amount due and last bill of 116.38 SGD, bill status due on November 17, 2026, the meter reading window upcoming, a bar chart of monthly bills, and Green Goals usage against a 350 kWh target with 203.7 kWh left" width="100%">
   <br>
-  <sub>The dashboard from <a href="examples/sp_account_dashboard.yaml">examples/sp_account_dashboard.yaml</a>, built only from Home Assistant's built-in cards. Example account data.</sub>
+  <sub>The dashboard from <a href="https://github.com/kianhean/singapore-homeassistant/blob/main/examples/sp_account_dashboard.yaml">examples/sp_account_dashboard.yaml</a>, built only from Home Assistant's built-in cards. Example account data.</sub>
 </p>
 
 - 📊 **Energy dashboard, ready to go.** Electricity (hourly on a smart meter) with its cost at
@@ -97,20 +97,20 @@ that part is built on [maci0/home-assistant-sp](https://github.com/maci0/home-as
 
 ## What's new
 
-- **v0.22** [Pump prices](docs/entities.md#pump-prices) (opt-in) from Caltex, SPC and Shell's own websites, and
-  [NEA beach water quality](docs/entities.md#beach-water-quality) (weekly band per beach, on by default). The
+- **v0.22** [Pump prices](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#pump-prices) (opt-in) from Caltex, SPC and Shell's own websites, and
+  [NEA beach water quality](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#beach-water-quality) (weekly band per beach, on by default). The
   example dashboard gains a *Daily life* view (prayer times and beaches) and pump prices on
   *Driving & parking*.
-- **v0.21** Two opt-in sources: [mall carparks](docs/entities.md#mall-carparks-lta-datamall) from LTA DataMall
+- **v0.21** Two opt-in sources: [mall carparks](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#mall-carparks-lta-datamall) from LTA DataMall
   (ION Orchard, VivoCity, Suntec City, Jem and the other malls LTA shows on its carpark signs,
-  whoever runs them; needs the LTA key) and [MUIS prayer times](docs/entities.md#prayer-times) (today's six
+  whoever runs them; needs the LTA key) and [MUIS prayer times](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#prayer-times) (today's six
   times and the next prayer, as timestamps).
-- **v0.19** [NEA weather warnings & regional advisories](docs/entities.md#nea-weather-warnings-and-advisories)
+- **v0.19** [NEA weather warnings & regional advisories](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#nea-weather-warnings-and-advisories)
   (Heavy Rain warning binary sensor, active advisories count and latest regional earthquake
-  magnitude); [NEA tide timings](docs/entities.md#nea-tide-timings) (next high/low tide and predicted height);
-  [LTA traffic incidents](docs/entities.md#lta-traffic-incidents) (active island-wide count, breakdown
+  magnitude); [NEA tide timings](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#nea-tide-timings) (next high/low tide and predicted height);
+  [LTA traffic incidents](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#lta-traffic-incidents) (active island-wide count, breakdown
   by type, nearest incident distance and a nearby binary sensor); four more
-  [checkpoint & gateway traffic cameras](docs/entities.md#checkpoint-traffic-cameras) (Woodlands Flyover, Tuas West
+  [checkpoint & gateway traffic cameras](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#checkpoint-traffic-cameras) (Woodlands Flyover, Tuas West
   Road and Sentosa Gateway inbound/outbound).
 
 Earlier versions (SP accounts in v0.11, choosing sources in v0.12, radar loops, school calendars,
@@ -125,10 +125,10 @@ carparks, translations and more) and full notes for every release are on the
   [linking your SP account](#optional-link-your-sp-group-e-account),
   [removing the integration](#removing-the-integration)
 - [Recipes](#recipes): [one-click blueprints](#one-click-blueprints) and
-  [copy-paste automations](docs/recipes.md)
+  [copy-paste automations](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/recipes.md)
 - [Dashboard ideas](#dashboard-ideas): [your SP account](#your-sp-account) and the
   [Energy dashboard](#energy-dashboard-electricity-and-water)
-- [Entity reference](#entity-reference) ([full page](docs/entities.md)): every sensor, camera,
+- [Entity reference](#entity-reference) ([full page](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md)): every sensor, camera,
   weather, calendar and event entity
 - [FAQ](#faq), [Troubleshooting](#troubleshooting) and [Known limitations](#known-limitations)
 - [Data sources](#data-sources), [Development](#development), [Contributing](#contributing),
@@ -164,7 +164,7 @@ Open **Settings → Devices & Services → Singapore → Configure** to change:
   cameras), or tick the opt-in ones ([table below](#data-sources-at-a-glance)). A source you
   turn off stops polling, and its entities and devices are removed; turn it back on and they
   come back. Sources added in later releases start out on, unless they're opt-in.
-- **School calendars:** which [MOE calendars](docs/entities.md#moe-school-calendar) to create (school holidays,
+- **School calendars:** which [MOE calendars](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#moe-school-calendar) to create (school holidays,
   school terms, national exams). All three are on by default.
 - **data.gov.sg API key** (optional): a free key from
   [data.gov.sg](https://data.gov.sg) raises the rate limits, which means fewer HTTP 429
@@ -235,7 +235,7 @@ premise address.
 ## Recipes
 
 <p align="center">
-  <img src="images/alerts.png" alt="Phone lock screen with Home Assistant notifications for heavy rain and nearby lightning, a PUB flood alert, a nearby traffic incident, a Circle Line disruption and new COE results, next to the NEA, PUB, Traffic and MRT/LRT sensors that triggered them" width="100%">
+  <img src="https://raw.githubusercontent.com/kianhean/singapore-homeassistant/main/images/alerts.png" alt="Phone lock screen with Home Assistant notifications for heavy rain and nearby lightning, a PUB flood alert, a nearby traffic incident, a Circle Line disruption and new COE results, next to the NEA, PUB, Traffic and MRT/LRT sensors that triggered them" width="100%">
   <br>
   <sub>Notifications like these come from the blueprints and the copy-paste automations.</sub>
 </p>
@@ -259,19 +259,19 @@ and so on from drop-downs. For the notify action, enter your phone's, for exampl
 | 🎉 **Public holiday tomorrow** | The evening before a public holiday, remind you and run actions, such as turning off a weekday alarm | <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fholiday_tomorrow.yaml"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Import the holiday_tomorrow.yaml blueprint"></a> |
 | 🧾 **SP bill** *(SP account)* | Notify when a new SP bill arrives, and remind you before the due date while something is outstanding (skipped on GIRO) | <a href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fsp_bill.yaml"><img src="https://my.home-assistant.io/badges/blueprint_import.svg" alt="Import the sp_bill.yaml blueprint"></a> |
 
-The blueprints live in [`blueprints/automation/singapore/`](blueprints/automation/singapore) and
+The blueprints live in [`blueprints/automation/singapore/`](https://github.com/kianhean/singapore-homeassistant/tree/main/blueprints/automation/singapore) and
 need Home Assistant 2025.4 or newer.
 
 ### Or copy the YAML
 
-**[Automation recipes →](docs/recipes.md)** Simpler automations to paste into the YAML editor:
+**[Automation recipes →](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/recipes.md)** Simpler automations to paste into the YAML editor:
 lightning, MRT/LRT disruptions, floods, haze, COE and UV; a reminder before each prayer, pump
 price changes, the beach band before the weekend and a mall carpark filling up; and, with an SP
 account, new bills, due dates, Green Goals and prepaid credit.
 
 ## Dashboard ideas
 
-**Copy the whole dashboard:** [`examples/dashboard.yaml`](examples/dashboard.yaml) builds the dashboard
+**Copy the whole dashboard:** [`examples/dashboard.yaml`](https://github.com/kianhean/singapore-homeassistant/blob/main/examples/dashboard.yaml) builds the dashboard
 at the top of this page. Paste it into a new dashboard's raw configuration editor.
 
 **Driving and parking:** the same YAML has a second view, *Driving & parking*, for four
@@ -279,33 +279,33 @@ opt-in sources: a tile per HDB carpark and per CapitaLand mall with its free lot
 lots of each, free taxis near home, and pump prices at Caltex, SPC and Shell. Tick **HDB
 carpark availability**, **Taxi availability**, **CapitaLand mall carparks** and **Pump prices
 (Caltex, SPC, Shell)** under Configure first, and swap the example carpark numbers (`B8B`,
-`B8`, `B6`) and malls for yours. [Mall carparks from LTA DataMall](docs/entities.md#mall-carparks-lta-datamall)
+`B8`, `B6`) and malls for yours. [Mall carparks from LTA DataMall](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#mall-carparks-lta-datamall)
 work the same way (`sensor.mall_carparks_<mall>` tiles); they aren't in the picture because it
 only shows real readings and was made without an LTA key.
 
 <p align="center">
-  <img src="images/carparks-taxis.png" alt="Driving and parking dashboard view: three HDB carparks in Bedok with 82, 31 and 230 free car lots and their total lots, Bedok Mall, Tampines Mall and Plaza Singapura with 111, 336 and 415 free lots of 264, 637 and 650, 30 free taxis within 1 km and 4,105 island-wide, and pump prices: 95 at 3.60 SGD/L at Caltex, 3.56 at SPC and 3.60 at Shell, 98 at 4.30, 4.08 and 4.12, diesel at 4.04, 4.00 and 4.04, and 95 after discounts at 3.42 (Caltex) and 2.63 (Shell)" width="800">
+  <img src="https://raw.githubusercontent.com/kianhean/singapore-homeassistant/main/images/carparks-taxis.png" alt="Driving and parking dashboard view: three HDB carparks in Bedok with 82, 31 and 230 free car lots and their total lots, Bedok Mall, Tampines Mall and Plaza Singapura with 111, 336 and 415 free lots of 264, 637 and 650, 30 free taxis within 1 km and 4,105 island-wide, and pump prices: 95 at 3.60 SGD/L at Caltex, 3.56 at SPC and 3.60 at Shell, 98 at 4.30, 4.08 and 4.12, diesel at 4.04, 4.00 and 4.04, and 95 after discounts at 3.42 (Caltex) and 2.63 (Shell)" width="800">
   <br>
   <sub>Pump prices from the companies' websites, 22 November 2026.</sub>
 </p>
 
-**Daily life:** a third view, *Daily life*, shows today's [prayer times](docs/entities.md#prayer-times) with
-the next one, and [beach water quality](docs/entities.md#beach-water-quality) with NEA's advice for the week.
+**Daily life:** a third view, *Daily life*, shows today's [prayer times](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#prayer-times) with
+the next one, and [beach water quality](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#beach-water-quality) with NEA's advice for the week.
 Prayer times are opt-in; beach water quality is on by default.
 
 <p align="center">
-  <img src="images/daily-life.png" alt="Daily life dashboard view: next prayer Zohor in 2 hours; today's times Subuh 05:28, Syuruk 06:50, Zohor 12:53, Asar 16:16, Maghrib 18:53 and Isyak 20:07; beach water quality Normal at East Coast, Sentosa, Changi, Pasir Ris, Punggol, Seletar Island and Sembawang Park, with NEA's advice: Safe to Enter the Water, week of 9 November 2026" width="800">
+  <img src="https://raw.githubusercontent.com/kianhean/singapore-homeassistant/main/images/daily-life.png" alt="Daily life dashboard view: next prayer Zohor in 2 hours; today's times Subuh 05:28, Syuruk 06:50, Zohor 12:53, Asar 16:16, Maghrib 18:53 and Isyak 20:07; beach water quality Normal at East Coast, Sentosa, Changi, Pasir Ris, Punggol, Seletar Island and Sembawang Park, with NEA's advice: Safe to Enter the Water, week of 9 November 2026" width="800">
   <br>
   <sub>MUIS timetable and NEA bands for Sunday 22 November 2026, 10:30.</sub>
 </p>
 
 **PSI by region:** the hero dashboard lists the 24-hour PSI for each region. Each regional sensor
-also carries `latitude`/`longitude`, so you can put them on a Map card instead ([YAML](docs/entities.md#psi-on-the-map)).
+also carries `latitude`/`longitude`, so you can put them on a Map card instead ([YAML](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#psi-on-the-map)).
 
 **Checkpoint cameras:** a picture-entity card per camera gives you a quick look at the Causeway, Second Link and Sentosa Gateway queues.
 
 <p align="center">
-  <img src="images/checkpoint-cameras.jpg" alt="Eight picture-entity cards showing live LTA stills of Woodlands Causeway, Woodlands Checkpoint, Woodlands Flyover, Tuas Second Link, Tuas Checkpoint, Tuas West Road, and Sentosa Gateway Inbound and Outbound" width="640">
+  <img src="https://raw.githubusercontent.com/kianhean/singapore-homeassistant/main/images/checkpoint-cameras.jpg" alt="Eight picture-entity cards showing live LTA stills of Woodlands Causeway, Woodlands Checkpoint, Woodlands Flyover, Tuas Second Link, Tuas Checkpoint, Tuas West Road, and Sentosa Gateway Inbound and Outbound" width="640">
   <br>
   <sub>Real LTA stills from data.gov.sg.</sub>
 </p>
@@ -327,10 +327,10 @@ cards:
 ```
 
 For the last hour as a moving loop, use `camera.weather_rain_radar_70_km_animation` and
-`camera.weather_rain_radar_240_km_animation` instead (see [Rain radar](docs/entities.md#rain-radar)).
+`camera.weather_rain_radar_240_km_animation` instead (see [Rain radar](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#rain-radar)).
 
 <p align="center">
-  <img src="images/rain-radar.jpg" alt="Picture-entity cards of NEA rain radar: the 70 km view over a map of Singapore with light scattered echoes, and the 240 km view over Johor, the Riau Islands and Sumatra with showers east of Johor" width="480">
+  <img src="https://raw.githubusercontent.com/kianhean/singapore-homeassistant/main/images/rain-radar.jpg" alt="Picture-entity cards of NEA rain radar: the 70 km view over a map of Singapore with light scattered echoes, and the 240 km view over Johor, the Riau Islands and Sumatra with showers east of Johor" width="480">
   <br>
   <sub>Real NEA radar from data.gov.sg, Friday 13 November 2026, 22:45.</sub>
 </p>
@@ -338,7 +338,7 @@ For the last hour as a moving loop, use `camera.weather_rain_radar_70_km_animati
 ### Your SP account
 
 The dashboard pictured [at the top](#your-sp-group-account-in-home-assistant): with an SP account
-linked, **[`examples/sp_account_dashboard.yaml`](examples/sp_account_dashboard.yaml)**
+linked, **[`examples/sp_account_dashboard.yaml`](https://github.com/kianhean/singapore-homeassistant/blob/main/examples/sp_account_dashboard.yaml)**
 adds an *SP account* dashboard built only from built-in cards. Find-and-replace its two
 placeholders (your device slug and premise ID, explained at the top of the file), then paste it in.
 It shows:
@@ -408,10 +408,10 @@ lists them.
 
 ## Entity reference
 
-**[Everything the integration creates →](docs/entities.md)** Each data source's entities,
+**[Everything the integration creates →](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md)** Each data source's entities,
 attributes and update interval, with example states:
 
-[SP Group utility tariffs](docs/entities.md#sp-group-utility-tariffs) · [SP Group e-account (optional)](docs/entities.md#sp-group-e-account-optional) · [COE bidding results](docs/entities.md#coe-bidding-results) · [NEA realtime weather readings](docs/entities.md#nea-realtime-weather-readings) · [Weather entities (by forecast area)](docs/entities.md#weather-entities-by-forecast-area) · [MRT/LRT train status](docs/entities.md#mrtlrt-train-status) · [Air quality (PSI)](docs/entities.md#air-quality-psi) · [PUB flood alerts](docs/entities.md#pub-flood-alerts) · [Checkpoint traffic cameras](docs/entities.md#checkpoint-traffic-cameras) · [LTA traffic incidents](docs/entities.md#lta-traffic-incidents) · [Rain radar](docs/entities.md#rain-radar) · [Dengue clusters](docs/entities.md#dengue-clusters) · [Lightning](docs/entities.md#lightning) · [UV index](docs/entities.md#uv-index) · [Heat stress (WBGT)](docs/entities.md#heat-stress-wbgt) · [NEA weather warnings and advisories](docs/entities.md#nea-weather-warnings-and-advisories) · [NEA tide timings](docs/entities.md#nea-tide-timings) · [Hawker centre closures](docs/entities.md#hawker-centre-closures) · [HDB carpark availability](docs/entities.md#hdb-carpark-availability) · [Taxi availability](docs/entities.md#taxi-availability) · [CapitaLand mall carparks](docs/entities.md#capitaland-mall-carparks) · [Mall carparks (LTA DataMall)](docs/entities.md#mall-carparks-lta-datamall) · [Prayer times](docs/entities.md#prayer-times) · [Pump prices](docs/entities.md#pump-prices) · [Beach water quality](docs/entities.md#beach-water-quality) · [Public holidays](docs/entities.md#public-holidays) · [MOE school calendar](docs/entities.md#moe-school-calendar) · [FX rates and interest rates](docs/entities.md#fx-rates-and-interest-rates) · [MRT/LRT crowd density and EV charger availability (optional LTA DataMall key)](docs/entities.md#mrtlrt-crowd-density-and-ev-charger-availability-optional-lta-datamall-key)
+[SP Group utility tariffs](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#sp-group-utility-tariffs) · [SP Group e-account (optional)](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#sp-group-e-account-optional) · [COE bidding results](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#coe-bidding-results) · [NEA realtime weather readings](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#nea-realtime-weather-readings) · [Weather entities (by forecast area)](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#weather-entities-by-forecast-area) · [MRT/LRT train status](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#mrtlrt-train-status) · [Air quality (PSI)](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#air-quality-psi) · [PUB flood alerts](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#pub-flood-alerts) · [Checkpoint traffic cameras](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#checkpoint-traffic-cameras) · [LTA traffic incidents](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#lta-traffic-incidents) · [Rain radar](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#rain-radar) · [Dengue clusters](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#dengue-clusters) · [Lightning](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#lightning) · [UV index](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#uv-index) · [Heat stress (WBGT)](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#heat-stress-wbgt) · [NEA weather warnings and advisories](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#nea-weather-warnings-and-advisories) · [NEA tide timings](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#nea-tide-timings) · [Hawker centre closures](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#hawker-centre-closures) · [HDB carpark availability](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#hdb-carpark-availability) · [Taxi availability](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#taxi-availability) · [CapitaLand mall carparks](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#capitaland-mall-carparks) · [Mall carparks (LTA DataMall)](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#mall-carparks-lta-datamall) · [Prayer times](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#prayer-times) · [Pump prices](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#pump-prices) · [Beach water quality](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#beach-water-quality) · [Public holidays](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#public-holidays) · [MOE school calendar](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#moe-school-calendar) · [FX rates and interest rates](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#fx-rates-and-interest-rates) · [MRT/LRT crowd density and EV charger availability (optional LTA DataMall key)](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#mrtlrt-crowd-density-and-ev-charger-availability-optional-lta-datamall-key)
 
 ## FAQ
 
@@ -445,7 +445,7 @@ the amount SP billed.
 <summary><b>Does it work with prepaid (PPMS) accounts?</b></summary>
 
 Yes. A *Prepaid credit* sensor appears when SP reports a prepaid balance, and there's a
-[low-credit automation](docs/recipes.md#with-a-linked-sp-account) to copy.
+[low-credit automation](https://github.com/kianhean/singapore-homeassistant/blob/main/docs/recipes.md#with-a-linked-sp-account) to copy.
 </details>
 
 <details>
@@ -598,7 +598,7 @@ What the integration can't do, mostly because of what the sources publish:
 
 ## Development
 
-See [CLAUDE.md](CLAUDE.md) for project structure, test instructions, and conventions.
+See [CLAUDE.md](https://github.com/kianhean/singapore-homeassistant/blob/main/CLAUDE.md) for project structure, test instructions, and conventions.
 
 ```bash
 pip install -r requirements_test.txt
@@ -608,12 +608,12 @@ pytest tests/ -v -m "not e2e"
 `tests_ha/` runs the integration inside a real Home Assistant; `pytest tests/test_e2e.py -m e2e`
 hits the live data sources. See CLAUDE.md for both.
 
-The README images are rendered from HTML in [`docs/mockups/`](docs/mockups): run
+The README images are rendered from HTML in [`docs/mockups/`](https://github.com/kianhean/singapore-homeassistant/tree/main/docs/mockups): run
 `uv run docs/mockups/fetch_cameras.py` for fresh camera stills (`fetch_radar.py` for radar images), then
 `cd docs/mockups && npm install && node build.mjs`. The same script renders the icon and logo from
-[`images/brand/`](images/brand) into `custom_components/singapore/brand/` (`node build.mjs brand`
+[`images/brand/`](https://github.com/kianhean/singapore-homeassistant/tree/main/images/brand) into `custom_components/singapore/brand/` (`node build.mjs brand`
 for those alone). Keep `hero.html` in sync with
-[`examples/dashboard.yaml`](examples/dashboard.yaml).
+[`examples/dashboard.yaml`](https://github.com/kianhean/singapore-homeassistant/blob/main/examples/dashboard.yaml).
 
 ## Contributing
 
@@ -628,8 +628,8 @@ The SP Group e-account support is built on
 **Marcel W. Wysocki ([@maci0](https://github.com/maci0))**. The SP API client, sign-in and
 MFA handling, sensor mapping, Energy statistics logic and their tests are vendored from its
 v1.8.0 release under the MIT License, in
-[`custom_components/singapore/sp_account/`](custom_components/singapore/sp_account) with
-the original [LICENSE](custom_components/singapore/sp_account/LICENSE). This port fixes its
+[`custom_components/singapore/sp_account/`](https://github.com/kianhean/singapore-homeassistant/tree/main/custom_components/singapore/sp_account) with
+the original [LICENSE](https://github.com/kianhean/singapore-homeassistant/blob/main/custom_components/singapore/sp_account/LICENSE). This port fixes its
 "Config flow could not be loaded: 500" error
 ([maci0/home-assistant-sp#21](https://github.com/maci0/home-assistant-sp/issues/21)) by
 keeping every form field serializable. If you only want SP account data, use the original
@@ -637,7 +637,7 @@ integration. Thank you, Marcel!
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE). The vendored SP Group client in
+This project is licensed under the [MIT License](https://github.com/kianhean/singapore-homeassistant/blob/main/LICENSE). The vendored SP Group client in
 `custom_components/singapore/sp_account/` is MIT licensed, Copyright (c) 2026 Marcel W. Wysocki.
 
 Data and the checkpoint camera stills in the README come from data.gov.sg, LTA, NEA, PUB, MOM and
