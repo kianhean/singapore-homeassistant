@@ -136,10 +136,16 @@ examples/dashboard.yaml          # Built-in-cards dashboard: view 1 = images/her
 examples/sp_account_dashboard.yaml # SP account dashboard (built-in cards); tests_ha checks every
                                  # entity/statistic in it exists (test_sp_account_statistics.py)
                                  # docs/mockups/sp_account.html mirrors it → images/sp-account-dashboard.png
+docs/entities.md                 # Entity reference (every source's entities + attributes), linked from the README
+docs/recipes.md                  # Copy-paste automation YAML, linked from the README's Recipes section
 docs/mockups/                    # HTML sources for the README images (node build.mjs → images/*.png)
 ├── fetch_cameras.py             # uv run: pulls real checkpoint stills into docs/mockups/cameras/
 └── fetch_radar.py               # uv run: renders real radar (via radar_image.py) into docs/mockups/radar/
 ```
+
+The README is the landing page (hero, what's inside, setup, options, blueprints, dashboards, FAQ);
+a new source gets a row in "What's inside", "Data sources at a glance" and "Data sources", and its
+entities go in `docs/entities.md` (README links point at `docs/entities.md#<anchor>`).
 
 README images must only show what Home Assistant really renders from this integration's
 entities with built-in cards (no custom cards, invented attributes or reworded states), and
