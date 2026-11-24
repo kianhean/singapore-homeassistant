@@ -30,6 +30,7 @@ from custom_components.singapore.diagnostics import (
 )
 from custom_components.singapore.ev_charger_coordinator import (
     EvChargerCoordinator,
+    batch_link,
     parse_ev_locations,
     summarize_ev_locations,
 )
@@ -158,6 +159,31 @@ def test_parse_ev_locations_and_summary():
     with pytest.raises(UpdateFailed):
         parse_ev_locations({"wrong": []})
 
+    # DataMall's OData envelope is unwrapped
+    wrapped = parse_ev_locations(
+        {"odata.metadata": "x", "value": EV_FIXTURE},
+        home_lat=1.3540,
+        home_lon=103.9450,
+        max_distance_km=2.0,
+    )
+    assert [w.name for w in wrapped] == ["Tampines 1 Carpark"]
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        ({"odata.metadata": "x", "value": [{"Link": "https://a"}]}, "https://a"),
+        ({"value": {"Link": "https://b"}}, "https://b"),
+        ({"Link": "https://c"}, "https://c"),
+        ({"value": []}, None),
+        ({"value": [{"Link": ""}]}, None),
+        ([], None),
+        (None, None),
+    ],
+)
+def test_ev_batch_link(payload, expected):
+    assert batch_link(payload) == expected
+
 
 @pytest.mark.asyncio
 async def test_ev_charger_coordinator_postal_and_batch_modes():
@@ -200,7 +226,13 @@ async def test_ev_charger_coordinator_postal_and_batch_modes():
     entry_batch = _entry({CONF_LTA_API_KEY: "test-key"})
     coord_batch = EvChargerCoordinator(hass, entry_batch)
     meta_resp = MagicMock(status=200)
-    meta_resp.json = AsyncMock(return_value={"Link": "https://s3.example/ev.json"})
+    # DataMall's real answer: the link inside the OData "value" list
+    meta_resp.json = AsyncMock(
+        return_value={
+            "odata.metadata": "https://datamall2.mytransport.sg/ltaodataservice/$metadata#EVCBatch",
+            "value": [{"Link": "https://s3.example/ev.json"}],
+        }
+    )
     batch_resp = MagicMock(status=200)
     batch_resp.json = AsyncMock(return_value=EV_FIXTURE)
 

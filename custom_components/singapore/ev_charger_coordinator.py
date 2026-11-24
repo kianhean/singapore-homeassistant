@@ -89,6 +89,27 @@ def _parse_float(value: Any) -> float | None:
         return None
 
 
+def _unwrap(payload: Any) -> Any:
+    """Strip DataMall's OData envelope (``{"odata.metadata": ..., "value": ...}``)."""
+    if isinstance(payload, dict) and "value" in payload:
+        return payload["value"]
+    return payload
+
+
+def batch_link(payload: Any) -> str | None:
+    """Return the download link from an ``EVCBatch`` answer.
+
+    DataMall answers ``{"value": [{"Link": "..."}]}``, like its other batch
+    endpoints; a bare ``{"Link": ...}`` or ``{"value": {"Link": ...}}`` is
+    accepted too.
+    """
+    value = _unwrap(payload)
+    if isinstance(value, list):
+        value = value[0] if value else None
+    link = value.get("Link") if isinstance(value, dict) else None
+    return link if isinstance(link, str) and link else None
+
+
 def parse_ev_locations(
     payload: Any,
     *,
@@ -96,7 +117,11 @@ def parse_ev_locations(
     home_lon: float | None = None,
     max_distance_km: float | None = None,
 ) -> list[EvLocation]:
-    """Parse an LTA DataMall ``evLocationsData`` payload."""
+    """Parse an LTA DataMall ``evLocationsData`` payload.
+
+    Accepts the bare object and DataMall's ``{"value": {...}}`` envelope.
+    """
+    payload = _unwrap(payload)
     if not isinstance(payload, dict) or not isinstance(
         payload.get("evLocationsData"), list
     ):
@@ -264,7 +289,7 @@ class EvChargerCoordinator(DataUpdateCoordinator[EvChargerData]):
             except (aiohttp.ClientError, TimeoutError, ValueError) as err:
                 raise source_error(ERROR_FETCH, SOURCE_EV_CHARGERS, error=err) from err
 
-            link = meta.get("Link") if isinstance(meta, dict) else None
+            link = batch_link(meta)
             if not link:
                 raise source_error(
                     ERROR_PAYLOAD, SOURCE_EV_CHARGERS, detail="missing batch Link"
