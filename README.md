@@ -9,10 +9,11 @@
   <b>Your own SP Group electricity, water and bills, right in Home Assistant's Energy dashboard.</b><br>
   Plus weather, PSI, MRT status, COE prices, flash floods, carparks, pump prices, prayer times<br>
   and more, straight from official Singapore sources. No API keys needed.<br>
-  <sub>In English, Bahasa Melayu, தமிழ் and 简体中文.</sub>
+  <sub>In English, Bahasa Melayu, தமிழ் and 简体中文 · <a href="https://ha.kianhean.com/">ha.kianhean.com</a></sub>
 </p>
 
 <p align="center">
+  <a href="https://ha.kianhean.com/"><img src="https://img.shields.io/badge/Website-ha.kianhean.com-EF3340.svg" alt="Website: ha.kianhean.com"></a>
   <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-Default-41BDF5.svg" alt="HACS Default"></a>
   <a href="https://github.com/kianhean/singapore-homeassistant/releases"><img src="https://img.shields.io/github/v/release/kianhean/singapore-homeassistant" alt="Latest release"></a>
   <a href="https://github.com/kianhean/singapore-homeassistant/stargazers"><img src="https://img.shields.io/github/stars/kianhean/singapore-homeassistant" alt="GitHub stars"></a>
