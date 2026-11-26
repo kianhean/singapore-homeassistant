@@ -22,6 +22,7 @@ from pytest_homeassistant_custom_component.components.diagnostics import (
 )
 
 from custom_components.singapore.const import DOMAIN
+from custom_components.singapore.health import issue_owner
 from custom_components.singapore.sp_account import client as client_module
 from custom_components.singapore.sp_account_coordinator import (
     SUBENTRY_TYPE_SP_ACCOUNT,
@@ -205,6 +206,11 @@ async def test_rejected_session_opens_repair_issue_and_reconfigure_fixes_it(
     issue = ir.async_get(hass).async_get_issue(DOMAIN, auth_issue_id(subentry_id))
     assert issue is not None
     assert issue.translation_placeholders == {"title": USERNAME}
+    owner = issue_owner(entry.entry_id, subentry_id)
+    if "config_subentry_id" in owner:
+        # HA 2026.12+: removing the account deletes its issue.
+        assert issue.config_entry_id == entry.entry_id
+        assert issue.config_subentry_id == subentry_id
 
     # The user signs in again after the client's anti-lockout cooldown.
     sp_transport.fail_login = False

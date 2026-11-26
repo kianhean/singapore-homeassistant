@@ -10,7 +10,7 @@ import pytest
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import issue_registry as ir
 
-from custom_components.singapore import async_setup_entry
+from custom_components.singapore import async_setup_entry, health
 from custom_components.singapore.coe_coordinator import CoeData
 from custom_components.singapore.config_flow import (
     SingaporeOptionsFlow,
@@ -38,6 +38,7 @@ from custom_components.singapore.event import (
 from custom_components.singapore.health import (
     FAILING_THRESHOLD,
     SourceHealthMonitor,
+    issue_owner,
 )
 from custom_components.singapore.holiday_coordinator import PublicHolidayCoordinator
 from custom_components.singapore.sensor import (
@@ -257,6 +258,8 @@ def test_health_monitor_opens_issue_after_threshold_and_clears_it():
     kwargs = ir.async_create_issue.call_args.kwargs
     assert issue == "source_failing_tariff"
     assert kwargs["translation_placeholders"]["source"] == "SP Group tariffs"
+    # Without an entry id the issue isn't tied to one (whatever HA supports).
+    assert "config_entry_id" not in kwargs
     assert "markup changed" in kwargs["translation_placeholders"]["error"]
 
     coordinator.last_update_success = True
@@ -344,3 +347,44 @@ async def test_train_event_fires_per_line_change():
             {"line": "Circle Line", "status": "disruption", "details": "CCL delayed"},
         )
     ]
+
+
+@pytest.mark.parametrize(
+    ("params", "expected"),
+    [
+        # HA 2025.4 - 2026.10: neither argument exists.
+        (frozenset({"hass", "domain", "issue_id"}), ({}, {})),
+        # HA 2026.11: config entries only.
+        (
+            frozenset({"issue_id", "config_entry_id"}),
+            ({"config_entry_id": "e1"}, {"config_entry_id": "e1"}),
+        ),
+        # HA 2026.12: subentries too.
+        (
+            frozenset({"issue_id", "config_entry_id", "config_subentry_id"}),
+            (
+                {"config_entry_id": "e1"},
+                {"config_entry_id": "e1", "config_subentry_id": "s1"},
+            ),
+        ),
+    ],
+)
+def test_issue_owner_follows_the_running_ha(monkeypatch, params, expected):
+    monkeypatch.setattr(health, "_create_issue_params", lambda: params)
+    assert issue_owner("e1") == expected[0]
+    assert issue_owner("e1", "s1") == expected[1]
+
+
+def test_health_monitor_ties_issue_to_entry(monkeypatch):
+    monkeypatch.setattr(
+        health, "_create_issue_params", lambda: frozenset({"config_entry_id"})
+    )
+    ir.async_create_issue.reset_mock()
+    coordinator = SimpleNamespace(
+        last_update_success=False, last_exception=ValueError("markup changed")
+    )
+    monitor = SourceHealthMonitor(MagicMock(), {"tariff": coordinator}, "entry1")
+    start = datetime(2026, 11, 15, tzinfo=UTC)
+    monitor.async_check(start)
+    monitor.async_check(start + FAILING_THRESHOLD)
+    assert ir.async_create_issue.call_args.kwargs["config_entry_id"] == "entry1"

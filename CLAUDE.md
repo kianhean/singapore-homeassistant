@@ -65,7 +65,8 @@ custom_components/singapore/
 ├── diagnostics.py          # "Download diagnostics": coordinator status + parsed data
 ├── sensor.py               # Sensor entities (tariff, COE, weather, PSI, trains, flood, dengue, lightning, UV,
 │                           #   heat stress, HDB carparks (added dynamically), taxis)
-├── manifest.json           # Integration metadata; declares beautifulsoup4 dep, single_config_entry
+├── manifest.json           # Integration metadata; beautifulsoup4 dep, single_config_entry, Marketplace
+│                           #   categories (local_services, weather_alerts, energy)
 ├── icons.json              # Icon translations (entity icons live here, not in _attr_icon)
 ├── strings.json            # Config flow UI strings + entity names + enum state names
 └── translations/
@@ -144,6 +145,8 @@ docs/mockups/                    # HTML sources for the README images (node buil
 ```
 
 The README is the landing page (hero, what's inside, setup, options, blueprints, dashboards, FAQ);
+text between `<!-- ha-marketplace:exclude-start -->` / `-end -->` (the HACS buttons and install steps)
+is shown on GitHub only, not on the HA 2026.12+ Marketplace page, which has its own install button;
 a new source gets a row in "What's inside", "Data sources at a glance" and "Data sources", and its
 entities go in `docs/entities.md` (README links point at `docs/entities.md#<anchor>`).
 
@@ -278,6 +281,11 @@ whose `last_update_success` has been False for `FAILING_THRESHOLD` (24 h) gets a
 success, turning the source off, or removing the entry deletes it. Transient network errors
 don't trigger it because coordinators serve last-known data through those (see Key
 Conventions); it catches parse failures and sources that never loaded.
+
+Create repair issues with `**health.issue_owner(entry_id[, subentry_id])`: it passes
+`config_entry_id` (HA 2026.11+) / `config_subentry_id` (2026.12+) only when the running HA's
+`async_create_issue` takes them, so HA deletes the issue with the entry or SP subentry; older HA
+gets neither (the explicit `async_delete_issue` calls stay for those).
 
 ## Event entities
 

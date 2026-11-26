@@ -25,7 +25,11 @@ from custom_components.singapore.const import (
     DOMAIN,
     SOURCES,
 )
-from custom_components.singapore.health import CHECK_INTERVAL, FAILING_THRESHOLD
+from custom_components.singapore.health import (
+    CHECK_INTERVAL,
+    FAILING_THRESHOLD,
+    issue_owner,
+)
 from custom_components.singapore.psi_coordinator import PSI_URL
 from custom_components.singapore.train_coordinator import TRAIN_STATUS_URL
 
@@ -284,6 +288,9 @@ async def test_failing_source_opens_and_clears_repair(
     issue = registry.async_get_issue(DOMAIN, "source_failing_psi")
     assert issue is not None
     assert issue.translation_placeholders["source"] == "Air quality (PSI)"
+    if "config_entry_id" in issue_owner(entry.entry_id):
+        # HA 2026.11+: removing the entry deletes the issue with it.
+        assert issue.config_entry_id == entry.entry_id
 
     # Turning the source off clears its issue.
     hass.config_entries.async_update_entry(

@@ -10,8 +10,11 @@ entities that just sit unavailable.
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Mapping
 from datetime import datetime, timedelta
+from functools import cache
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -34,6 +37,32 @@ def issue_id(source: str) -> str:
     return f"source_failing_{source}"
 
 
+@cache
+def _create_issue_params() -> frozenset[str]:
+    """The keyword arguments the running HA's async_create_issue takes."""
+    try:
+        return frozenset(inspect.signature(ir.async_create_issue).parameters)
+    except (TypeError, ValueError):
+        return frozenset()
+
+
+def issue_owner(entry_id: str, subentry_id: str | None = None) -> dict[str, Any]:
+    """Tie a repair issue to its config entry (and subentry) where HA can.
+
+    HA 2026.11 added ``config_entry_id`` and 2026.12 ``config_subentry_id``:
+    an issue created with them is deleted along with the entry or subentry.
+    Older releases (back to the 2025.4 minimum) don't take them, so each is
+    only passed when the running HA's ``async_create_issue`` accepts it.
+    """
+    params = _create_issue_params()
+    owner: dict[str, Any] = {}
+    if "config_entry_id" in params:
+        owner["config_entry_id"] = entry_id
+        if subentry_id is not None and "config_subentry_id" in params:
+            owner["config_subentry_id"] = subentry_id
+    return owner
+
+
 class SourceHealthMonitor:
     """Tracks how long each enabled source has been failing."""
 
@@ -41,9 +70,11 @@ class SourceHealthMonitor:
         self,
         hass: HomeAssistant,
         coordinators: Mapping[str, DataUpdateCoordinator],
+        entry_id: str | None = None,
     ) -> None:
         self.hass = hass
         self.coordinators = coordinators
+        self.entry_id = entry_id
         self.failing_since: dict[str, datetime] = {}
 
     @callback
@@ -60,10 +91,12 @@ class SourceHealthMonitor:
             if now - since < FAILING_THRESHOLD:
                 continue
             error = repr(coordinator.last_exception or "unknown error")
+            owner = issue_owner(self.entry_id) if self.entry_id else {}
             ir.async_create_issue(
                 self.hass,
                 DOMAIN,
                 issue_id(source),
+                **owner,
                 is_fixable=False,
                 is_persistent=False,
                 severity=ir.IssueSeverity.WARNING,
@@ -87,7 +120,7 @@ def async_setup_source_health(
     for source in SOURCES:
         if source not in coordinators:
             ir.async_delete_issue(hass, DOMAIN, issue_id(source))
-    monitor = SourceHealthMonitor(hass, coordinators)
+    monitor = SourceHealthMonitor(hass, coordinators, entry.entry_id)
     entry.async_on_unload(
         async_track_time_interval(hass, monitor.async_check, CHECK_INTERVAL)
     )

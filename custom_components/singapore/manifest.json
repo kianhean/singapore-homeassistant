@@ -4,6 +4,11 @@
   "after_dependencies": [
     "recorder"
   ],
+  "categories": [
+    "local_services",
+    "weather_alerts",
+    "energy"
+  ],
   "codeowners": [
     "@kianhean"
   ],
@@ -17,5 +22,5 @@
     "beautifulsoup4>=4.12.3"
   ],
   "single_config_entry": true,
-  "version": "0.22.1"
+  "version": "0.22.2"
 }
