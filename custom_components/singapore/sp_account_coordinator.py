@@ -37,6 +37,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .const import DOMAIN
 from .coordinator import SPGroupCoordinator
+from .health import issue_owner
 from .sp_account.client import (
     AuthError,
     Session,
@@ -381,6 +382,7 @@ class SpAccountCoordinator(DataUpdateCoordinator[UsageReadings]):
                 self.hass,
                 DOMAIN,
                 auth_issue_id(self.subentry_id),
+                **issue_owner(self.entry.entry_id, self.subentry_id),
                 is_fixable=False,
                 severity=ir.IssueSeverity.ERROR,
                 translation_key=ISSUE_AUTH_FAILED,

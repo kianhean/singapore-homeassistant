@@ -23,10 +23,12 @@
   <a href="https://github.com/kianhean/singapore-homeassistant/blob/main/LICENSE"><img src="https://img.shields.io/github/license/kianhean/singapore-homeassistant" alt="MIT License"></a>
 </p>
 
+<!-- ha-marketplace:exclude-start -->
 <p align="center">
   <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=kianhean&repository=singapore-homeassistant&category=integration"><img src="https://my.home-assistant.io/badges/hacs_repository.svg" alt="Open your Home Assistant instance and open this repository in HACS"></a>
   <a href="https://my.home-assistant.io/redirect/config_flow_start/?domain=singapore"><img src="https://my.home-assistant.io/badges/config_flow_start.svg" alt="Open your Home Assistant instance and start setting up the Singapore integration"></a>
 </p>
+<!-- ha-marketplace:exclude-end -->
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/kianhean/singapore-homeassistant/main/images/hero.jpg" alt="Example Singapore dashboard: Bedok weather with a 4-day forecast, rainfall, wind, UV index and UV exposure, WBGT and heat stress, heavy rain warning, weather advisories, next tide and tide level, PSI gauge, 1-hour and 24-hour PM2.5, PM10, ozone and PSI by region, MRT/LRT line status, live LTA traffic incidents and nearest incident distance, live Woodlands Causeway and Tuas Checkpoint camera stills, nearest lightning and dengue cluster distances, flood alerts, the current hawker centre closure, SGD exchange rates for USD, EUR, 100 JPY and MYR, SORA, compounded SORA, T-bill and SGS bond yields, utility tariffs and COE prices" width="100%">
@@ -136,13 +138,15 @@ carparks, translations and more) and full notes for every release are on the
 
 ## Installation
 
+Requires **Home Assistant 2025.4** or newer.
+
+<!-- ha-marketplace:exclude-start -->
 The integration is in the default HACS store. Use the **Open in HACS** button above, or:
 
 1. Open **HACS** in Home Assistant.
 2. Search for **Singapore** and install it.
 3. Restart Home Assistant.
-
-Requires **Home Assistant 2025.4** or newer.
+<!-- ha-marketplace:exclude-end -->
 
 ## Setup
 
