@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Singapore for Home Assistant — SP Group Energy, Weather, MRT, COE & More</title>
+  <meta name="description" content="Your SP Group electricity, water and bills in Home Assistant's Energy dashboard — plus NEA weather, PSI, MRT/LRT status, COE prices, flash floods, carparks, pump prices and 30+ official Singapore feeds. In HACS, no API keys needed.">
+  <link rel="canonical" href="https://ha.kianhean.com/">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/icon.svg">
+
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://ha.kianhean.com/">
+  <meta property="og:title" content="Singapore for Home Assistant">
+  <meta property="og:description" content="Your SP Group electricity, water and bills in Home Assistant's Energy dashboard — plus weather, PSI, MRT/LRT, COE, flash floods, carparks, pump prices and more. In HACS, no API keys needed.">
+  <meta property="og:image" content="https://ha.kianhean.com/assets/img/social-preview.png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Singapore for Home Assistant">
+  <meta name="twitter:description" content="SP Group energy & bills, NEA weather, PSI, MRT/LRT, COE, flash floods, carparks and 30+ Singapore feeds in Home Assistant. In HACS, no API keys needed.">
+  <meta name="twitter:image" content="https://ha.kianhean.com/assets/img/social-preview.png">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Singapore for Home Assistant",
+    "applicationCategory": "HomeAutomationApplication",
+    "operatingSystem": "Home Assistant 2025.4+",
+    "url": "https://ha.kianhean.com/",
+    "downloadUrl": "https://github.com/kianhean/singapore-homeassistant",
+    "softwareVersion": "0.22.2",
+    "license": "https://opensource.org/licenses/MIT",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "SGD"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Kian Hean",
+      "url": "https://kianhean.com/"
+    },
+    "description": "Home Assistant HACS integration for Singapore: SP Group electricity, water and bills, NEA weather, PSI, MRT/LRT status, COE results, PUB flash floods, dengue, lightning, carparks, pump prices and more."
+  }
+  </script>
+
+  <link rel="stylesheet" href="/assets/css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand-link" href="#top">
+        <img src="/assets/img/icon.svg" alt="" width="28" height="28">
+        <span>Singapore <span class="brand-sub">for Home Assistant</span></span>
+      </a>
+
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#sp-account">SP Account</a>
+        <a href="#sources">Data Sources</a>
+        <a href="#dashboards">Dashboards</a>
+        <a href="#blueprints">Blueprints</a>
+        <a href="#install">Install</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+
+      <div class="header-actions">
+        <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+          </svg>
+          <span id="theme-label">Dark</span>
+        </button>
+        <a class="icon-btn" href="https://github.com/kianhean/singapore-homeassistant" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.57.1.78-.25.78-.55v-2.1c-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.16 1.18a10.9 10.9 0 0 1 5.76 0c2.2-1.49 3.16-1.18 3.16-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.83 1.18 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.06.78 2.13v3.16c0 .31.21.66.79.55A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/>
+          </svg>
+          <span>GitHub</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- Hero -->
+    <section class="hero">
+      <div class="container">
+        <div class="hero-top">
+          <div class="eyebrow-row">
+            <span class="pill pill-brand"><span class="pill-dot"></span>HACS Default</span>
+            <span class="pill" id="latest-version">v0.22.2</span>
+            <span class="pill">Home Assistant 2025.4+</span>
+            <span class="pill">MIT License</span>
+          </div>
+
+          <h1>Singapore, built into Home Assistant.</h1>
+
+          <p class="hero-lead">
+            Your own SP Group electricity, water and bills in Home Assistant's Energy dashboard —
+            plus weather, PSI, MRT/LRT status, COE prices, flash floods, carparks, pump prices,
+            prayer times and more from official Singapore sources. <strong>No API keys needed.</strong>
+          </p>
+
+          <p class="hero-langs">
+            Translated in English · Bahasa Melayu · தமிழ் · 简体中文
+          </p>
+
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=kianhean&repository=singapore-homeassistant&category=integration" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Open in HACS
+            </a>
+            <a class="btn btn-ha" href="https://my.home-assistant.io/redirect/config_flow_start/?domain=singapore" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 5v14M5 12h14"></path>
+              </svg>
+              Add Integration
+            </a>
+            <a class="btn btn-secondary" href="https://github.com/kianhean/singapore-homeassistant" target="_blank" rel="noopener">
+              View on GitHub
+            </a>
+          </div>
+
+          <div class="stats-strip" aria-label="Highlights">
+            <div class="stat-card">
+              <span class="stat-value">30</span>
+              <span class="stat-label">Data sources</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value">10</span>
+              <span class="stat-label">One-click blueprints</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value">4</span>
+              <span class="stat-label">Official languages</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value">0</span>
+              <span class="stat-label">API keys required</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="showcase-wrap">
+          <div class="shot-frame">
+            <button class="shot-btn" type="button" data-lightbox data-caption="Example Singapore dashboard built only with Home Assistant's built-in cards using examples/dashboard.yaml.">
+              <img src="/assets/img/hero.jpg" alt="Example Singapore Home Assistant dashboard showing Bedok weather, 4-day forecast, UV, WBGT, tides, PSI, MRT/LRT line status, live traffic incidents, checkpoint cameras, lightning, dengue, flood alerts, hawker closures, FX rates, SORA yields, tariffs and COE prices" width="1600" height="900">
+            </button>
+            <div class="shot-caption">
+              <span>Built exclusively from Home Assistant's built-in cards — click image to expand.</span>
+              <a href="https://github.com/kianhean/singapore-homeassistant/blob/main/examples/dashboard.yaml" target="_blank" rel="noopener">Copy dashboard.yaml →</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SP Group Account Spotlight -->
+    <section class="section" id="sp-account">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-kicker">Optional · SP Group e-account</span>
+          <h2>Your SP Group electricity, water and bills — no clamps or smart plugs.</h2>
+          <p>
+            Sign in once with your SP app email and password (MFA supported). Your flat or house's
+            actual meter readings and bills land straight in Home Assistant's Energy dashboard.
+          </p>
+        </div>
+
+        <div class="shot-frame">
+          <button class="shot-btn" type="button" data-lightbox data-caption="SP account dashboard from examples/sp_account_dashboard.yaml — built only with Home Assistant's built-in cards.">
+            <img src="/assets/img/sp-account-dashboard.png" alt="SP Group account dashboard in Home Assistant showing monthly electricity usage and cost, similar homes benchmark, 160 W always-on standby power, daily and hourly smart-meter bars, bills, due date and Green Goals progress" loading="lazy">
+          </button>
+          <div class="shot-caption">
+            <span>Ready-to-paste SP account dashboard (example account data).</span>
+            <a href="https://github.com/kianhean/singapore-homeassistant/blob/main/examples/sp_account_dashboard.yaml" target="_blank" rel="noopener">Copy sp_account_dashboard.yaml →</a>
+          </div>
+        </div>
+
+        <div class="sp-grid">
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">📊</div>
+            <h3>Energy dashboard ready</h3>
+            <p>Hourly electricity (on a smart meter) priced at the current SP tariff, plus monthly water and gas statistics.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">⏪</div>
+            <h3>13 months of history on day one</h3>
+            <p>Past usage is imported on the very first poll so your month and year views populate immediately.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">🏘️</div>
+            <h3>Standby load &amp; home benchmarks</h3>
+            <p>Track your always-on wattage and annual cost, projected monthly bill, and how you compare to similar homes.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">🌡️</div>
+            <h3>See what the air-con costs</h3>
+            <p>Half-hourly smart-meter readings reveal evening spikes — plot them next to <code>sensor.weather_temperature</code>.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">🧾</div>
+            <h3>Bills, calendar &amp; Green Goals</h3>
+            <p>Last bill, amount due, bill status, meter-reading window calendar, prepaid credit and a one-click bill reminder blueprint.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">🔒</div>
+            <h3>Password never stored</h3>
+            <p>Only renewable session tokens are stored in HA config. Supports SMS, email and authenticator MFA, plus multiple accounts.</p>
+          </article>
+        </div>
+
+        <div class="callout-banner">
+          <div>
+            <strong>Built on open source:</strong> SP account support vendors the MIT-licensed client and statistics engine from
+            <a href="https://github.com/maci0/home-assistant-sp" target="_blank" rel="noopener">maci0/home-assistant-sp</a>
+            by Marcel W. Wysocki. Everything else in the integration works without linking an SP account.
+          </div>
+          <a href="https://github.com/kianhean/singapore-homeassistant#energy-dashboard-electricity-and-water" target="_blank" rel="noopener">Energy dashboard setup →</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive Data Source Explorer -->
+    <section class="section" id="sources">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-kicker">Interactive explorer</span>
+          <h2>30 Singapore data sources, toggleable per source.</h2>
+          <p>
+            Turn off any source you don't need under <strong>Configure</strong> — it stops polling and cleans up its entities automatically.
+            Turn on opt-in feeds whenever you want them.
+          </p>
+        </div>
+
+        <div class="explorer-controls">
+          <div class="explorer-row">
+            <div class="filter-group" role="group" aria-label="Filter by category">
+              <button class="filter-btn is-active" type="button" data-category="all">All</button>
+              <button class="filter-btn" type="button" data-category="weather">Weather &amp; Air</button>
+              <button class="filter-btn" type="button" data-category="transport">Transport &amp; Driving</button>
+              <button class="filter-btn" type="button" data-category="alerts">Safety &amp; Alerts</button>
+              <button class="filter-btn" type="button" data-category="energy">Energy &amp; Bills</button>
+              <button class="filter-btn" type="button" data-category="daily">Daily Life &amp; Finance</button>
+            </div>
+
+            <div class="search-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input id="sources-search" type="search" placeholder="Search sensors, NEA, LTA, MRT, COE..." aria-label="Search data sources">
+            </div>
+          </div>
+
+          <div class="explorer-row">
+            <div class="filter-group" role="group" aria-label="Filter by mode">
+              <button class="filter-btn is-active" type="button" data-tier="all">All modes</button>
+              <button class="filter-btn" type="button" data-tier="default">On by default</button>
+              <button class="filter-btn" type="button" data-tier="optin">Opt-in (no key)</button>
+              <button class="filter-btn" type="button" data-tier="lta">Opt-in · LTA key</button>
+              <button class="filter-btn" type="button" data-tier="sp">Optional · SP account</button>
+            </div>
+            <span class="explorer-meta" id="sources-count">Showing 30 of 30 data sources</span>
+          </div>
+        </div>
+
+        <div class="sources-grid" id="sources-grid"></div>
+      </div>
+    </section>
+
+    <!-- Dashboard Gallery -->
+    <section class="section" id="dashboards">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-kicker">Dashboard gallery</span>
+          <h2>Ready-made views using only built-in cards.</h2>
+          <p>
+            No HACS frontend cards required. Paste the example YAML straight into a new Home Assistant
+            dashboard and swap in your area, carparks or SP device slug.
+          </p>
+        </div>
+
+        <div class="gallery-tabs" role="tablist" aria-label="Dashboard screenshots">
+          <button class="gallery-tab is-active" type="button" role="tab" aria-selected="true" data-gallery-tab="driving">Driving &amp; Parking</button>
+          <button class="gallery-tab" type="button" role="tab" aria-selected="false" data-gallery-tab="daily">Daily Life</button>
+          <button class="gallery-tab" type="button" role="tab" aria-selected="false" data-gallery-tab="cameras">Checkpoint Cameras</button>
+          <button class="gallery-tab" type="button" role="tab" aria-selected="false" data-gallery-tab="radar">NEA Rain Radar</button>
+          <button class="gallery-tab" type="button" role="tab" aria-selected="false" data-gallery-tab="alerts">Phone Alerts</button>
+        </div>
+
+        <div class="gallery-panel is-active" data-gallery-panel="driving">
+          <div class="shot-frame">
+            <button class="shot-btn gallery-img-wrap" type="button" data-lightbox data-caption="Driving & parking view: HDB carparks, CapitaLand malls, nearby taxis, and Caltex, SPC and Shell pump prices.">
+              <img src="/assets/img/carparks-taxis.png" alt="Driving and parking dashboard view showing HDB carpark lots, CapitaLand mall lots, nearby taxis and Caltex, SPC and Shell pump prices" loading="lazy">
+            </button>
+            <div class="shot-caption">
+              <span>HDB &amp; CapitaLand carpark lots, nearby free taxis, and Caltex / SPC / Shell pump prices.</span>
+              <a href="https://github.com/kianhean/singapore-homeassistant/blob/main/examples/dashboard.yaml" target="_blank" rel="noopener">Included in dashboard.yaml →</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="gallery-panel" data-gallery-panel="daily">
+          <div class="shot-frame">
+            <button class="shot-btn gallery-img-wrap" type="button" data-lightbox data-caption="Daily life view: official MUIS prayer times with next prayer countdown, and NEA weekly beach water quality bands.">
+              <img src="/assets/img/daily-life.png" alt="Daily life dashboard view showing MUIS prayer times and NEA beach water quality across seven Singapore beaches" loading="lazy">
+            </button>
+            <div class="shot-caption">
+              <span>MUIS prayer timetable with next-prayer countdown, plus NEA weekly beach water quality bands.</span>
+              <a href="https://github.com/kianhean/singapore-homeassistant/blob/main/examples/dashboard.yaml" target="_blank" rel="noopener">Included in dashboard.yaml →</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="gallery-panel" data-gallery-panel="cameras">
+          <div class="shot-frame">
+            <button class="shot-btn gallery-img-wrap" type="button" data-lightbox data-caption="Eight live LTA traffic camera stills covering Woodlands Causeway, Tuas Second Link and Sentosa Gateway.">
+              <img src="/assets/img/checkpoint-cameras.jpg" alt="Eight picture-entity cards showing live LTA traffic cameras at Woodlands Causeway, Woodlands Checkpoint, Woodlands Flyover, Tuas Second Link, Tuas Checkpoint, Tuas West Road and Sentosa Gateway" loading="lazy">
+            </button>
+            <div class="shot-caption">
+              <span>Live LTA camera stills for Woodlands, Tuas and Sentosa Gateway — updated every 2 minutes.</span>
+              <a href="https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#checkpoint-traffic-cameras" target="_blank" rel="noopener">Camera entity IDs →</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="gallery-panel" data-gallery-panel="radar">
+          <div class="shot-frame">
+            <button class="shot-btn gallery-img-wrap" type="button" data-lightbox data-caption="NEA 70 km and 240 km rain radar images — animated 1-hour loop cameras are also included.">
+              <img src="/assets/img/rain-radar.jpg" alt="Picture-entity cards of NEA 70 km and 240 km rain radar over Singapore, Johor and the Riau Islands" loading="lazy">
+            </button>
+            <div class="shot-caption">
+              <span>70 km &amp; 240 km NEA rain radar stills and 1-hour animated loops over NEA's official base maps.</span>
+              <a href="https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md#rain-radar" target="_blank" rel="noopener">Radar camera entities →</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="gallery-panel" data-gallery-panel="alerts">
+          <div class="shot-frame">
+            <button class="shot-btn gallery-img-wrap" type="button" data-lightbox data-caption="Phone lock-screen notifications triggered by Singapore blueprints for heavy rain, lightning, PUB floods, traffic, MRT disruptions and COE results.">
+              <img src="/assets/img/alerts.png" alt="Phone lock screen showing Home Assistant notifications for heavy rain, nearby lightning, PUB flood alert, traffic incident, Circle Line disruption and COE results" loading="lazy">
+            </button>
+            <div class="shot-caption">
+              <span>Actionable phone notifications powered by the built-in blueprints and recipes.</span>
+              <a href="#blueprints">Browse blueprints →</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- One-Click Blueprints -->
+    <section class="section" id="blueprints">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-kicker">Automations</span>
+          <h2>10 one-click Home Assistant blueprints.</h2>
+          <p>
+            Import straight into Home Assistant, pick your MRT lines, radius or air purifier from
+            drop-downs, and you're done. Prefer raw YAML? Check the
+            <a href="https://github.com/kianhean/singapore-homeassistant/blob/main/docs/recipes.md" target="_blank" rel="noopener" style="color: var(--brand); font-weight: 600;">copy-paste recipes</a>.
+          </p>
+        </div>
+
+        <div class="blueprints-grid">
+          <article class="blueprint-card">
+            <div class="blueprint-info">
+              <h3>⚡ Lightning nearby</h3>
+              <p>Notify when lightning strikes within a distance of home that you choose.</p>
+            </div>
+            <a class="btn btn-ha btn-sm" href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Flightning_nearby.yaml" target="_blank" rel="noopener">Import →</a>
+          </article>
+
+          <article class="blueprint-card">
+            <div class="blueprint-info">
+              <h3>🚇 MRT/LRT line disruption</h3>
+              <p>Alert when your lines are disrupted during commute hours, and when service resumes.</p>
+            </div>
+            <a class="btn btn-ha btn-sm" href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fmrt_line_disruption.yaml" target="_blank" rel="noopener">Import →</a>
+          </article>
+
+          <article class="blueprint-card">
+            <div class="blueprint-info">
+              <h3>🌊 PUB flash-flood alert</h3>
+              <p>Notify for each new PUB flash-flood alert, island-wide or only near home.</p>
+            </div>
+            <a class="btn btn-ha btn-sm" href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fflood_alert.yaml" target="_blank" rel="noopener">Import →</a>
+          </article>
+
+          <article class="blueprint-card">
+            <div class="blueprint-info">
+              <h3>😷 Haze mode</h3>
+              <p>Turn air purifiers or fans on above your PSI threshold and off when the air clears.</p>
+            </div>
+            <a class="btn btn-ha btn-sm" href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fhaze_purifier.yaml" target="_blank" rel="noopener">Import →</a>
+          </article>
+
+          <article class="blueprint-card">
+            <div class="blueprint-info">
+              <h3>🚗 COE results</h3>
+              <p>One summary notification with every category's premium after each bidding exercise.</p>
+            </div>
+            <a class="btn btn-ha btn-sm" href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fcoe_results.yaml" target="_blank" rel="noopener">Import →</a>
+          </article>
+
+          <article class="blueprint-card">
+            <div class="blueprint-info">
+              <h3>🌧️ Rain expected</h3>
+              <p>Notify when the 2-hour forecast for your area turns to rain or thundery showers.</p>
+            </div>
+            <a class="btn btn-ha btn-sm" href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Frain_forecast.yaml" target="_blank" rel="noopener">Import →</a>
+          </article>
+
+          <article class="blueprint-card">
+            <div class="blueprint-info">
+              <h3>☀️ High UV</h3>
+              <p>Remind you to put on sunscreen when the hourly UV index reaches your chosen level.</p>
+            </div>
+            <a class="btn btn-ha btn-sm" href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fuv_high.yaml" target="_blank" rel="noopener">Import →</a>
+          </article>
+
+          <article class="blueprint-card">
+            <div class="blueprint-info">
+              <h3>🦟 Dengue cluster nearby</h3>
+              <p>Notify when an active NEA dengue cluster appears within a set distance of home.</p>
+            </div>
+            <a class="btn btn-ha btn-sm" href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fdengue_nearby.yaml" target="_blank" rel="noopener">Import →</a>
+          </article>
+
+          <article class="blueprint-card">
+            <div class="blueprint-info">
+              <h3>🎉 Public holiday tomorrow</h3>
+              <p>Remind you the evening before a public holiday and run actions like disabling weekday alarms.</p>
+            </div>
+            <a class="btn btn-ha btn-sm" href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fholiday_tomorrow.yaml" target="_blank" rel="noopener">Import →</a>
+          </article>
+
+          <article class="blueprint-card">
+            <div class="blueprint-info">
+              <h3>🧾 SP bill <span class="badge badge-sp">SP account</span></h3>
+              <p>Notify when a new SP bill arrives and remind you before it's due (automatically skipped on GIRO).</p>
+            </div>
+            <a class="btn btn-ha btn-sm" href="https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkianhean%2Fsingapore-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fsingapore%2Fsp_bill.yaml" target="_blank" rel="noopener">Import →</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick Install -->
+    <section class="section" id="install">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-kicker">Get started in 2 minutes</span>
+          <h2>Install from the default HACS store.</h2>
+          <p>Requires Home Assistant 2025.4 or newer. Make sure your home location is set in <strong>Settings → System → General</strong> for lightning, dengue, carpark and taxi distances.</p>
+        </div>
+
+        <div class="steps-grid">
+          <div class="step-card">
+            <span class="step-num">1</span>
+            <h3>Install via HACS</h3>
+            <p>Search for <strong>Singapore</strong> in the default HACS store (or click below), download it, and restart Home Assistant.</p>
+            <a class="btn btn-primary btn-sm" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=kianhean&repository=singapore-homeassistant&category=integration" target="_blank" rel="noopener">Open in HACS →</a>
+          </div>
+
+          <div class="step-card">
+            <span class="step-num">2</span>
+            <h3>Add the integration</h3>
+            <p>Go to <strong>Settings → Devices &amp; Services → Add Integration</strong>, search <strong>Singapore</strong>, and click Submit. Entities are grouped cleanly by device.</p>
+            <a class="btn btn-ha btn-sm" href="https://my.home-assistant.io/redirect/config_flow_start/?domain=singapore" target="_blank" rel="noopener">Add Integration →</a>
+          </div>
+
+          <div class="step-card">
+            <span class="step-num">3</span>
+            <h3>Customise &amp; link SP</h3>
+            <p>Open <strong>Configure</strong> to toggle data sources, add carparks or optional API keys — or click <strong>Add SP account</strong> to link your SP Group meters.</p>
+            <a class="btn btn-secondary btn-sm" href="https://github.com/kianhean/singapore-homeassistant#options" target="_blank" rel="noopener">Read options guide →</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="section" id="faq">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-kicker">FAQ</span>
+          <h2>Common questions.</h2>
+        </div>
+
+        <div class="faq-list">
+          <details class="faq-item" open>
+            <summary>Is it safe to sign in with my SP Group account?</summary>
+            <p>Your password is only used once during sign-in and is never stored. Home Assistant keeps only the renewable session tokens SP returns, and diagnostics downloads automatically redact your address, account number, premise ID and tokens. Deleting the account or integration removes them.</p>
+          </details>
+
+          <details class="faq-item">
+            <summary>Do I need a smart meter or SP as my electricity retailer?</summary>
+            <p>No to both. With a smart meter you get half-hourly usage (hourly bars in the Energy dashboard); without one, SP provides billed monthly totals. If you buy electricity from an Open Electricity Market retailer, usage still works because SP reads the meters — Energy dashboard costs are estimated at SP's regulated tariff while the <strong>Last bill</strong> sensor shows the exact billed amount.</p>
+          </details>
+
+          <details class="faq-item">
+            <summary>Do I need any API keys?</summary>
+            <p>No. Every default and opt-in public feed works without keys. A free <a href="https://data.gov.sg" target="_blank" rel="noopener">data.gov.sg</a> API key is optional if you want higher rate limits, and a free <a href="https://datamall.lta.gov.sg/content/datamall/en/request-for-api.html" target="_blank" rel="noopener">LTA DataMall</a> key unlocks three optional sources (MRT/LRT crowd density, EV chargers and LTA mall carparks).</p>
+          </details>
+
+          <details class="faq-item">
+            <summary>Can I add more than one SP account, or use prepaid (PPMS)?</summary>
+            <p>Yes. Click <strong>Add SP account</strong> again for additional premises — each gets its own device and Energy statistics. Prepaid (PPMS) accounts automatically expose a <strong>Prepaid credit</strong> sensor with a low-balance automation recipe.</p>
+          </details>
+
+          <details class="faq-item">
+            <summary>Is this an official app from SP Group, NEA, LTA or GovTech?</summary>
+            <p>No. This is an independent, MIT-licensed community project, not affiliated with or endorsed by SP Group, NEA, LTA, PUB, MOM, MOE, MUIS, MAS or GovTech. Public feeds use official open data under the <a href="https://data.gov.sg/open-data-licence" target="_blank" rel="noopener">Singapore Open Data Licence</a>; SP account data uses the unofficial APIs behind the SP app.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-grid">
+      <div class="footer-brand">
+        <a class="brand-link" href="#top">
+          <img src="/assets/img/icon.svg" alt="" width="24" height="24">
+          <span>Singapore for Home Assistant</span>
+        </a>
+        <p>
+          Made by <a href="https://kianhean.com/" target="_blank" rel="noopener">Kian Hean</a>.
+          MIT licensed. SP account support built on
+          <a href="https://github.com/maci0/home-assistant-sp" target="_blank" rel="noopener">maci0/home-assistant-sp</a>.
+          Not affiliated with SP Group, NEA, LTA, PUB, MOM, MOE or GovTech.
+        </p>
+      </div>
+
+      <div class="footer-links" aria-label="Footer links">
+        <a href="https://github.com/kianhean/singapore-homeassistant" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/kianhean/singapore-homeassistant/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md" target="_blank" rel="noopener">Entity Reference</a>
+        <a href="https://github.com/kianhean/singapore-homeassistant/blob/main/docs/recipes.md" target="_blank" rel="noopener">Recipes</a>
+        <a href="https://github.com/kianhean/singapore-homeassistant/issues" target="_blank" rel="noopener">Issues</a>
+        <a href="https://kianhean.com/" target="_blank" rel="noopener">kianhean.com</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Image preview">
+    <button class="lightbox-close" id="lightbox-close" type="button" aria-label="Close preview">&times;</button>
+    <div class="lightbox-inner">
+      <img id="lightbox-img" src="" alt="">
+      <p class="lightbox-caption" id="lightbox-caption"></p>
+    </div>
+  </div>
+
+  <script src="/assets/js/main.js" defer></script>
+</body>
+</html>

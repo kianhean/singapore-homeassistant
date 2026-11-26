@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- The little red dot, at home: a red disc holding a white house, with a red dot inside it. -->
+  <circle cx="128" cy="128" r="124" fill="#EF3340"/>
+  <path d="M128 52 L210 124 Q214 128 208 132 L190 132 L190 192 Q190 202 180 202 L76 202 Q66 202 66 192 L66 132 L48 132 Q42 128 46 124 Z"
+        fill="#FFFFFF" stroke="#FFFFFF" stroke-width="10" stroke-linejoin="round"/>
+  <circle cx="128" cy="156" r="24" fill="#EF3340"/>
+</svg>
