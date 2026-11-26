@@ -1,0 +1,25 @@
+# Singapore for Home Assistant
+
+> Official microsite: https://ha.kianhean.com/
+> Repository: https://github.com/kianhean/singapore-homeassistant
+> Author: Kian Hean (https://kianhean.com/)
+> License: MIT
+
+Singapore for Home Assistant is a HACS Default custom integration for Home Assistant (2025.4+) that brings Singapore's official public data feeds and optional SP Group e-account electricity, water, gas and bill tracking into Home Assistant — with no API keys required for default feeds and full translations in English, Bahasa Melayu, தமிழ் and 简体中文.
+
+## Key Capabilities
+
+- **SP Group e-account (optional):** Smart-meter half-hourly electricity usage, water, gas, 13 months of initial Energy dashboard history, standby power, similar-home comparisons, bill status, calendar of due dates, Green Goals and MFA support. Built on maci0/home-assistant-sp.
+- **Weather & Air Quality:** NEA per-area forecasts, nearest-station realtime readings, 70 km & 240 km rain radar stills and 1-hour animated loops, PSI & hourly PM2.5, UV index, WBGT heat stress, weather warnings & earthquake advisories, and tide timings.
+- **Transport & Driving:** MRT/LRT line status, live LTA traffic incidents, Woodlands/Tuas/Sentosa checkpoint cameras, COE bidding results, opt-in HDB & CapitaLand carparks, taxis nearby, Caltex/SPC/Shell pump prices, plus optional LTA DataMall mall carparks, MRT crowd density and EV chargers.
+- **Safety & Daily Life:** Live NEA lightning distance, PUB flash-flood alerts, NEA dengue clusters, MOM public holidays, MOE school calendars, hawker centre closures, NEA beach water quality, opt-in MUIS prayer times, ECB SGD FX rates, and MAS/SingStat SORA, T-bill and SGS bond yields.
+- **10 One-Click Blueprints:** Lightning nearby, MRT/LRT disruption, PUB flash-flood alert, haze purifier mode, COE results, rain expected, high UV, dengue cluster nearby, public holiday tomorrow, and SP bill reminders.
+
+## Links
+
+- Install in HACS: https://my.home-assistant.io/redirect/hacs_repository/?owner=kianhean&repository=singapore-homeassistant&category=integration
+- Add Integration: https://my.home-assistant.io/redirect/config_flow_start/?domain=singapore
+- Entity Reference: https://github.com/kianhean/singapore-homeassistant/blob/main/docs/entities.md
+- Automation Recipes: https://github.com/kianhean/singapore-homeassistant/blob/main/docs/recipes.md
+- Dashboard YAML: https://github.com/kianhean/singapore-homeassistant/blob/main/examples/dashboard.yaml
+- SP Account Dashboard YAML: https://github.com/kianhean/singapore-homeassistant/blob/main/examples/sp_account_dashboard.yaml
